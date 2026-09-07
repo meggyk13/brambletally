@@ -2,6 +2,11 @@
   "name": "brambletally",
   "compatibility_date": "2026-07-01",
   "main": "worker/index.js",
+  // Runs before `wrangler dev` and `wrangler deploy`, so a Cloudflare
+  // Workers Build that only calls `wrangler deploy` still produces dist/.
+  "build": {
+    "command": "npm run build"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS"
