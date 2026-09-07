@@ -361,7 +361,7 @@ function renderAuth() {
         <div id="bt-ts"></div>
         <button type="submit" class="btn-primary" id="bt-auth-submit">Send link</button>
       </form>
-      <a class="back" href="/">← Rayhana's Repositorium</a>
+      <a class="back" href="https://rayhanasrepositorium.com/">← Rayhana's Repositorium</a>
     </div>
   `)
   );
