@@ -37,14 +37,18 @@ fully replaced.)
 - noodlr's `IS_PREMIUM` / `FREE_LIMIT` / lock overlays / upgrade prompts /
   demo-mode toggle — all removed from the port.
 
-**Tiers — door left open (decided 2026-09-06):**
+**Tiers — now being planned (updated 2026-09-07):**
 - `users.plan` column exists (`DEFAULT 'free'`), surfaced in `/api/auth/me`.
-  **Nothing is gated.** No Stripe, no billing UI, no Terms of Service yet.
-- If tiers are ever built, the intended gates are: photo uploads (a future
-  R2-backed feature, not just a flag), active-project count, and
-  collaboration (invite/transfer). Adding payment later is additive — no
-  schema rework.
-- Not needed for cost: Cloudflare Workers + D1 free tier covers this site.
+  **Nothing is gated yet.** No Stripe, no billing UI.
+- Full design: the **Supporter tier** section in `docs/social-plan.md`. A
+  $10/year plan, scaffolded with social Phase 1 (`isSupporter()` helper,
+  badge, inert Settings section, admin manual-grant); billing deferred until
+  there are users who might pay. Gates: project photo count, uploaded vs
+  initials avatar, immediate vs digest email, active board-listing count,
+  profile badge — never the core project/step/collaboration features. Adding
+  payment later is additive — no schema rework.
+- Not needed for cost: Cloudflare Workers + D1 free tier covers this site for
+  a long time; the $5/month Workers Paid plan is the escape hatch.
 
 **Add (GTD structure):**
 - Project **category** (revised 2026-09-06 — was a fixed Office/Research/A&S
@@ -362,3 +366,233 @@ only.
   permission check on both sides; moving a container moves its children too.
 - **Recurring steps** — needs a `recurrence` field + regen-on-completion.
 - **Step-level blocked / waiting-for flag** — its own GTD design call.
+
+## Planned: Project links (spec'd 2026-09-07)
+
+A per-project link list — reference material, inspiration, product pages,
+shared docs. Separate from supplies (which carry their own single `url` each).
+Own pass, ahead of and independent of the social features. Pure text rows, no
+R2, no hosting cost.
+
+### Schema — one migration
+
+`migrations/0002_project_links.sql` (fold into `schema.sql` for fresh
+installs):
+
+```sql
+CREATE TABLE project_links (
+  id          TEXT PRIMARY KEY,             -- uuid
+  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  url         TEXT NOT NULL,                -- http(s) only, <= 2000
+  title       TEXT,                         -- optional label; UI falls back to hostname
+  note        TEXT,                         -- optional "why this matters", <= 500
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_links_project ON project_links(project_id);
+```
+
+### API
+
+Two modules mirroring `worker/api/projects/id/supplies.js` +
+`.../supplies/supplyId.js`, registered in `worker/routes.js`:
+
+```
+GET    /api/projects/:id/links
+POST   /api/projects/:id/links            { url, title?, note? }
+PATCH  /api/projects/:id/links/:linkId    { url?, title?, note?, sort_order? }
+DELETE /api/projects/:id/links/:linkId
+```
+
+- Viewer reads, editor writes (`requireProject` at `'viewer'` / `'editor'`).
+- URL validation: `https?://` only; reject `javascript:` / `data:` /
+  scheme-relative. Trim, cap 2000 chars. A scheme check goes in
+  `worker/api/lib/validate.js`.
+- POST / PATCH run in a `DB.batch` with `touchStmt`, like supplies.
+- **No** server-side page-title fetch and **no** favicon fetch (decided
+  2026-09-07) — a blank title renders as the URL hostname (`www.` stripped)
+  with a generic link icon.
+
+### UI
+
+A "Links" panel on the project detail view, next to Supplies. Each row: link
+icon, title-or-hostname, `note` on the sub-line; tap opens in a new tab
+(`rel="noopener noreferrer" target="_blank"`). A persistent `+ add a link`
+inline row (paste URL, optional title) — no modal, same pattern as the step
+quick-add. Reorder handles later (`sort_order` is already there).
+
+### Build order
+
+1. Migration + `schema.sql`.
+2. API — two modules + `worker/routes.js` rows + the URL-scheme check in
+   `worker/api/lib/validate.js`.
+3. Frontend — the Links panel and inline add row in the project detail view.
+
+## Planned: Landing page (spec'd 2026-09-07)
+
+Brambletally is its own app and domain now. It needs a real front door instead
+of dropping straight to the sign-in form.
+
+### Public-page exception
+
+The landing page and the legal pages are the deliberate exception to
+`social-plan.md`'s login-wall rule — marketing copy, no user data, no abuse
+surface. `noindex` lifts on `/` and the legal pages. The app (`/app`) and every
+`/api/*` route stay private and `noindex`.
+
+### Routing
+
+The client app has no router today — `state.user === null` just renders the
+sign-in form at `/`. Split it:
+
+- `/` → new static `src/pages/index.astro` = the landing page.
+- `/app` → the current full-screen client shell (move today's `index.astro`
+  content there; the mount div and `app.{js,css}` are unchanged).
+- Magic-link callback redirects to `/app` instead of `/`.
+- A logged-in visitor who lands on `/` sees an "Open your projects" button — a
+  small inline script hits `/api/auth/me` and swaps the hero CTA.
+
+### The page
+
+One scrolling page in the Bramble aesthetic (hedgehog mark, wordmark in
+`--font-display`, Alegreya Sans / EB Garamond, Bramble-light default, respects
+`prefers-color-scheme`). Sections:
+
+1. **Hero** — mark + wordmark + "a keeping-book for makers", one plain sentence
+   on what it is, a "Start your keeping-book" CTA to `/app`, and a picture of
+   the project list.
+2. **Who it's for** — costuming and A&S, personal research, Kingdom office work,
+   event prep, household projects.
+3. **How it works** — capture a loose idea, break a project into steps, plan
+   focus time, run a weekly review. Small visual per step.
+4. **Made to share** — shared projects, viewer/editor roles, hand off the whole
+   project.
+5. **Yours to keep** — the three themes, works on your phone, free. One
+   friendly line on the Supporter tier.
+6. **Footer** — sign in, Terms / Privacy / Acceptable use, byline.
+
+### Copy
+
+Plain, warm, direct. **Do not name "GTD"** or other methodology jargon —
+describe what the app does. Short declarative sentences (the repo editorial
+standard applies).
+
+### Screenshots
+
+Ship now with **placeholders** — framed, captioned boxes (or light CSS/SVG
+mockups of the card UI) sized to the real screenshots. Swap in real app
+captures after the Pass 1 theme redesign lands, so the shots show the finished
+look.
+
+### Build order
+
+1. Move the app shell to `src/pages/app.astro`; point the auth callback at
+   `/app`; confirm `app.{js,css}` paths still resolve.
+2. New `src/pages/index.astro` — the landing page, self-contained styles in the
+   design-system tokens.
+3. Legal pages under `src/pages/legal/` (shared with `social-plan.md` — build
+   whichever pass gets there first).
+4. Swap placeholders for real screenshots post-redesign.
+
+## Planned: Work-session scheduling + calendar (spec'd 2026-09-07)
+
+Plan when you intend to work on a project, and put that on your calendar as
+Focus time that links back into the app.
+
+### Schema — one migration
+
+```sql
+CREATE TABLE work_sessions (
+  id          TEXT PRIMARY KEY,             -- uuid
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  step_id     TEXT REFERENCES project_steps(id) ON DELETE SET NULL,  -- optional
+  starts_at   TEXT NOT NULL,                -- ISO datetime
+  ends_at     TEXT NOT NULL,                -- ISO datetime
+  note        TEXT,                         -- optional, <= 500
+  status      TEXT NOT NULL DEFAULT 'planned'
+                CHECK(status IN ('planned','done','skipped')),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_work_sessions_user ON work_sessions(user_id, starts_at);
+CREATE INDEX idx_work_sessions_project ON work_sessions(project_id);
+```
+
+Scope: **project-level, with an optional `step_id`.** The focus deep link still
+lands on a step when one is attached.
+
+Add to `users`: `calendar_token TEXT` (random, regenerable) for the feed URL.
+
+### API
+
+```
+GET    /api/projects/:id/sessions                 sessions for this project
+POST   /api/projects/:id/sessions                 { startsAt, endsAt, stepId?, note? }
+PATCH  /api/projects/:id/sessions/:sessionId      { startsAt?, endsAt?, stepId?, note?, status? }
+DELETE /api/projects/:id/sessions/:sessionId
+GET    /api/sessions?from=&to=                    all the caller's sessions in a range (home view)
+GET    /api/calendar/:token.ics                   per-user ICS subscription feed (no auth cookie; token is the key)
+POST   /api/settings/calendar-token              regenerate the token
+```
+
+Editor+ to create a session on a project; the session's `user_id` is the
+caller (each collaborator plans their own).
+
+### Calendar — no OAuth
+
+Two paths, both offered:
+
+1. **Per-event "Add to calendar"** — the default control on a planned session.
+   Emits a single-event `.ics` download *and* a "Add to Google Calendar"
+   template link (`calendar.google.com/calendar/render?action=TEMPLATE&…`).
+   One tap, no setup, no sync. This is the primary mobile path.
+2. **Per-user ICS subscription feed** — `GET /api/calendar/:token.ics` returns
+   all upcoming `planned` sessions as a `VCALENDAR`. Subscribe once, stays in
+   sync. Lives in **Settings → Calendar** with a copy button and regenerate.
+
+**Mobile reality (why both):** an iOS user can tap a `webcal://` link and
+subscribe in one step, but a Google Calendar user has to add the feed URL from
+Google Calendar *on the web* first — the Google Calendar mobile app can't add a
+subscription. Subscribed feeds also refresh on the calendar app's own schedule,
+so a session you just planned may not show for a while. The per-event add is
+immediate and universal; the feed is the "set once, forget" option for people
+who want it.
+
+Each `VEVENT`: `SUMMARY:Focus — <project title>`, `DTSTART`/`DTEND`, and
+`URL` + `DESCRIPTION` carrying the deep link
+`https://brambletally.com/app?focus=<sessionId>`.
+
+### Deep link back into the app
+
+The app reads `?focus=<sessionId>` on load — same mechanism as the existing
+`?auth=invalid` check (`public/app.js:346`). It opens that project and starts
+the Focus (candle) screen pre-set to the session's `step_id` when present. This
+is the "links back to the app" payoff.
+
+### UI
+
+- **Plan focus time** — a control on the project detail view. Date (reuse the
+  Today / Tomorrow / This weekend / Next week chips from `openStepForm`), start
+  time, duration (reuse the estimate stops: 15 / 30 / 60 / 120 / 240 min),
+  optional note.
+- **Upcoming** sessions listed on the project.
+- **Home** — a "Planned" line near the status tabs: *"Next: Blue wool
+  overdress · Sat 2:00–4:00pm"* with a "Start now" that jumps into the Focus
+  screen.
+- **Settings → Calendar** — the subscription URL, copy button, regenerate.
+- On Focus-session completion, if a `planned` `work_session` for that
+  step/project overlaps now, offer "mark planned session done".
+
+### Later
+
+- Reminder email before a planned session — rides the `social-plan.md`
+  notification system (Resend) once it exists.
+- Recurring sessions.
+
+### Build order
+
+1. Migration (`work_sessions` + `users.calendar_token`) + `schema.sql`.
+2. API — the sessions CRUD, `GET /api/sessions`, the `.ics` feed, token
+   regenerate.
+3. Frontend — Plan-focus-time control, project + home surfacing, Settings →
+   Calendar, `?focus=` handling on load.

@@ -9,11 +9,15 @@ a few sub-points are still open (see "Open questions").
 
 ## Guiding constraint
 
-**Everything stays behind the login wall for v1.** No public or unauthenticated
-pages. `noindex` stays. No SEO surface. Every "other user" you can see is a
-signed-in account. This one rule keeps the abuse, privacy, and moderation
-surface small enough to self-manage. It can be relaxed later without schema
-rework.
+**Everything stays behind the login wall for v1.** Every "other user" you can
+see is a signed-in account. This one rule keeps the abuse, privacy, and
+moderation surface small enough to self-manage. It can be relaxed later without
+schema rework.
+
+The exceptions are the **marketing landing page** at `/` and the **legal
+pages** — public and indexable (they carry no user data and no abuse surface).
+The app at `/app` and every `/api/*` route stay private and `noindex`. See
+"Planned: Landing page" in `docs/plan.md`.
 
 ## Feature summary
 
@@ -96,12 +100,12 @@ charge ever**. Storage is the only line you'll approach.
 
 | Uploads are… | ~10 GB holds |
 | --- | --- |
-| resized server-side to ~400 KB each | ~26,000 photos (~1,300 projects at 20 each) |
+| resized to ~400 KB each (client-side, ~1600px/q80) | ~26,000 photos (~1,300 projects at 20 each) |
 | raw ~5 MB phone photos, unresized | ~2,000 photos (~100 projects) |
 
 Past 10 GB: **$0.015 / GB-month**. 50 GB of photos ≈ $0.60/month. It scales in
-cents. Not resizing on upload is the only thing that breaks this — so
-server-side resize is a build requirement.
+cents. Not resizing on upload is the only thing that breaks this — so a resize
+step is a build requirement (see "Resize approach" under Phase 4).
 
 ### Email → Resend
 
@@ -118,15 +122,60 @@ requirement.
 
 ### Cost controls to build in from day one
 
-- **Server-side resize + re-encode every upload.** Cap input at 10 MB,
-  downscale to ~2000px on the long edge, re-encode WebP or JPEG q80, store only
-  that. Biggest single lever.
+- **Resize + re-encode every upload** (see "Resize approach" under Phase 4).
+  Client-side `<canvas>` resize to ~1600px on the long edge / q80 now, with the
+  server rejecting anything over 2 MB; move the resize into the Worker
+  (Photon/WASM) once on Workers Paid. Store only the resized copy. Biggest
+  single lever.
 - **Caps as safety valves:** ~30 photos per project, 1 avatar per user.
 - **`Cache-Control: public, max-age=31536000, immutable`** on image responses
   (versioned R2 keys) so the CDN serves repeats and Class B reads stay near
   zero.
 - **Weekly-digest email option** so notification volume can't push a user past
   Resend's daily cap.
+
+## Supporter tier
+
+A **$10/year "Supporter"** plan. Scaffolded alongside Phase 1; **billing is not
+built until there are real users who might pay.** Nothing about it gates the
+core app — projects, steps, supplies, journal, links, collaboration, the inbox,
+review, and the calculators stay free and unlimited. Gating cheap text rows
+would contradict the "self-manageable, everything behind login" ethos; the
+perks that cost money (R2 storage, Resend volume) are what the tier offsets.
+
+### Ships in Phase 1 (no billing)
+
+- `users.plan` already exists (`DEFAULT 'free'`, in `/api/auth/me`). Values:
+  `'free'` | `'supporter'`. No migration needed to scaffold.
+- `isSupporter(user)` helper in `worker/api/lib/` — the single gate check used
+  everywhere. Today: `user.plan === 'supporter'`. Later also checks
+  subscription status / expiry.
+- **Supporter badge** on the profile, board cards, and the collaborator-invite
+  picker.
+- A **Supporter** section in Settings showing plan status — inert until there
+  is something to buy.
+- **Manual grant** through the admin panel (set `plan`), so early supporters
+  and testers can be comped before Stripe exists.
+
+### Gates (designed now, enforced as each feature lands)
+
+| Area | Free | Supporter |
+| --- | --- | --- |
+| Projects / steps / supplies / journal / links / collaboration | unlimited | unlimited |
+| Project photos (Phase 4) | 10 / project | 30 / project |
+| Avatar (Phase 4) | initials | uploaded image |
+| Email notifications (Phase 3) | weekly digest | immediate |
+| Active board listings (Phase 3) | 1 | 3 |
+| Profile badge + accent colour | — | yes |
+
+### Deferred until there are users
+
+Stripe Checkout (annual billing), a webhook module under `worker/api/`, and
+additive columns on `users` — `stripe_customer_id`, `subscription_status`,
+`current_period_end` (plain `ALTER`, no rework). Cancellation runs through
+Stripe's hosted portal. On a $10 charge Stripe takes ~$0.59 (~6%); annual
+billing keeps that to one transaction per member per year. A lifetime option
+(one-time ~$25) is a later call.
 
 ## Identity model (prerequisite — build first)
 
@@ -184,8 +233,9 @@ followee_id)`. No status column — a follow either exists or doesn't.
 ## Schema additions
 
 New tables. All user-referencing FKs are `ON DELETE CASCADE` unless noted.
-Fold into `brambletally_schema.sql` for fresh installs; ship as
-`migrations/0002_social.sql` for the live DB.
+Fold into `schema.sql` for fresh installs; ship as
+`migrations/0003_social.sql` for the live DB (`0002` is `project_links` — see
+`docs/plan.md`).
 
 ```sql
 -- 1:1 with users. Split out so the hot auth SELECT in session.js stays lean.
@@ -580,10 +630,19 @@ list (tag tools already exist from Phase 1). `requireBoardOk` on board write
 routes. Rate limits + Turnstile on first board actions.
 
 **Phase 4 — R2 media.**
-Stand up the R2 bucket + binding. Upload endpoint with server-side resize /
-re-encode / size cap. Profile avatars. `project_photos` table + gallery on the
-project detail view (editors upload, viewers see). Per-project photo cap.
-`Cache-Control: immutable` on delivery.
+Stand up the R2 bucket + binding. Upload endpoint with a server-side size cap.
+Profile avatars. `project_photos` table + gallery on the project detail view
+(editors upload, viewers see). Per-project photo cap (10 free / 30 supporter).
+`Cache-Control: immutable` on delivery; reads proxy through the Worker for the
+permission check (bucket stays private). Project delete sweeps
+`projects/<projectId>/*` from R2 — the FK cascades the rows, not the blobs.
+
+**Resize approach.** Client-side `<canvas>` resize to ~1600px on the long edge,
+q80, before upload; the server rejects anything over 2 MB. Trusted enough
+behind the login wall for now. Swap in an in-Worker re-encode (Photon/WASM)
+when the app moves to Workers Paid — that plan's 30s CPU ceiling is what makes
+a server-side encode of a full photo safe. iPhone Safari canvas resize is the
+main path and holds up.
 
 ## Open questions
 
