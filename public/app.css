@@ -1708,12 +1708,9 @@ textarea{resize:vertical;min-height:60px}
 .bt-swatch-name { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
 .bt-swatch-note { font-size: var(--fs-label); color: var(--text-muted); text-align: center; line-height: 1.3; }
 
-/* ── Inline-SVG icons (icon() / HEDGEHOG in app.js) ─────────────────────── */
+/* ── Inline-SVG icons (icon() in app.js) ───────────────────────────────── */
 .bt-ic { display: inline-block; vertical-align: -0.15em; flex-shrink: 0; }
 #bt-app .btn-icon .bt-ic { vertical-align: middle; }
-#bt-app .wordmark .bt-hog {
-  width: 1.05em; height: 1.05em; vertical-align: -0.2em; margin-right: .3em;
-}
 #bt-app .focus-detail-btn .bt-ic { margin-right: 4px; }
 #bt-app .meta-people .bt-ic { vertical-align: -0.22em; margin-right: 3px; }
 #bt-app .step-bash .bt-ic { vertical-align: middle; }
