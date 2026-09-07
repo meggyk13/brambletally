@@ -180,7 +180,7 @@ const ICONS = {
 function icon(name, size = 20) {
   return `<svg class="bt-ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 }
-const HEDGEHOG = '<svg class="bt-hog" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 22c-2.6 0-4.4-1.7-4.4-3.9 0-1.6 1-3 2.6-3.6"/><path d="M6.2 14.5c1-3 3.8-4.9 7.3-4.9"/><path d="M13.5 9.6c-1.3-.5-2.1-.2-2.6.5-.5.8-.3 1.9.6 2.6"/><path d="M4 20.6l3-4.2 2.4 3.4 2.2-4.6 2.6 4.2 2.3-4.6 2.5 4.2 2.3-4 2.4 3.8c1 1.1 1.5 2.4 1.5 3.7 0 .5-.4.9-.9.9H6.5C5 27 4 25.7 4 24c0-1.2.4-2.4 1.2-3.4"/><circle cx="10.4" cy="11.4" r=".85" fill="currentColor" stroke="none"/><circle cx="14.2" cy="12.6" r=".7" fill="currentColor" stroke="none"/><path d="M11 27v1.6M17 27v1.6M23 27v1.6"/></svg>';
+const HEDGEHOG = '<svg class="bt-hog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15.5C4 11.8 7 9.3 10.8 9.3c3.7 0 6.7 2.1 7.8 5.2"/><path d="M4 15.5c0 2.5 2 4.1 4.8 4.1h6.8c2 0 3.3-1.4 3.4-3.2"/><path d="M4 15.5 2.2 17c-.3.3-.3.7 0 1l2.2 1"/><path d="M6.5 11 5.2 7.6M9 9.6 8.4 6M11.7 9.3v-3.6M14 9.6 15 6M16.3 10.6 17.9 7.7"/><circle cx="2.4" cy="17.4" r=".85" fill="currentColor" stroke="none"/><circle cx="6.7" cy="15" r="1" fill="currentColor" stroke="none"/><path d="M8.6 19.6v2M14.4 19.6v2"/></svg>';
 
 function on(el, sel, evt, fn) {
   el.querySelectorAll(sel).forEach((n) => n.addEventListener(evt, fn));
