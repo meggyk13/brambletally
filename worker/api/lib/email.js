@@ -22,23 +22,19 @@ export async function sendMagicLink(env, to, link) {
     return { ok: true, skipped: true };
   }
 
+  const from = env.MAIL_FROM || FROM_EMAIL;
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${env.RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      from: env.MAIL_FROM || FROM_EMAIL,
-      to,
-      subject,
-      text,
-      html,
-    }),
+    body: JSON.stringify({ from, to, subject, text, html }),
   });
 
   if (!r.ok) {
-    console.error('[brambletally] Resend send failed', r.status, await r.text().catch(() => ''));
+    const body = await r.text().catch(() => '');
+    console.error(`[brambletally] Resend send failed: status=${r.status} body=${body}`);
     return { ok: false };
   }
   return { ok: true };
