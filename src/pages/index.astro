@@ -1,7 +1,9 @@
 ---
 // Brambletally — a full-screen client app. Deliberately not wrapped in a shared
 // layout: it renders its own <html> shell and mounts the client app into #bt-app.
-// Palette + type: İznik / EB Garamond / IBM Plex Mono.
+// Palette: Bramble / Hearth / Fen (data-theme="<palette>-<mode>").
+// Type: Alegreya Sans body / EB Garamond headings / IBM Plex Mono / IM Fell
+// English (display). See docs/design.md.
 ---
 <!doctype html>
 <html lang="en">
@@ -14,19 +16,29 @@
     <meta name="description" content="A project tracker for craft, research, and event work." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script is:inline>
-      // Set the theme before first paint to avoid a flash.
+      // Resolve theme before first paint to avoid a flash.
+      // bt-mode (light|dark|system) + bt-palette (bramble|hearth|fen) -> data-theme.
       try {
-        var t = localStorage.getItem('bt-theme');
-        if (t !== 'light' && t !== 'dark') {
-          t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        var pals = ['bramble', 'hearth', 'fen'];
+        var p = localStorage.getItem('bt-palette');
+        if (pals.indexOf(p) < 0) p = 'bramble';
+        var m = localStorage.getItem('bt-mode');
+        var legacy = localStorage.getItem('bt-theme');
+        if (m !== 'light' && m !== 'dark' && (legacy === 'light' || legacy === 'dark')) {
+          m = legacy;
+          localStorage.setItem('bt-mode', m);
+          localStorage.removeItem('bt-theme');
         }
-        document.documentElement.setAttribute('data-theme', t);
+        if (m !== 'light' && m !== 'dark') {
+          m = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', p + '-' + m);
       } catch (e) {}
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=IM+Fell+English:ital@0;1&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/app.css" />

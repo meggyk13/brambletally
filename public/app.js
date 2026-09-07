@@ -266,39 +266,143 @@ async function guard(fn) {
 }
 
 // ── Theme ──────────────────────────────────────────────────────────────────
-function effectiveTheme() {
-  let t;
+// Two choices: bt-mode (light | dark | system) and bt-palette (bramble | hearth
+// | fen). They resolve to data-theme="<palette>-<mode>". The full palette picker
+// lands with the Settings Appearance section; the header button just flips
+// light/dark for now.
+const PALETTES = ['bramble', 'hearth', 'fen'];
+function lsGet(k) {
   try {
-    t = localStorage.getItem('bt-theme');
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+}
+function lsSet(k, v) {
+  try {
+    localStorage.setItem(k, v);
   } catch {
     /* private mode */
   }
-  if (t === 'light' || t === 'dark') return t;
+}
+function currentPalette() {
+  const p = lsGet('bt-palette');
+  return PALETTES.includes(p) ? p : 'bramble';
+}
+function currentMode() {
+  // one-time migration of the old light/dark-only key
+  const legacy = lsGet('bt-theme');
+  if (legacy === 'light' || legacy === 'dark') {
+    lsSet('bt-mode', legacy);
+    try {
+      localStorage.removeItem('bt-theme');
+    } catch {
+      /* ignore */
+    }
+    return legacy;
+  }
+  const m = lsGet('bt-mode');
+  return m === 'light' || m === 'dark' ? m : 'system';
+}
+function effectiveTheme() {
+  const m = currentMode();
+  if (m === 'light' || m === 'dark') return m;
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 function applyTheme() {
-  document.documentElement.setAttribute('data-theme', effectiveTheme());
+  document.documentElement.setAttribute('data-theme', currentPalette() + '-' + effectiveTheme());
 }
 function toggleTheme() {
-  const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
-  try {
-    localStorage.setItem('bt-theme', next);
-  } catch {
-    /* ignore */
-  }
+  lsSet('bt-mode', effectiveTheme() === 'dark' ? 'light' : 'dark');
   applyTheme();
   render();
 }
-// react to system changes only while the user hasn't set an explicit choice
+// react to system changes only while the user is on 'system'
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-  let stored;
-  try {
-    stored = localStorage.getItem('bt-theme');
-  } catch {
-    /* ignore */
-  }
-  if (stored !== 'light' && stored !== 'dark') applyTheme();
+  if (currentMode() === 'system') applyTheme();
 });
+
+// Settings → Appearance. No Settings shell yet, so the header button opens this
+// directly; it moves into Settings when that lands. Live-applies on tap.
+const MODES = [
+  ['light', 'Light'],
+  ['dark', 'Dark'],
+  ['system', 'System'],
+];
+// light-variant swatch colours (bg, accent, accent-2) — a preview chip can't
+// read :root[data-theme] tokens, so mirror them here. Source: docs/design.md.
+const PALETTE_CARDS = [
+  { id: 'bramble', name: 'Bramble', note: 'blackberry & hedgerow', c: ['#f3ecdc', '#6b3457', '#4b6b3a'] },
+  { id: 'hearth', name: 'Hearth', note: 'tavern warmth', c: ['#f6eede', '#a8482b', '#8a6a1f'] },
+  { id: 'fen', name: 'Fen', note: 'misty marsh', c: ['#e9ece4', '#2f6b6b', '#54763a'] },
+];
+
+function openAppearance() {
+  const overlay = h(`
+    <div class="modal-overlay open bt-ask bt-appearance">
+      <div class="modal">
+        <div class="bt-appr-head">
+          <span class="bt-appr-title">Appearance</span>
+          <button class="modal-close" data-close aria-label="Close">&times;</button>
+        </div>
+
+        <div class="bt-appr-label">Mode</div>
+        <div class="bt-seg" role="group" aria-label="Mode">
+          ${MODES.map(
+            ([v, label]) =>
+              `<button type="button" data-mode="${v}" class="bt-seg-btn${
+                currentMode() === v ? ' is-sel' : ''
+              }">${label}</button>`
+          ).join('')}
+        </div>
+
+        <div class="bt-appr-label">Theme</div>
+        <div class="bt-swatches">
+          ${PALETTE_CARDS.map(
+            (p) => `
+            <button type="button" data-palette="${p.id}" class="bt-swatch${
+              currentPalette() === p.id ? ' is-sel' : ''
+            }" aria-pressed="${currentPalette() === p.id}">
+              <span class="bt-swatch-chip" style="background:${p.c[0]}">
+                <i style="background:${p.c[1]}"></i><i style="background:${p.c[2]}"></i>
+              </span>
+              <span class="bt-swatch-name">${p.name}</span>
+              <span class="bt-swatch-note">${p.note}</span>
+            </button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+  `);
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = (e) => e.key === 'Escape' && close();
+
+  on(overlay, '[data-mode]', 'click', (e) => {
+    lsSet('bt-mode', e.currentTarget.dataset.mode);
+    applyTheme();
+    overlay
+      .querySelectorAll('[data-mode]')
+      .forEach((b) => b.classList.toggle('is-sel', b.dataset.mode === currentMode()));
+    render(); // header moon/sun icon follows the mode
+  });
+  on(overlay, '[data-palette]', 'click', (e) => {
+    lsSet('bt-palette', e.currentTarget.dataset.palette);
+    applyTheme();
+    overlay.querySelectorAll('[data-palette]').forEach((b) => {
+      const sel = b.dataset.palette === currentPalette();
+      b.classList.toggle('is-sel', sel);
+      b.setAttribute('aria-pressed', String(sel));
+    });
+  });
+  on(overlay, '[data-close]', 'click', close);
+  overlay.addEventListener('click', (e) => e.target === overlay && close());
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(overlay);
+}
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
@@ -422,7 +526,7 @@ function header() {
           <div class="tagline">project tracker</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn-icon" id="bt-theme" title="Switch theme" aria-label="Switch theme">${
+          <button class="btn-icon" id="bt-theme" title="Appearance" aria-label="Appearance">${
             effectiveTheme() === 'dark' ? '☀' : '☾'
           }</button>
           <button class="btn-icon" id="bt-search" title="Search" aria-label="Search">🔍</button>
@@ -447,7 +551,7 @@ function header() {
     }
     location.href = APP_PATH;
   });
-  on(el, '#bt-theme', 'click', toggleTheme);
+  on(el, '#bt-theme', 'click', openAppearance);
   on(el, '#bt-search', 'click', () => {
     state.viewBeforeSearch = state.view;
     state.view = 'search';
@@ -1181,7 +1285,7 @@ function renderProject(app) {
             p.role !== 'owner' ? ` &middot; ${esc(p.role)}` : ''
           }</button>
         </div>
-        ${p.description ? `<p style="color:var(--text-muted);font-size:15px;line-height:1.55;margin-bottom:14px">${esc(p.description)}</p>` : ''}
+        ${p.description ? `<p style="color:var(--text-muted);font-size:16px;line-height:1.55;margin-bottom:14px">${esc(p.description)}</p>` : ''}
         <div class="pickup-box" id="bt-pickup-box"></div>
         ${
           leaves.length
@@ -1664,7 +1768,7 @@ function openSupplyForm(b, existing, done) {
           <input class="sp-input" name="source" value="${esc(s.source || '')}" placeholder="Store or maker" />
           <label class="sp-label">Link</label>
           <input class="sp-input" type="url" name="url" value="${esc(s.url || '')}" />
-          <label style="display:flex;gap:8px;align-items:center;margin:10px 0;font-size:14px">
+          <label style="display:flex;gap:8px;align-items:center;margin:10px 0;font-size:16px">
             <input type="checkbox" name="acquired" ${s.acquired ? 'checked' : ''} /> Have it
           </label>
           <div style="display:flex;gap:8px;margin-top:8px">
@@ -2158,7 +2262,7 @@ async function renderReview(main) {
   const wrap = h('<div></div>');
   wrap.appendChild(
     h(
-      '<p style="color:var(--text-muted);font-size:14px;margin-bottom:16px">Everything Active or Waiting For, with its open steps. A pass for your weekly review.</p>'
+      '<p style="color:var(--text-muted);font-size:16px;margin-bottom:16px">Everything Active or Waiting For, with its open steps. A pass for your weekly review.</p>'
     )
   );
   if (data.done_this_week) {
@@ -2362,7 +2466,7 @@ function openFocusSession(bundle) {
           <div class="noodle-finish-headline">Session done</div>
           <div class="noodle-finish-time">${mins} minute${mins === 1 ? '' : 's'} on ${esc(sess.projectTitle)}</div>
           <div class="noodle-finish-msg">What did you get done?</div>
-          <textarea id="fs-note" rows="2" placeholder="Optional — adds a timeline note" style="width:100%;padding:12px 14px;border-radius:9px;border:1px solid var(--border-strong);background:var(--input);color:var(--text);font:inherit;font-size:15px;resize:vertical;margin-bottom:12px"></textarea>
+          <textarea id="fs-note" rows="2" placeholder="Optional — adds a timeline note" style="width:100%;padding:12px 14px;border-radius:9px;border:1px solid var(--border-strong);background:var(--input);color:var(--text);font:inherit;font-size:16px;resize:vertical;margin-bottom:12px"></textarea>
           <div class="noodle-finish-actions">
             ${step ? `<button class="btn-sm btn-sm-sage" id="fs-markdone">Mark “${esc(step.title)}” done</button>` : ''}
             <button class="btn-sm btn-sm-amethyst" id="fs-again">Another session</button>
