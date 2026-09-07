@@ -428,10 +428,24 @@ quick-add. Reorder handles later (`sort_order` is already there).
    `worker/api/lib/validate.js`.
 3. Frontend — the Links panel and inline add row in the project detail view.
 
-## Planned: Landing page (spec'd 2026-09-07)
+## Landing page — shipped in PR #7 (2026-09-07)
 
 Brambletally is its own app and domain now. It needs a real front door instead
 of dropping straight to the sign-in form.
+
+**Built:** `APP_PATH` `/` → `/app` in `worker/api/lib/constants.js` and
+`public/app.js` (so the magic-link callback and logout land at `/app`).
+`src/pages/index.astro` moved to `src/pages/app.astro` (the client shell, keeps
+`noindex`). New `src/pages/index.astro` = the landing page — own `<html>`
+shell, self-contained styles, self-hosted latin fonts, Bramble palette
+(respects `prefers-color-scheme`), **not** `noindex`, with the six sections
+below. Four draft legal pages under `src/pages/legal/` (`terms`,
+`privacy`, `acceptable-use`, `cookies`) — each carries a "working draft, not
+binding yet" banner; real reviewed copy lands with the first-login acceptance
+gate (social Phase 1). A load-time `fetch('/api/auth/me')` swaps the sign-in
+CTAs to "Open your projects" for signed-in visitors. Build is 6 pages.
+Screenshots are dashed placeholder boxes — swap for real captures after the
+Pass-1 look is on prod (it now is).
 
 ### Public-page exception
 
