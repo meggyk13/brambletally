@@ -209,24 +209,17 @@ Numerals: the app shows counts everywhere ("2/8 steps · ~3h left"). Add
 `font-feature-settings:"tnum"` on step counts, estimates, timers, and card meta
 lines so digits don't jitter.
 
-### Self-hosting
+### Self-hosting — done in PR #3
 
-Fold the self-host into this pass — `social-plan.md`'s "Legal + cookies"
-section already calls for it (removes the last non-essential third-party
-request; the cookie notice stays one line). Turnstile on the sign-in screen
-stays and is consent-exempt.
-
-1. Pull woff2 from google-webfonts-helper or Fontsource. Subset to
-   `latin` + `latin-ext` (SCA display names and pronouns use diacritics).
-2. Files under `public/fonts/`.
-3. `@font-face` blocks at the top of `public/app.css`, `font-display:swap`.
-4. Remove from `src/pages/index.astro`: the `fonts.googleapis.com` stylesheet
-   `<link>` and both font preconnects.
-5. Add `<link rel="preload" as="font" type="font/woff2" crossorigin>` for
-   Alegreya Sans 400 and EB Garamond 400.
-6. Update the header comment in `index.astro` (currently "İznik / EB Garamond /
-   IBM Plex Mono") and the token comment block in `app.css` (currently "İznik
-   ware… Matches Rayhana's Repositorium").
+21 woff2 files (`latin` + `latin-ext` subsets, `unicode-range`-gated so an
+English page only pulls the latin ones) in `public/fonts/`, downloaded from
+gstatic via `/tmp/fetch-fonts.mjs`. `@font-face` block prepended to
+`public/app.css`, `font-display:swap`. IM Fell English italic dropped (the
+wordmark is never italic). `src/pages/index.astro`: Google `<link>` +
+preconnects removed, `<link rel=preload>` added for Alegreya Sans 400 + EB
+Garamond 400 latin. This clears `social-plan.md`'s "self-host the fonts" item
+— the only remaining third-party request is Turnstile on the sign-in screen,
+which is consent-exempt.
 
 ## Type sizes
 
@@ -374,18 +367,29 @@ carry the theme, not the labels.
 
 ## Sequencing
 
-**Pass 1 — palette + type (one PR, functional).**
-Done 2026-09-07: three palettes × two modes as token blocks (contrast-checked);
-`--accent` / `--accent-2` + literal `--sage` / `--amethyst` aliases;
-`--on-accent` on all filled buttons; `--text-faint` → `--text-muted` (four
-tiers); `--fs-*` scale + mechanical px uplift; `line-height` 1.6;
-`bt-mode` + `bt-palette` storage with legacy migration; the Appearance picker.
-Still open in Pass 1: self-host the fonts (still on the Google `<link>`);
-convert the ~10 `var(--sage)NN` alpha-hex tints to `color-mix()` so the aliases
-can be dropped; adopt `--fs-*` tokens rule-by-rule.
+**Pass 1 — palette + type (PR #1, merged).**
+Three palettes × two modes as token blocks (contrast-checked); `--accent` /
+`--accent-2` + `--on-accent`; `--text-faint` → `--text-muted` (four tiers);
+`--fs-*` scale + mechanical px uplift; `line-height` 1.6; `bt-mode` +
+`bt-palette` storage with legacy migration; the Appearance picker.
 
-**Pass 2 — identity (piecemeal).**
-Wordmark + mark + favicon. Icon set replacing emoji. `noodle` rename.
+**Pass 1 finish (PR #3).**
+Self-hosted fonts — 21 latin/latin-ext woff2 subsets in `public/fonts/`,
+`@font-face` at the top of `app.css`, no more Google `<link>` (removes the last
+non-essential third-party request); `<link rel=preload>` for Alegreya Sans 400
++ EB Garamond 400. All `var(--sage)NN` / `var(--amethyst)NN` alpha-hex tints
+→ `color-mix()`; plain `var(--sage)` / `var(--amethyst)` → `var(--accent)` /
+`var(--accent-2)`; the alias declarations dropped from every palette block (the
+`.btn-sm-amethyst` / `.checked-sage` *class names* stay — cosmetic). `noodle-*`
+classes / `#noodle-screen` → `focus-*` / `#focus-screen`. Header tagline →
+"a keeping-book for makers". Wordmark set in `--font-display` (IM Fell English),
+weight 400, `--accent-2`.
+Still open: adopt the `--fs-*` tokens rule-by-rule (currently the scale is
+defined and the raw px values were uplifted, but rules don't reference the
+tokens yet).
+
+**Pass 2 — identity (PR #4).**
+Hedgehog mark + favicon. Icon set replacing emoji.
 
 **Pass 3 — polish (optional).**
 Paper texture, flourish dividers, empty-state illustrations, radius tokens.
@@ -407,9 +411,10 @@ None blocking. Resolved 2026-09-07:
 - **Type scale raised** — `--fs-*` tokens, 12px floor, +1–2px under 16px,
   `line-height` 1.6 (see Type sizes). Re-check body size on a phone after the
   Alegreya swap.
-- **Pass 1 landed 2026-09-07** — palette, type, four tiers, `bt-mode`/`bt-palette`
-  storage, and the Appearance picker. Font self-hosting and the alpha-hex →
-  `color-mix()` cleanup still open (see Sequencing).
+- **PR #1** — palette, type, four tiers, `bt-mode`/`bt-palette` storage, the
+  Appearance picker.
+- **PR #3** — self-hosted fonts, `color-mix()` cleanup + aliases dropped,
+  `noodle`→`focus` rename, tagline copy, IM Fell wordmark.
 
 Still to design during the build: the hedgehog mark itself, the icon set, and
-the optional empty-state illustrations.
+the optional empty-state illustrations (PR #4).
