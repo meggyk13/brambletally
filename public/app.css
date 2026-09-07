@@ -1717,3 +1717,14 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .checkbox .bt-ic, #bt-app .focus-check-icon .bt-ic { vertical-align: middle; }
 #bt-app .focus-finish-emoji { line-height: 0; }
 #bt-app .focus-finish-emoji .bt-ic { color: var(--accent-2); }
+
+/* ── Project links panel ──────────────────────────────────────────────── */
+#bt-app .link-row .link-ic { flex-shrink: 0; color: var(--text-muted); margin-top: 2px; line-height: 0; }
+#bt-app .link-title { color: var(--accent); text-decoration: none; font-weight: 600; }
+#bt-app .link-title:hover { text-decoration: underline; }
+#bt-app .link-edit {
+  flex-shrink: 0; align-self: center; background: none; border: none; cursor: pointer;
+  color: var(--text-muted); padding: 4px; line-height: 0; transform: rotate(-90deg);
+}
+#bt-app .link-edit:hover { color: var(--accent); }
+#bt-app .link-add { margin-top: 6px; }

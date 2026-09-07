@@ -119,6 +119,11 @@ const API = {
   deleteSupply: (pid, sid) =>
     api(`/api/projects/${pid}/supplies/${sid}`, { method: 'DELETE' }),
 
+  addLink: (pid, b) => api(`/api/projects/${pid}/links`, { method: 'POST', body: b }),
+  updateLink: (pid, lid, b) =>
+    api(`/api/projects/${pid}/links/${lid}`, { method: 'PATCH', body: b }),
+  deleteLink: (pid, lid) => api(`/api/projects/${pid}/links/${lid}`, { method: 'DELETE' }),
+
   addJournal: (pid, text) =>
     api(`/api/projects/${pid}/journal`, { method: 'POST', body: { text } }),
 
@@ -176,6 +181,7 @@ const ICONS = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8L6 18M18 6l1.8-1.8"/>',
   moon: '<path d="M19 13.5A7.5 7.5 0 1 1 10.5 5a6 6 0 0 0 8.5 8.5z"/>',
   chevron: '<path d="M6 9l6 6 6-6"/>',
+  link: '<path d="M9.5 13.5a3.5 3.5 0 0 0 5 .3l3-3a3.5 3.5 0 0 0-5-5l-1.2 1.1"/><path d="M14.5 10.5a3.5 3.5 0 0 0-5-.3l-3 3a3.5 3.5 0 0 0 5 5l1.2-1.1"/>',
 };
 function icon(name, size = 20) {
   return `<svg class="bt-ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -201,6 +207,15 @@ function fmtDate(d) {
   const dt = new Date(d + 'T00:00:00');
   if (isNaN(dt)) return d;
   return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+// Bare hostname for a link with no title — "www." stripped, path dropped.
+function linkHost(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 }
 
 function toast(msg) {
@@ -1314,7 +1329,7 @@ function renderProject(app) {
         }
         <button class="focus-detail-btn" id="bt-focus">${icon('candle')} Start a focus session</button>
         <div class="detail-tabs">
-          ${['steps', 'supplies', 'timeline']
+          ${['steps', 'supplies', 'links', 'timeline']
             .map(
               (t) =>
                 `<button class="detail-tab${state.detailTab === t ? ' active' : ''}" data-tab="${t}">${
@@ -1357,6 +1372,7 @@ function renderPanel(panel) {
 
   if (state.detailTab === 'steps') panel.appendChild(stepsPanel(b, canEdit));
   else if (state.detailTab === 'supplies') panel.appendChild(suppliesPanel(b, canEdit));
+  else if (state.detailTab === 'links') panel.appendChild(linksPanel(b, canEdit));
   else panel.appendChild(timelinePanel(b, canEdit));
 }
 
@@ -1825,6 +1841,116 @@ function openSupplyForm(b, existing, done) {
   });
   document.body.appendChild(overlay);
   overlay.querySelector('input[name=name]').focus();
+}
+
+// links
+function linksPanel(b, canEdit) {
+  const wrap = h('<div class="detail-panel"></div>');
+  const listEl = h('<div></div>');
+  const rerender = refreshDetail;
+  const fill = () => {
+    listEl.replaceChildren();
+    if (!b.links.length) {
+      listEl.appendChild(h('<div class="empty-section">No links yet.</div>'));
+    } else {
+      b.links.forEach((l) => listEl.appendChild(linkRow(b, l, canEdit, rerender)));
+    }
+    if (canEdit) listEl.appendChild(linkAddRow(b, rerender));
+  };
+  wrap.appendChild(
+    sectionHeader('Links', b.links.length, canEdit ? () => openLinkForm(b, null, rerender) : null)
+  );
+  wrap.appendChild(listEl);
+  fill();
+  return wrap;
+}
+
+function linkRow(b, l, canEdit, rerender) {
+  const label = l.title || linkHost(l.url);
+  // Sub-line: the note if there is one; otherwise the hostname, but only when
+  // the label isn't already the hostname (an untitled link needs nothing more).
+  const sub = l.note || (l.title ? linkHost(l.url) : '');
+  const row = h(`
+    <div class="check-row link-row">
+      <span class="link-ic">${icon('link', 18)}</span>
+      <div class="check-content">
+        <a class="check-title link-title" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>
+        ${sub ? `<div class="check-sub">${esc(sub)}</div>` : ''}
+      </div>
+      ${canEdit ? `<button class="link-edit" aria-label="Edit link">${icon('chevron', 16)}</button>` : ''}
+    </div>
+  `);
+  if (canEdit) on(row, '.link-edit', 'click', () => openLinkForm(b, l, rerender));
+  return row;
+}
+
+// Persistent "paste a URL" row at the foot of the list — no modal for the
+// common case. A pasted title is optional; Enter or the button adds it.
+function linkAddRow(b, done) {
+  const row = h(`
+    <form class="bt-quickadd link-add">
+      <input class="bt-quickadd-input link-add-url" type="url" inputmode="url"
+        placeholder="Paste a link…" aria-label="Link URL" />
+    </form>
+  `);
+  on(row, 'form', 'submit', async (e) => {
+    e.preventDefault();
+    const url = row.querySelector('.link-add-url').value.trim();
+    if (!url) return;
+    await guard(() => API.addLink(b.project.id, { url }));
+    done();
+  });
+  return row;
+}
+
+function openLinkForm(b, existing, done) {
+  const l = existing || {};
+  const overlay = h(`
+    <div class="modal-overlay open">
+      <div class="modal">
+        <div class="modal-header"><span class="modal-title">${existing ? 'Edit link' : 'Add link'}</span>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
+        <form id="bt-linkform">
+          <label class="sp-label">Link</label>
+          <input class="sp-input" name="url" type="url" inputmode="url" required
+            placeholder="https://…" value="${esc(l.url || '')}" />
+          <label class="sp-label">Title</label>
+          <input class="sp-input" name="title" value="${esc(l.title || '')}"
+            placeholder="Optional — shows the site name if blank" />
+          <label class="sp-label">Note</label>
+          <textarea class="sp-input" name="note" rows="2" placeholder="Optional — why this matters">${esc(l.note || '')}</textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button type="submit" class="btn-sm btn-sm-sage">${existing ? 'Save' : 'Add'}</button>
+            ${existing ? '<button type="button" class="btn-sm btn-sm-ghost" data-del>Delete</button>' : ''}
+            <button type="button" class="btn-sm btn-sm-ghost" data-cancel>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `);
+  const close = () => overlay.remove();
+  on(overlay, '.modal-close, [data-cancel]', 'click', close);
+  overlay.addEventListener('click', (e) => e.target === overlay && close());
+  on(overlay, '[data-del]', 'click', async () => {
+    await guard(() => API.deleteLink(b.project.id, existing.id));
+    close();
+    done();
+  });
+  on(overlay, '#bt-linkform', 'submit', async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const body = {
+      url: f.get('url').trim(),
+      title: f.get('title').trim() || null,
+      note: f.get('note').trim() || null,
+    };
+    if (existing) await guard(() => API.updateLink(b.project.id, existing.id, body));
+    else await guard(() => API.addLink(b.project.id, body));
+    close();
+    done();
+  });
+  document.body.appendChild(overlay);
+  overlay.querySelector('input[name=url]').focus();
 }
 
 // timeline / journal
