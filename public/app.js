@@ -5,7 +5,7 @@
 
 'use strict';
 
-const TURNSTILE_SITE_KEY = '0x4AAAAAAEqk-rZUelo-uw8q';
+const TURNSTILE_SITE_KEY = '0x4AAAAAAEr4nA7ZBjWvB0Ai';
 const APP_PATH = '/';
 
 const STATUSES = ['Active', 'Waiting For', 'Someday', 'Paused', 'Done'];
