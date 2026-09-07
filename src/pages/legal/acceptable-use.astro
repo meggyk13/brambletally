@@ -1,0 +1,74 @@
+---
+// Acceptable Use — draft. Real, reviewed copy lands with the first-login acceptance
+// gate (see social-plan.md "Legal + cookies"). Public + indexable.
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Acceptable Use — Brambletally</title>
+    <meta name="description" content="Acceptable Use for Brambletally." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preload" href="/fonts/eb-garamond-400-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <style>
+      @font-face { font-family:'Alegreya Sans'; font-weight:400; font-display:swap; src:url('/fonts/alegreya-sans-400-latin.woff2') format('woff2'); }
+      @font-face { font-family:'Alegreya Sans'; font-weight:700; font-display:swap; src:url('/fonts/alegreya-sans-700-latin.woff2') format('woff2'); }
+      @font-face { font-family:'EB Garamond'; font-weight:400; font-display:swap; src:url('/fonts/eb-garamond-400-latin.woff2') format('woff2'); }
+      @font-face { font-family:'EB Garamond'; font-weight:600; font-display:swap; src:url('/fonts/eb-garamond-600-latin.woff2') format('woff2'); }
+      :root {
+        --bg:#f3ecdc; --card:#fbf6ea; --border:#e0d4b8; --border-strong:#a89670;
+        --text:#2a2230; --text-sub:#4a3f4e; --text-muted:#6f6374; --accent:#6b3457;
+        --warn-bg:#f5e8cf; --warn-border:#dcc08a; --warn-text:#785412;
+        --head:'EB Garamond',Georgia,serif; --body:'Alegreya Sans',system-ui,sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg:#1e1a22; --card:#292330; --border:#3d3545; --border-strong:#625770;
+          --text:#ece3d6; --text-sub:#c7bcae; --text-muted:#948a83; --accent:#c17ba3;
+          --warn-bg:#2c2417; --warn-border:#5c4a22; --warn-text:#dcbd6a; }
+      }
+      * { box-sizing:border-box; }
+      body { margin:0; background:var(--bg); color:var(--text); font-family:var(--body);
+        font-size:1.0625rem; line-height:1.65; -webkit-font-smoothing:antialiased; }
+      .wrap { max-width:64ch; margin:0 auto; padding:32px 24px 72px; }
+      a { color:var(--accent); }
+      .back { font-size:.9rem; text-decoration:none; color:var(--text-sub); }
+      h1 { font-family:var(--head); font-weight:600; font-size:2.2rem; margin:1.5rem 0 .25rem; }
+      h2 { font-family:var(--head); font-weight:600; font-size:1.35rem; margin:2rem 0 .5rem; }
+      p, li { color:var(--text-sub); }
+      .meta { color:var(--text-muted); font-size:.9rem; margin-bottom:1.5rem; }
+      .draft { background:var(--warn-bg); border:1px solid var(--warn-border); color:var(--warn-text);
+        border-radius:10px; padding:12px 14px; font-size:.95rem; margin:0 0 1.5rem; }
+      :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <a class="back" href="/">&larr; Brambletally</a>
+      <h1>Acceptable Use</h1>
+      <p class="meta">Draft &middot; last updated —</p>
+      <p class="draft">
+        This is a working draft, not a binding policy yet. Final, reviewed terms
+        arrive with the acceptance step at first sign-in.
+      </p>
+
+      <p>Brambletally is a small, signed-in space. These rules keep it usable.</p>
+      <h2>Don't</h2>
+      <ul>
+        <li>Harass, threaten, or abuse other people.</li>
+        <li>Post spam, or content you have no right to share.</li>
+        <li>Upload anything illegal or infringing.</li>
+        <li>Try to break, overload, or probe the service.</li>
+      </ul>
+      <h2>On shared projects</h2>
+      <p>The person who owns a project decides who has access and what stays in
+      it. Their call on their own project stands.</p>
+      <h2>Enforcement</h2>
+      <p>An administrator may remove content or suspend an account that breaks
+      these rules. When the shared project board ships, it will have its own
+      report control and the same rules will apply there.</p>
+      <p style="margin-top:2.5rem"><a class="back" href="/">&larr; Back to Brambletally</a></p>
+    </div>
+  </body>
+</html>

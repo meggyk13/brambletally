@@ -1,0 +1,47 @@
+---
+// Brambletally — a full-screen client app. Deliberately not wrapped in a shared
+// layout: it renders its own <html> shell and mounts the client app into #bt-app.
+// Palette: Bramble / Hearth / Fen (data-theme="<palette>-<mode>").
+// Type: Alegreya Sans body / EB Garamond headings / IBM Plex Mono / IM Fell
+// English (display). See docs/design.md.
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Brambletally</title>
+    <meta name="robots" content="noindex" />
+    <meta name="description" content="A project tracker for craft, research, and event work." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script is:inline>
+      // Resolve theme before first paint to avoid a flash.
+      // bt-mode (light|dark|system) + bt-palette (bramble|hearth|fen) -> data-theme.
+      try {
+        var pals = ['bramble', 'hearth', 'fen'];
+        var p = localStorage.getItem('bt-palette');
+        if (pals.indexOf(p) < 0) p = 'bramble';
+        var m = localStorage.getItem('bt-mode');
+        var legacy = localStorage.getItem('bt-theme');
+        if (m !== 'light' && m !== 'dark' && (legacy === 'light' || legacy === 'dark')) {
+          m = legacy;
+          localStorage.setItem('bt-mode', m);
+          localStorage.removeItem('bt-theme');
+        }
+        if (m !== 'light' && m !== 'dark') {
+          m = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', p + '-' + m);
+      } catch (e) {}
+    </script>
+    <link rel="preload" href="/fonts/alegreya-sans-400-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/eb-garamond-400-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/app.css" />
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer is:inline></script>
+  </head>
+  <body>
+    <div id="bt-app"></div>
+    <script src="/app.js" is:inline></script>
+  </body>
+</html>

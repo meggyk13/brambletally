@@ -1,47 +1,306 @@
 ---
-// Brambletally — a full-screen client app. Deliberately not wrapped in a shared
-// layout: it renders its own <html> shell and mounts the client app into #bt-app.
-// Palette: Bramble / Hearth / Fen (data-theme="<palette>-<mode>").
-// Type: Alegreya Sans body / EB Garamond headings / IBM Plex Mono / IM Fell
-// English (display). See docs/design.md.
+// Brambletally — public landing page. The one indexable page; the app itself
+// lives at /app behind the login wall (see docs/plan.md "Planned: Landing page").
+// Own <html> shell, self-contained styles. Screenshot slots are placeholders
+// until the Pass-1 redesign is captured from the live app.
+const canonical = 'https://brambletally.com/';
 ---
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <title>Brambletally</title>
-    <meta name="robots" content="noindex" />
-    <meta name="description" content="A project tracker for craft, research, and event work." />
+    <title>Brambletally — a keeping-book for makers</title>
+    <meta
+      name="description"
+      content="A quiet place to track craft, research, and event projects — steps, supplies, a timeline, focus time, and projects you share with others."
+    />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Brambletally — a keeping-book for makers" />
+    <meta
+      property="og:description"
+      content="A quiet place to track craft, research, and event projects. Free, works on your phone."
+    />
+    <meta property="og:url" content={canonical} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <script is:inline>
-      // Resolve theme before first paint to avoid a flash.
-      // bt-mode (light|dark|system) + bt-palette (bramble|hearth|fen) -> data-theme.
-      try {
-        var pals = ['bramble', 'hearth', 'fen'];
-        var p = localStorage.getItem('bt-palette');
-        if (pals.indexOf(p) < 0) p = 'bramble';
-        var m = localStorage.getItem('bt-mode');
-        var legacy = localStorage.getItem('bt-theme');
-        if (m !== 'light' && m !== 'dark' && (legacy === 'light' || legacy === 'dark')) {
-          m = legacy;
-          localStorage.setItem('bt-mode', m);
-          localStorage.removeItem('bt-theme');
-        }
-        if (m !== 'light' && m !== 'dark') {
-          m = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        }
-        document.documentElement.setAttribute('data-theme', p + '-' + m);
-      } catch (e) {}
-    </script>
+    <link rel="preload" href="/fonts/im-fell-english-400-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/alegreya-sans-400-latin.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/eb-garamond-400-latin.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="/app.css" />
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer is:inline></script>
+
+    <style>
+      @font-face {
+        font-family: 'Alegreya Sans'; font-style: normal; font-weight: 400; font-display: swap;
+        src: url('/fonts/alegreya-sans-400-latin.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Alegreya Sans'; font-style: normal; font-weight: 700; font-display: swap;
+        src: url('/fonts/alegreya-sans-700-latin.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'EB Garamond'; font-style: normal; font-weight: 400; font-display: swap;
+        src: url('/fonts/eb-garamond-400-latin.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'EB Garamond'; font-style: normal; font-weight: 600; font-display: swap;
+        src: url('/fonts/eb-garamond-600-latin.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'IM Fell English'; font-style: normal; font-weight: 400; font-display: swap;
+        src: url('/fonts/im-fell-english-400-latin.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400; font-display: swap;
+        src: url('/fonts/ibm-plex-mono-400-latin.woff2') format('woff2');
+      }
+
+      :root {
+        --bg: #f3ecdc; --card: #fbf6ea; --elevated: #eadfc8;
+        --border: #e0d4b8; --border-strong: #a89670;
+        --text: #2a2230; --text-sub: #4a3f4e; --text-muted: #6f6374;
+        --accent: #6b3457; --accent-2: #4b6b3a; --on-accent: #ffffff;
+        --gold: #9a7526;
+        --head: 'EB Garamond', Georgia, 'Times New Roman', serif;
+        --body: 'Alegreya Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+        --display: 'IM Fell English', 'EB Garamond', Georgia, serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1e1a22; --card: #292330; --elevated: #342c3c;
+          --border: #3d3545; --border-strong: #625770;
+          --text: #ece3d6; --text-sub: #c7bcae; --text-muted: #948a83;
+          --accent: #c17ba3; --accent-2: #8fb073; --on-accent: #241a20;
+          --gold: #d8b768;
+        }
+      }
+
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0; background: var(--bg); color: var(--text);
+        font-family: var(--body); font-size: 1.0625rem; line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+      .prose { max-width: 62ch; }
+
+      a { color: var(--accent); }
+      h1, h2, h3 { font-family: var(--head); font-weight: 600; line-height: 1.15; text-wrap: balance; margin: 0; }
+      p { margin: 0 0 1rem; }
+
+      .topbar { display: flex; align-items: baseline; justify-content: space-between; padding: 22px 0 0; }
+      .brand { font-family: var(--display); font-size: 1.5rem; color: var(--accent-2); letter-spacing: .01em; }
+      .brand b { color: var(--gold); font-weight: 400; }
+      .topbar a.signin {
+        font-family: var(--body); font-weight: 600; font-size: .95rem;
+        color: var(--text-sub); text-decoration: none; border: 1px solid var(--border-strong);
+        border-radius: 8px; padding: 7px 14px;
+      }
+      .topbar a.signin:hover { border-color: var(--accent); color: var(--accent); }
+
+      .hero { padding: clamp(48px, 9vw, 96px) 0 clamp(40px, 7vw, 72px); }
+      .hero h1 {
+        font-family: var(--display); font-weight: 400;
+        font-size: clamp(2.6rem, 7vw, 4.5rem); color: var(--accent-2); margin-bottom: .5rem;
+      }
+      .hero .tagline {
+        font-family: 'IBM Plex Mono', ui-monospace, monospace;
+        text-transform: uppercase; letter-spacing: .18em; font-size: .8rem;
+        color: var(--text-muted); margin-bottom: 1.5rem;
+      }
+      .hero .lede { font-size: clamp(1.15rem, 2.4vw, 1.4rem); color: var(--text-sub); margin-bottom: 1.75rem; }
+      .cta {
+        display: inline-block; background: var(--accent); color: var(--on-accent);
+        font-family: var(--body); font-weight: 700; font-size: 1.05rem;
+        text-decoration: none; border-radius: 10px; padding: 13px 26px;
+      }
+      .cta:hover { opacity: .92; }
+      .cta.ghost { background: none; color: var(--text-sub); border: 1px solid var(--border-strong); margin-left: 10px; }
+      .cta.ghost:hover { color: var(--accent); border-color: var(--accent); }
+
+      .shot {
+        margin-top: clamp(32px, 6vw, 56px);
+        border: 1.5px dashed var(--border-strong); border-radius: 14px;
+        background: var(--card); aspect-ratio: 16 / 10; max-height: 460px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--text-muted); font-size: .95rem; text-align: center; padding: 20px;
+      }
+      .shot.sm { aspect-ratio: 4 / 3; max-height: 220px; margin: 0; font-size: .85rem; }
+
+      section { padding: clamp(44px, 8vw, 80px) 0; border-top: 1px solid var(--border); }
+      section h2 { font-size: clamp(1.7rem, 4vw, 2.4rem); color: var(--text); margin-bottom: .75rem; }
+      section .intro { color: var(--text-sub); font-size: 1.1rem; margin-bottom: 2rem; }
+
+      .kinds { display: flex; flex-wrap: wrap; gap: 10px; padding: 0; margin: 0; list-style: none; }
+      .kinds li {
+        border: 1px solid var(--border-strong); border-radius: 999px;
+        padding: 7px 15px; font-size: .95rem; color: var(--text-sub);
+      }
+
+      .steps { display: grid; gap: 22px; grid-template-columns: repeat(2, 1fr); }
+      @media (max-width: 720px) { .steps { grid-template-columns: 1fr; } }
+      .step { border: 1px solid var(--border); border-radius: 14px; background: var(--card); padding: 20px; }
+      .step .n {
+        font-family: var(--head); font-weight: 600; color: var(--accent-2);
+        font-size: 1.25rem; margin-bottom: .35rem;
+      }
+      .step p { margin: 0; color: var(--text-sub); font-size: 1rem; }
+
+      .themes { display: flex; gap: 14px; flex-wrap: wrap; margin: 0 0 1.5rem; }
+      .sw {
+        display: flex; align-items: center; gap: 10px;
+        border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 10px 14px;
+        font-weight: 600; color: var(--text);
+      }
+      .sw .chip { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(0,0,0,.12); display: flex; align-items: flex-end; justify-content: center; gap: 3px; padding-bottom: 5px; }
+      .sw .chip i { width: 8px; height: 8px; border-radius: 50%; display: block; }
+      .sw small { display: block; font-weight: 400; color: var(--text-muted); font-size: .8rem; }
+
+      .close { text-align: center; padding: clamp(56px, 10vw, 100px) 0; border-top: 1px solid var(--border); }
+      .close h2 { margin-bottom: 1.25rem; }
+
+      footer {
+        border-top: 1px solid var(--border); padding: 28px 0 48px;
+        display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
+        font-size: .9rem; color: var(--text-muted);
+      }
+      footer a { color: var(--text-sub); text-decoration: none; }
+      footer a:hover { color: var(--accent); }
+      footer .spacer { flex: 1; }
+
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    </style>
   </head>
+
   <body>
-    <div id="bt-app"></div>
-    <script src="/app.js" is:inline></script>
+    <div class="wrap">
+      <div class="topbar">
+        <span class="brand">brambletally<b>.</b></span>
+        <a class="signin" href="/app">Sign in</a>
+      </div>
+
+      <div class="hero prose">
+        <h1>brambletally.</h1>
+        <div class="tagline">a keeping-book for makers</div>
+        <p class="lede">
+          A quiet place to track the things you make — steps, supplies, a
+          timeline, a bit of focused time, and projects you keep with other
+          people.
+        </p>
+        <a class="cta" href="/app">Start your keeping-book</a>
+        <a class="cta ghost" href="#how">See how it works</a>
+      </div>
+      <div class="shot" aria-hidden="true">Your projects, at a glance — screenshot coming once the new look ships</div>
+    </div>
+
+    <main class="wrap">
+      <section id="who">
+        <div class="prose">
+          <h2>For long projects that live in your head</h2>
+          <p class="intro">
+            Costuming and Arts &amp; Sciences work, personal research, Kingdom
+            office and Chatelaine tasks, event prep, the household list that
+            never ends. If it has steps and it takes a while, it belongs here.
+          </p>
+        </div>
+        <ul class="kinds">
+          <li>A&amp;S &amp; costuming</li>
+          <li>Research</li>
+          <li>Kingdom office work</li>
+          <li>Event prep</li>
+          <li>Household</li>
+        </ul>
+      </section>
+
+      <section id="how">
+        <div class="prose">
+          <h2>How it works</h2>
+          <p class="intro">Four small habits, nothing to learn.</p>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="n">Catch the thought</div>
+            <p>Drop a loose idea in the inbox before it's gone. Sort it into a project later.</p>
+          </div>
+          <div class="step">
+            <div class="n">Break it down</div>
+            <p>Turn a project into steps, and a step into sub-steps. Add supplies, a due date, notes.</p>
+          </div>
+          <div class="step">
+            <div class="n">Plan some focus</div>
+            <p>Pick a step, set a length, and work by candlelight. Stop whenever you need to.</p>
+          </div>
+          <div class="step">
+            <div class="n">Look back weekly</div>
+            <p>One screen of everything active and waiting, for a calm review pass.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="share">
+        <div class="prose">
+          <h2>Made to share</h2>
+          <p class="intro">
+            Invite someone to a project as a viewer or an editor. Hand a whole
+            project over when it's not yours to run any more. Everyone works
+            from the same steps and the same timeline.
+          </p>
+        </div>
+        <div class="shot sm" aria-hidden="true">A shared project — screenshot coming</div>
+      </section>
+
+      <section id="keep">
+        <div class="prose">
+          <h2>Yours to keep</h2>
+          <p class="intro">Pick a look that suits the work.</p>
+        </div>
+        <div class="themes">
+          <span class="sw"><span class="chip" style="background:#f3ecdc"><i style="background:#6b3457"></i><i style="background:#4b6b3a"></i></span>Bramble<br /><small>blackberry &amp; hedgerow</small></span>
+          <span class="sw"><span class="chip" style="background:#f6eede"><i style="background:#a8482b"></i><i style="background:#8a6a1f"></i></span>Hearth<br /><small>tavern warmth</small></span>
+          <span class="sw"><span class="chip" style="background:#e9ece4"><i style="background:#2f6b6b"></i><i style="background:#54763a"></i></span>Fen<br /><small>misty marsh</small></span>
+        </div>
+        <div class="prose">
+          <p>
+            Light or dark, on your phone or a laptop. Sign in with a one-time
+            email link — no password to keep.
+          </p>
+          <p style="color:var(--text-muted); font-size:.98rem;">
+            Free, and staying that way. If it earns a place in your week, a
+            small yearly Supporter fee will add a badge and a few extra themes —
+            not built yet.
+          </p>
+        </div>
+      </section>
+
+      <div class="close wrap">
+        <h2>Tend your projects.</h2>
+        <a class="cta" href="/app">Start your keeping-book</a>
+      </div>
+    </main>
+
+    <div class="wrap">
+      <footer>
+        <a href="/app">Sign in</a>
+        <a href="/legal/terms">Terms</a>
+        <a href="/legal/privacy">Privacy</a>
+        <a href="/legal/acceptable-use">Acceptable use</a>
+        <span class="spacer"></span>
+        <span>Made for Rayhana's Repositorium.</span>
+      </footer>
+    </div>
+
+    <script is:inline>
+      // Swap the sign-in affordance for people who already have a session.
+      fetch('/api/auth/me', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (me) {
+          if (!me || !me.user) return;
+          document.querySelectorAll('a.signin').forEach(function (a) { a.textContent = 'Open your projects'; });
+          document.querySelectorAll('a.cta[href="/app"]').forEach(function (a) {
+            if (a.textContent.trim() === 'Start your keeping-book') a.textContent = 'Open your projects';
+          });
+        })
+        .catch(function () {});
+    </script>
   </body>
 </html>
