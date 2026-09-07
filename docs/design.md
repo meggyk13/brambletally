@@ -3,8 +3,11 @@
 Brambletally's own visual identity, separate from Rayhana's Repositorium.
 Companion to `plan.md` and `social-plan.md`.
 
-Status: **direction locked 2026-09-07**. Palettes and type committed; wordmark,
-icon set, and illustration work still open (see "Open decisions").
+Status: **Pass 1–2 shipped 2026-09-07** (PRs #1, #3, #4). Palettes, type,
+four tiers, Appearance picker, self-hosted fonts, `noodle`→`focus`, IM Fell
+wordmark, `icon()` line set — all live. **No brand mark** (hedgehog attempts
+dropped; favicon is a placeholder berry). Pass 3 polish and a real mark are
+later work.
 
 ## Direction
 
@@ -303,19 +306,17 @@ blind-toggling light/dark. The quick light/dark flip is one tap deep, inside
 the picker's Mode control. When the Settings shell lands, move this block into
 it and decide whether the header reverts to a blind toggle.
 
-## Wordmark, mark, favicon — done in PR #4
+## Wordmark, mark, favicon
 
 - **Wordmark** — set in `--font-display` (IM Fell English), weight 400,
   `--accent-2`, lowercase "brambletally." with the `.` in `--gold`. The old
-  800-weight `-.03em` treatment is gone.
-- **Mark** — a **side-profile hedgehog** as an inline `<svg class="bt-hog">`
-  in `app.js`: spike-fan back, wedge snout with nose + eye dots, three feet.
-  All stroke, `currentColor`, so it inherits the wordmark's `--accent-2`.
-  Sits before "brambletally." in the header and the auth screen. The curled
-  variant was tried and dropped — it read as an emoji face.
-- **Favicon** — `public/favicon.svg` is the same hedgehog path with an explicit
-  `#4b6b3a` stroke (works on light and dark browser chrome). PNG fallbacks
-  (32 / 180 apple-touch) still to add.
+  800-weight `-.03em` treatment is gone. (PR #4)
+- **Mark — none for now.** Two hedgehog attempts (a mountain-range-ish first
+  pass, then a rounder redraw) were both rejected and removed (PR to drop it,
+  post-#5). The wordmark + tagline carry the identity. A real mark is a later
+  job — the user will design one.
+- **Favicon** — `public/favicon.svg` is a placeholder blackberry (four
+  `#6b3457` circles). Replace when the mark exists; add PNG fallbacks then.
 
 ## Icon set — done in PR #4
 
@@ -388,7 +389,7 @@ defined and the raw px values were uplifted, but rules don't reference the
 tokens yet).
 
 **Pass 2 — identity (PR #4, done).**
-Hedgehog mark (side profile) + favicon. `icon()` helper + a 13-icon line set;
+Mark dropped (two hedgehog attempts rejected) — wordmark-only for now. Favicon is a placeholder berry. `icon()` helper + a 13-icon line set;
 every emoji and symbol glyph swapped. IM Fell wordmark + gold dot.
 Still to add: PNG favicon fallbacks; more icons as later features need them.
 
@@ -401,7 +402,7 @@ None blocking. Resolved 2026-09-07:
 
 - Themes: **Bramble** (default), **Hearth**, **Fen** — light + dark each.
 - Body font: **Alegreya Sans**.
-- Mark: a **hedgehog**.
+- Mark: **none for now** — hedgehog attempts dropped; wordmark-only.
 - Tokens rename to **`--accent` / `--accent-2`** with back-compat aliases
   through Pass 1; new **`--on-accent`** for filled-button labels.
 - Tagline: **"a keeping-book for makers"**.
@@ -417,5 +418,5 @@ None blocking. Resolved 2026-09-07:
 - **PR #3** — self-hosted fonts, `color-mix()` cleanup + aliases dropped,
   `noodle`→`focus` rename, tagline copy, IM Fell wordmark.
 
-Still to design during the build: the hedgehog mark itself, the icon set, and
+Still to design later: a brand mark (hedgehog attempts dropped), and
 the optional empty-state illustrations (PR #4).

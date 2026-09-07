@@ -180,7 +180,6 @@ const ICONS = {
 function icon(name, size = 20) {
   return `<svg class="bt-ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 }
-const HEDGEHOG = '<svg class="bt-hog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15.5C4 11.8 7 9.3 10.8 9.3c3.7 0 6.7 2.1 7.8 5.2"/><path d="M4 15.5c0 2.5 2 4.1 4.8 4.1h6.8c2 0 3.3-1.4 3.4-3.2"/><path d="M4 15.5 2.2 17c-.3.3-.3.7 0 1l2.2 1"/><path d="M6.5 11 5.2 7.6M9 9.6 8.4 6M11.7 9.3v-3.6M14 9.6 15 6M16.3 10.6 17.9 7.7"/><circle cx="2.4" cy="17.4" r=".85" fill="currentColor" stroke="none"/><circle cx="6.7" cy="15" r="1" fill="currentColor" stroke="none"/><path d="M8.6 19.6v2M14.4 19.6v2"/></svg>';
 
 function on(el, sel, evt, fn) {
   el.querySelectorAll(sel).forEach((n) => n.addEventListener(evt, fn));
@@ -472,7 +471,7 @@ function renderAuth() {
   root().replaceChildren(
     h(`
     <div class="bt-auth">
-      <div class="wordmark">${HEDGEHOG}brambletally<span>.</span></div>
+      <div class="wordmark">brambletally<span>.</span></div>
       <div class="tagline">a keeping-book for makers</div>
       <p class="sub">A place to track A&amp;S projects, personal research, and Chatelaine office work &mdash; steps, supplies, a timeline, a focus timer, and projects you share with others.</p>
       <h1>Sign in</h1>
@@ -543,7 +542,7 @@ function header() {
     <div class="header">
       <div class="header-row">
         <div>
-          <div class="wordmark">${HEDGEHOG}brambletally<span>.</span></div>
+          <div class="wordmark">brambletally<span>.</span></div>
           <div class="tagline">a keeping-book for makers</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
