@@ -15,8 +15,7 @@
     {
       "binding": "DB",
       "database_name": "brambletally",
-      // Fill in after: npx wrangler d1 create brambletally
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+      "database_id": "77c8c947-6d7f-4d5c-aac6-8170f9edd5aa"
     }
   ]
 }
