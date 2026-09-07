@@ -16,6 +16,9 @@ export async function onRequestGet(context) {
   const supplies = (await db.prepare(
     'SELECT * FROM project_supplies WHERE project_id = ? ORDER BY created_at'
   ).bind(id).all()).results;
+  const links = (await db.prepare(
+    'SELECT * FROM project_links WHERE project_id = ? ORDER BY sort_order, created_at'
+  ).bind(id).all()).results;
   const journal = (await db.prepare(
     `SELECT j.*, u.name AS author_name
        FROM project_journal j JOIN users u ON u.id = j.user_id
@@ -27,7 +30,14 @@ export async function onRequestGet(context) {
       WHERE pc.project_id = ? ORDER BY pc.added_at`
   ).bind(id).all()).results;
 
-  return json({ project: { ...project, role: g.role }, steps, supplies, journal, collaborators });
+  return json({
+    project: { ...project, role: g.role },
+    steps,
+    supplies,
+    links,
+    journal,
+    collaborators,
+  });
 }
 
 // PATCH /api/projects/:id — editors and up.

@@ -26,3 +26,27 @@ export function pick(obj, keys) {
   for (const k of keys) if (obj[k] !== undefined) out[k] = obj[k];
   return out;
 }
+
+// Trim a string, cap its length, and collapse empty to null.
+export const trimOrNull = (v, max = 500) => {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  return s ? s.slice(0, max) : null;
+};
+
+// Accept only http/https URLs, <= 2000 chars, and return the normalised href.
+// `new URL()` throws on scheme-relative ("//x") and junk; the protocol check
+// rejects javascript:/data:/mailto:/etc. Anything invalid -> null.
+export function httpUrlOrNull(v) {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (!s || s.length > 2000) return null;
+  let u;
+  try {
+    u = new URL(s);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+  return u.href;
+}

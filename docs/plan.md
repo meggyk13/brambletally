@@ -367,12 +367,25 @@ only.
 - **Recurring steps** — needs a `recurrence` field + regen-on-completion.
 - **Step-level blocked / waiting-for flag** — its own GTD design call.
 
-## Planned: Project links (spec'd 2026-09-07)
+## Project links — shipped in PR #8 (2026-09-07)
 
 A per-project link list — reference material, inspiration, product pages,
 shared docs. Separate from supplies (which carry their own single `url` each).
-Own pass, ahead of and independent of the social features. Pure text rows, no
-R2, no hosting cost.
+Pure text rows, no R2, no hosting cost.
+
+**Built:** `project_links` table + `migrations/0002_project_links.sql` (folded
+into `schema.sql`). `httpUrlOrNull` / `trimOrNull` in `worker/api/lib/validate.js`.
+Two worker modules mirroring supplies — `worker/api/projects/id/links.js`
+(GET + POST) and `.../links/linkId.js` (PATCH + DELETE), viewer-reads /
+editor-writes, `DB.batch` + `touchStmt`; registered in `worker/routes.js`.
+`id.js` adds `links` to the detail bundle. Frontend: a **Links** detail tab
+between Supplies and Timeline — `linksPanel` / `linkRow` (link icon,
+title-or-hostname as the link, note or hostname on the sub-line, edit chevron)
+/ `openLinkForm` modal / a persistent "Paste a link…" inline row. New `link`
+icon; `linkHost()` strips `www.` and the path. No title/favicon fetch.
+
+**Migration to run against prod D1 after merge:**
+`npx wrangler d1 execute brambletally --remote --file=./migrations/0002_project_links.sql`
 
 ### Schema — one migration
 

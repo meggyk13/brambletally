@@ -125,6 +125,20 @@ CREATE TABLE project_supplies (
 );
 CREATE INDEX idx_supplies_project ON project_supplies(project_id);
 
+-- Per-project link list: reference material, inspiration, product pages, docs.
+-- Separate from project_supplies.url (one link per supply). No server-side
+-- title/favicon fetch — a blank title renders as the URL hostname.
+CREATE TABLE project_links (
+  id            TEXT PRIMARY KEY,        -- uuid
+  project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  url           TEXT NOT NULL,           -- http(s) only, <= 2000, normalised on write
+  title         TEXT,                    -- optional label, <= 200; UI falls back to hostname
+  note          TEXT,                    -- optional "why this matters", <= 500
+  sort_order    INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_links_project ON project_links(project_id);
+
 CREATE TABLE project_journal (
   id            TEXT PRIMARY KEY,        -- uuid
   project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
