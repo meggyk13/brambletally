@@ -161,6 +161,27 @@ function esc(s) {
   ));
 }
 
+// ── Icons ───────────────────────────────────────────
+// Line set, 24x24, currentColor. icon(name[, size]).
+const ICONS = {
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+  people: '<circle cx="9" cy="9" r="3.2"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M16 7.2A3.2 3.2 0 0 1 19.5 12M15.5 14.4c2.7.2 4.7 2.2 4.7 4.9"/>',
+  steps: '<path d="M4 6h16"/><path d="M9 12h11M9 18h11"/><path d="M4.5 12h.01M4.5 18h.01"/>',
+  candle: '<path d="M12 3c1.6 1.2 1.6 3 0 4-1.6-1-1.6-2.8 0-4z" fill="currentColor" stroke="none"/><rect x="8.5" y="8" width="7" height="12" rx="1"/><path d="M6 20h12"/>',
+  leaf: '<path d="M12 21V7"/><path d="M12 12c-3 0-5-1.6-5.5-4.5C9.4 7 12 8.6 12 12zM12 15c3 0 5-1.6 5.5-4.5C14.6 10 12 11.6 12 15z"/><path d="M12 9c-2.2 0-3.7-1.2-4-3.3M12 9c2.2 0 3.7-1.2 4-3.3"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  back: '<path d="M14 5l-7 7 7 7"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8L6 18M18 6l1.8-1.8"/>',
+  moon: '<path d="M19 13.5A7.5 7.5 0 1 1 10.5 5a6 6 0 0 0 8.5 8.5z"/>',
+  chevron: '<path d="M6 9l6 6 6-6"/>',
+};
+function icon(name, size = 20) {
+  return `<svg class="bt-ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+const HEDGEHOG = '<svg class="bt-hog" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 22c-2.6 0-4.4-1.7-4.4-3.9 0-1.6 1-3 2.6-3.6"/><path d="M6.2 14.5c1-3 3.8-4.9 7.3-4.9"/><path d="M13.5 9.6c-1.3-.5-2.1-.2-2.6.5-.5.8-.3 1.9.6 2.6"/><path d="M4 20.6l3-4.2 2.4 3.4 2.2-4.6 2.6 4.2 2.3-4.6 2.5 4.2 2.3-4 2.4 3.8c1 1.1 1.5 2.4 1.5 3.7 0 .5-.4.9-.9.9H6.5C5 27 4 25.7 4 24c0-1.2.4-2.4 1.2-3.4"/><circle cx="10.4" cy="11.4" r=".85" fill="currentColor" stroke="none"/><circle cx="14.2" cy="12.6" r=".7" fill="currentColor" stroke="none"/><path d="M11 27v1.6M17 27v1.6M23 27v1.6"/></svg>';
+
 function on(el, sel, evt, fn) {
   el.querySelectorAll(sel).forEach((n) => n.addEventListener(evt, fn));
 }
@@ -343,7 +364,7 @@ function openAppearance() {
       <div class="modal">
         <div class="bt-appr-head">
           <span class="bt-appr-title">Appearance</span>
-          <button class="modal-close" data-close aria-label="Close">&times;</button>
+          <button class="modal-close" data-close aria-label="Close">${icon('close')}</button>
         </div>
 
         <div class="bt-appr-label">Mode</div>
@@ -451,7 +472,7 @@ function renderAuth() {
   root().replaceChildren(
     h(`
     <div class="bt-auth">
-      <div class="wordmark">brambletally<span>.</span></div>
+      <div class="wordmark">${HEDGEHOG}brambletally<span>.</span></div>
       <div class="tagline">a keeping-book for makers</div>
       <p class="sub">A place to track A&amp;S projects, personal research, and Chatelaine office work &mdash; steps, supplies, a timeline, a focus timer, and projects you share with others.</p>
       <h1>Sign in</h1>
@@ -522,14 +543,14 @@ function header() {
     <div class="header">
       <div class="header-row">
         <div>
-          <div class="wordmark">brambletally<span>.</span></div>
+          <div class="wordmark">${HEDGEHOG}brambletally<span>.</span></div>
           <div class="tagline">a keeping-book for makers</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn-icon" id="bt-theme" title="Appearance" aria-label="Appearance">${
-            effectiveTheme() === 'dark' ? '☀' : '☾'
+            effectiveTheme() === 'dark' ? icon('sun') : icon('moon')
           }</button>
-          <button class="btn-icon" id="bt-search" title="Search" aria-label="Search">🔍</button>
+          <button class="btn-icon" id="bt-search" title="Search" aria-label="Search">${icon('search')}</button>
           <button class="btn-sm btn-sm-ghost" id="bt-signout">Sign out</button>
         </div>
       </div>
@@ -856,7 +877,7 @@ async function openProjectForm(existing, opts = {}) {
     <div class="modal-overlay open">
       <div class="modal">
         <div class="modal-header"><span class="modal-title">${existing ? 'Edit project' : 'New project'}</span>
-          <button class="modal-close" aria-label="Close">×</button></div>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
         <form id="bt-pform">
           <label class="sp-label">Title</label>
           <input class="sp-input" name="title" required value="${esc(p.title || '')}" />
@@ -988,7 +1009,7 @@ function openManageCategories(onDone) {
     <div class="modal-overlay open">
       <div class="modal">
         <div class="modal-header"><span class="modal-title">Categories</span>
-          <button class="modal-close">×</button></div>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
         <div id="bt-cat-list"></div>
         <div class="person-add">
           <label class="sp-label">Add a category</label>
@@ -1074,7 +1095,7 @@ async function openPeople(bundle) {
     <div class="modal-overlay open">
       <div class="modal">
         <div class="modal-header"><span class="modal-title">People</span>
-          <button class="modal-close">×</button></div>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
         <div id="bt-people-body"><div class="empty">Loading…</div></div>
       </div>
     </div>
@@ -1281,7 +1302,7 @@ function renderProject(app) {
           <span class="status-pill" style="--tab-color:${STATUS_COLOR[p.status]}">${esc(p.status)}</span>
           ${p.category ? `<span>${esc(p.category)}</span>` : ''}
           ${p.deadline ? `<span>due ${esc(fmtDate(p.deadline))}</span>` : ''}
-          <button class="meta-people" id="bt-people">👥 ${b.collaborators.length}${
+          <button class="meta-people" id="bt-people">${icon('people', 16)} ${b.collaborators.length}${
             p.role !== 'owner' ? ` &middot; ${esc(p.role)}` : ''
           }</button>
         </div>
@@ -1292,7 +1313,7 @@ function renderProject(app) {
             ? `<div class="progress-bar-wrap" style="margin:14px 0"><div class="progress-bar-fill" style="width:${pct}%;background:${STATUS_COLOR[p.status]}"></div></div>`
             : ''
         }
-        <button class="focus-detail-btn" id="bt-focus">▶ Start a focus session</button>
+        <button class="focus-detail-btn" id="bt-focus">${icon('candle')} Start a focus session</button>
         <div class="detail-tabs">
           ${['steps', 'supplies', 'timeline']
             .map(
@@ -1481,7 +1502,7 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
     }">
       <button class="checkbox" ${s.completed ? 'aria-checked="true"' : ''} ${
         boxDisabled ? 'disabled' : ''
-      }>${s.completed ? '✓' : ''}</button>
+      }>${s.completed ? icon('check', 18) : ''}</button>
       <div class="check-content${canEdit ? ' tappable' : ''}">
         <div class="check-title">${esc(s.title)}</div>
         ${bits.length ? `<div class="check-sub">${bits.join(' · ')}</div>` : ''}
@@ -1490,7 +1511,7 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
         showBash
           ? `<button class="step-bash" title="${
               isContainer ? 'Add sub-steps' : 'Break into steps'
-            }" aria-label="Break into steps">🔨</button>`
+            }" aria-label="Break into steps">${icon('steps', 18)}</button>`
           : ''
       }
     </div>
@@ -1569,7 +1590,7 @@ function openStepForm(b, existing, done, opts = {}) {
     <div class="modal-overlay open">
       <div class="modal">
         <div class="modal-header"><span class="modal-title">${existing ? 'Edit step' : 'Add step'}</span>
-          <button class="modal-close">×</button></div>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
         <form id="bt-sform">
           <label class="sp-label">Step</label>
           <input class="sp-input" name="title" required value="${esc(s.title || '')}" />
@@ -1662,7 +1683,7 @@ function openBashForm(b, step, done, opts = {}) {
       <div class="modal">
         <div class="modal-header">
           <span class="modal-title">${adding ? 'Add sub-steps' : 'Break into steps'}</span>
-          <button class="modal-close">×</button>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button>
         </div>
         <form id="bt-bashform">
           <p class="bt-bash-parent">${esc(step.title)}</p>
@@ -1727,7 +1748,7 @@ function supplyRow(b, s, canEdit, rerender) {
   const row = h(`
     <div class="check-row${s.acquired ? ' checked' : ''}">
       <button class="checkbox" ${s.acquired ? 'aria-checked="true"' : ''} ${canEdit ? '' : 'disabled'}>${
-        s.acquired ? '✓' : ''
+        s.acquired ? icon('check', 16) : ''
       }</button>
       <div class="check-content${canEdit ? ' tappable' : ''}">
         <div class="check-title">${esc(s.name)}</div>
@@ -1756,7 +1777,7 @@ function openSupplyForm(b, existing, done) {
     <div class="modal-overlay open">
       <div class="modal">
         <div class="modal-header"><span class="modal-title">${existing ? 'Edit supply' : 'Add supply'}</span>
-          <button class="modal-close">×</button></div>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
         <form id="bt-supform">
           <label class="sp-label">Item</label>
           <input class="sp-input" name="name" required value="${esc(s.name || '')}" />
@@ -1930,7 +1951,7 @@ async function openAssignStep(text, done) {
     <div class="modal-overlay open">
       <div class="modal">
         <div class="modal-header"><span class="modal-title">Add as a step</span>
-          <button class="modal-close">×</button></div>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
         <form id="bt-assign">
           <div class="pickup-box" style="margin-bottom:14px"><div class="pickup-text">${esc(text)}</div></div>
           <label class="sp-label">Project</label>
@@ -1970,7 +1991,7 @@ function renderSearch(app) {
         <button class="search-back" id="bt-s-back" aria-label="Back">←</button>
         <input class="search-field" id="bt-s-input" type="search"
           placeholder="Search projects, steps, inbox" autocomplete="off" />
-        <button class="search-clear" id="bt-s-clear" aria-label="Clear" hidden>✕</button>
+        <button class="search-clear" id="bt-s-clear" aria-label="Clear" hidden>${icon('close', 16)}</button>
       </div>
     </div>
   `);
@@ -2349,7 +2370,7 @@ function openFocusSession(bundle) {
       <div>
         <div class="focus-head">
           <div class="focus-wordmark">focus session</div>
-          <button class="focus-close" aria-label="Close">✕</button>
+          <button class="focus-close" aria-label="Close">${icon('close')}</button>
         </div>
         <div class="focus-body">
           <div class="focus-project-name">${esc(sess.projectTitle)}</div>
@@ -2361,7 +2382,7 @@ function openFocusSession(bundle) {
                     .map(
                       (s) =>
                         `<div class="focus-check-row" data-step="${s.id}">
-                          <span class="focus-check-box"><span class="focus-check-icon">✓</span></span>
+                          <span class="focus-check-box"><span class="focus-check-icon">${icon('check', 16)}</span></span>
                           <span class="focus-check-label">${esc(s.title)}</span>
                         </div>`
                     )
@@ -2409,7 +2430,7 @@ function openFocusSession(bundle) {
       <div>
         <div class="focus-head">
           <div class="focus-wordmark">focus session</div>
-          <button class="focus-close" aria-label="Close">✕</button>
+          <button class="focus-close" aria-label="Close">${icon('close')}</button>
         </div>
         <div class="focus-body focus-body-timer">
           <div class="focus-timer-project">${esc(sess.projectTitle)}</div>
@@ -2459,10 +2480,10 @@ function openFocusSession(bundle) {
       <div>
         <div class="focus-head">
           <div class="focus-wordmark">focus session</div>
-          <button class="focus-close" aria-label="Close">✕</button>
+          <button class="focus-close" aria-label="Close">${icon('close')}</button>
         </div>
         <div class="focus-body focus-body-timer">
-          <div class="focus-finish-emoji">✅</div>
+          <div class="focus-finish-emoji">${icon('leaf', 40)}</div>
           <div class="focus-finish-headline">Session done</div>
           <div class="focus-finish-time">${mins} minute${mins === 1 ? '' : 's'} on ${esc(sess.projectTitle)}</div>
           <div class="focus-finish-msg">What did you get done?</div>

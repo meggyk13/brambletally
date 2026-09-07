@@ -303,30 +303,29 @@ blind-toggling light/dark. The quick light/dark flip is one tap deep, inside
 the picker's Mode control. When the Settings shell lands, move this block into
 it and decide whether the header reverts to a blind toggle.
 
-## Wordmark, mark, favicon
+## Wordmark, mark, favicon — done in PR #4
 
-- **Wordmark** — "Brambletally" set in `--font-display`, lowercase or
-  small-caps. Drop the current treatment (800 weight, `-.03em`, one
-  `--amethyst` span) — it reads as a tech logo. Optionally a small sprig glyph
-  or one accent-coloured ligature.
-- **Mark** — a **hedgehog** (locked 2026-09-07): lives in the bramble,
-  friendly, reads at a glance. Woodcut line art, single path, `currentColor`,
-  legible at 16px (favicon) and ~32px (header). Try a curled/rolled hedgehog
-  for the favicon — a rounder silhouette holds up better small — against the
-  standard side profile for the header lockup.
-- **Favicon** — replace `public/favicon.svg` with the mark. Add PNG fallbacks
-  (32px, 180px apple-touch).
+- **Wordmark** — set in `--font-display` (IM Fell English), weight 400,
+  `--accent-2`, lowercase "brambletally." with the `.` in `--gold`. The old
+  800-weight `-.03em` treatment is gone.
+- **Mark** — a **side-profile hedgehog** as an inline `<svg class="bt-hog">`
+  in `app.js`: spike-fan back, wedge snout with nose + eye dots, three feet.
+  All stroke, `currentColor`, so it inherits the wordmark's `--accent-2`.
+  Sits before "brambletally." in the header and the auth screen. The curled
+  variant was tried and dropped — it read as an emoji face.
+- **Favicon** — `public/favicon.svg` is the same hedgehog path with an explicit
+  `#4b6b3a` stroke (works on light and dark browser chrome). PNG fallbacks
+  (32 / 180 apple-touch) still to add.
 
-## Icon set
+## Icon set — done in PR #4
 
-Replace emoji (🔨 for bash, the theme button, etc.) with a woodcut-style
-inline-SVG set: 24×24, ~1.75px stroke, `currentColor`, delivered as a JS
-`icon(name)` helper or an inline sprite.
-
-Needed: split (bash), sun, moon, plus, close, check, calendar/due, search,
-gear, chevron-back, candle (focus session), tag (category), people
-(collaborators), link, photo, quill (journal), basket (inbox), bundle
-(supplies), bell (notifications). ~19 icons.
+`icon(name, size)` in `app.js` returns an inline `<svg class="bt-ic">` — 24×24
+viewBox, 1.75 stroke, `currentColor`. Set shipped: **search, people, steps**
+(break-into-sub-steps, an indented-list glyph), **candle** (focus session),
+**leaf** (focus finish), **check, close, back, plus, sun, moon, chevron**.
+Every emoji (`🔍 👥 🔨 ✅`) and the `▶ ☾ ☀ ✕ ✓ ×` glyphs are swapped. More
+icons (tag, link, photo, quill, basket, bell) get added as the features that
+need them land.
 
 ## Polish — optional, later
 
@@ -388,8 +387,10 @@ Still open: adopt the `--fs-*` tokens rule-by-rule (currently the scale is
 defined and the raw px values were uplifted, but rules don't reference the
 tokens yet).
 
-**Pass 2 — identity (PR #4).**
-Hedgehog mark + favicon. Icon set replacing emoji.
+**Pass 2 — identity (PR #4, done).**
+Hedgehog mark (side profile) + favicon. `icon()` helper + a 13-icon line set;
+every emoji and symbol glyph swapped. IM Fell wordmark + gold dot.
+Still to add: PNG favicon fallbacks; more icons as later features need them.
 
 **Pass 3 — polish (optional).**
 Paper texture, flourish dividers, empty-state illustrations, radius tokens.
