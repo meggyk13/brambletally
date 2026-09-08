@@ -26,6 +26,8 @@ import * as category from './api/categories/categoryId.js';
 import * as inbox from './api/inbox/index.js';
 import * as inboxItem from './api/inbox/itemId.js';
 import * as usersSearch from './api/users/search.js';
+import * as profile from './api/profile/index.js';
+import * as profileHandle from './api/profile/handle.js';
 
 export const routes = [
   ['/api/auth/request-link', authRequestLink],
@@ -53,4 +55,6 @@ export const routes = [
   ['/api/inbox', inbox],
   ['/api/inbox/:itemId', inboxItem],
   ['/api/users/search', usersSearch],
+  ['/api/profile', profile],
+  ['/api/profile/handle', profileHandle],
 ];

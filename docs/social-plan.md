@@ -177,7 +177,30 @@ Stripe's hosted portal. On a $10 charge Stripe takes ~$0.59 (~6%); annual
 billing keeps that to one transaction per member per year. A lifetime option
 (one-time ~$25) is a later call.
 
-## Identity model (prerequisite — build first)
+## Identity model — Phase 1a shipped in PR #9 (2026-09-07)
+
+**Built:** `migrations/0003_social.sql` adds to `users`: `handle`,
+`handle_set_at`, `display_name`, `is_admin`, `tos_accepted_at`, `tos_version`,
+`board_blocked_at`, `disabled_at`, plus the partial unique index
+`idx_users_handle`. Folded into `schema.sql`.
+`worker/api/lib/handle.js` (`normalizeHandle` — format + reserved words) and
+`worker/api/lib/plan.js` (`isSupporter`). `loadSession` selects the new columns
+into `context.data.user`. `worker/index.js` 403s any route but `/api/auth/me`
+and `/api/auth/logout` when `disabled_at` is set (emergency stop; a by-hand D1
+edit is the trigger until the admin panel exists). `/api/auth/me` now returns
+`{ user, needs_handle, supporter }`. New endpoints: `PUT /api/profile/handle`
+(first set free, 30-day cooldown on changes, 409 on collision) and
+`PATCH /api/profile` (`display_name` only for now). `users/search` also matches
+`display_name` and `@handle`.
+Frontend: `boot` keeps the full `me` payload in `state.me`; `render` routes to
+a **"Pick a handle"** screen when `needs_handle`, an **"Account suspended"**
+screen when `disabled_at`, else the app. A gold **Supporter** pill in the
+header when `state.me.supporter`. `handleReason` mirrors the server format
+rules for inline feedback.
+**Still Phase 1b:** `user_profiles`, the profile view/edit, the Settings shell
+(handle/display-name editing moves there), legal acceptance gate.
+
+---
 
 Today `users.name` is nullable, unverified, non-unique, and defaults to the
 email local-part (`worker/api/auth/callback.js:40`). `users/search.js` matches

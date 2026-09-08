@@ -7,13 +7,22 @@ PRAGMA foreign_keys = ON;
 -- ── Auth ─────────────────────────────────────────────────────────────────
 
 CREATE TABLE users (
-  id            TEXT PRIMARY KEY,        -- uuid
-  email         TEXT UNIQUE NOT NULL,
-  name          TEXT,
-  avatar_url    TEXT,
-  plan          TEXT NOT NULL DEFAULT 'free',  -- tier hook; nothing is gated yet
-  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  id              TEXT PRIMARY KEY,        -- uuid
+  email           TEXT UNIQUE NOT NULL,
+  name            TEXT,                    -- legacy display fallback; superseded by display_name / handle
+  avatar_url      TEXT,
+  plan            TEXT NOT NULL DEFAULT 'free',  -- 'free' | 'supporter' (see worker/api/lib/plan.js)
+  handle          TEXT,                    -- 3-20 [a-z0-9_], case-folded; UNIQUE via the partial index below
+  handle_set_at   TEXT,                    -- ISO datetime of the last handle write; drives the 30-day change cooldown
+  display_name    TEXT,                    -- free text, <= 50; UI falls back to @handle
+  is_admin        INTEGER NOT NULL DEFAULT 0,
+  tos_accepted_at TEXT,                    -- set at the first-login acceptance gate (Phase 1b)
+  tos_version     TEXT,
+  board_blocked_at TEXT,                   -- soft sanction: no board posting (guarded from Phase 3)
+  disabled_at     TEXT,                    -- hard sanction: router 403s everything but /api/auth/me + logout
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE UNIQUE INDEX idx_users_handle ON users(handle) WHERE handle IS NOT NULL;
 
 CREATE TABLE sessions (
   id            TEXT PRIMARY KEY,        -- random token, stored as httpOnly cookie
