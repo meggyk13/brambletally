@@ -83,6 +83,52 @@ CREATE TABLE follows (
 );
 CREATE INDEX idx_follows_followee ON follows(followee_id);
 
+-- ── Board (Phase 3) ──────────────────────────────────────────────────────
+
+-- One "help wanted" listing per project. Public blurb + lifecycle, off the
+-- core projects row.
+CREATE TABLE project_listings (
+  id           TEXT PRIMARY KEY,             -- uuid
+  project_id   TEXT NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
+  created_by   TEXT NOT NULL REFERENCES users(id),
+  headline     TEXT NOT NULL,                -- <= 120
+  help_wanted  TEXT NOT NULL,                -- <= 2000, escaped on render
+  status       TEXT NOT NULL DEFAULT 'open'
+                 CHECK(status IN ('open','closed','archived')),
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_listings_status ON project_listings(status, updated_at);
+
+-- One level of replies only; soft delete keeps the row for reply context.
+CREATE TABLE listing_comments (
+  id                TEXT PRIMARY KEY,        -- uuid
+  listing_id        TEXT NOT NULL REFERENCES project_listings(id) ON DELETE CASCADE,
+  user_id           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  parent_comment_id TEXT REFERENCES listing_comments(id) ON DELETE CASCADE,
+  body              TEXT NOT NULL,           -- <= 2000, escaped on render
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  edited_at         TEXT,
+  deleted_at        TEXT
+);
+CREATE INDEX idx_listing_comments_listing ON listing_comments(listing_id, created_at);
+
+-- One live request per person per listing (UNIQUE); a declined/withdrawn row is
+-- reused on re-request (status back to 'pending', decided_* cleared).
+CREATE TABLE contributor_requests (
+  id            TEXT PRIMARY KEY,            -- uuid
+  listing_id    TEXT NOT NULL REFERENCES project_listings(id) ON DELETE CASCADE,
+  requester_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message       TEXT,                        -- <= 1000
+  status        TEXT NOT NULL DEFAULT 'pending'
+                  CHECK(status IN ('pending','accepted','declined','withdrawn')),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  decided_at    TEXT,
+  decided_by    TEXT REFERENCES users(id),
+  UNIQUE (listing_id, requester_id)
+);
+CREATE INDEX idx_contrib_req_listing ON contributor_requests(listing_id, status);
+
 CREATE TABLE sessions (
   id            TEXT PRIMARY KEY,        -- random token, stored as httpOnly cookie
   user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
