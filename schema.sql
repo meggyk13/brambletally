@@ -63,6 +63,17 @@ CREATE TABLE user_interests (
 );
 CREATE INDEX idx_user_interests_tag ON user_interests(tag_id);
 
+-- User-to-user blocking. A block hides both accounts from each other in user
+-- search, profile views, and interest discovery. Reciprocal follows-row
+-- deletion is wired in with Phase 2.
+CREATE TABLE user_blocks (
+  blocker_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  blocked_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (blocker_id, blocked_id)
+);
+CREATE INDEX idx_blocks_blocked ON user_blocks(blocked_id);
+
 CREATE TABLE sessions (
   id            TEXT PRIMARY KEY,        -- random token, stored as httpOnly cookie
   user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

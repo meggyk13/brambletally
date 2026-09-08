@@ -237,9 +237,31 @@ from global search (People) and Settings → Account → Profile. **Also fixed:*
 `worker/api/account.js` had `../lib/` imports (should be `./lib/`) — the build /
 `wrangler dev` failed on `main` before this.
 
-**Still Phase 1b-ii PR 2:** `user_blocks` + block/unblock + enforcement (search,
-profile, discovery, feed later), `requireAdmin` helper + admin interest-tag tool
-(merge / rename / delete). **Separate:** email change, the legal acceptance gate.
+**Phase 1b-ii PR 2 shipped in PR #TBD (2026-09-07):** `migrations/0006_social.sql`
+adds `user_blocks` (`blocker_id`, `blocked_id`, PK both, `idx_blocks_blocked`).
+Folded into `schema.sql`. New `worker/api/lib/blocks.js` — `blockedBetween(env,a,b)`
+(either direction) + `notBlockedSql(userCol)` list fragment — and
+`worker/api/lib/admin.js` — `requireAdmin(context)` (404 not 403 for a non-admin,
+reads `context.data.user.is_admin`). New endpoints: `GET /api/blocks` (own list,
+for Settings), `POST /api/blocks` `{ handle }` (idempotent; can't self-block;
+reciprocal `follows` cleanup deferred to Phase 2), `DELETE /api/blocks/:handle`.
+Admin interest-tag tool: `GET /api/admin/interests?q=`, `POST
+/api/admin/interests/merge` `{ fromSlug, toSlug }` (one batch: `UPDATE OR IGNORE
+user_interests` repoint + delete leftovers + recount winner + drop loser),
+`PATCH /api/admin/interests/:slug` `{ label?, slug? }` (409 on slug collision),
+`DELETE /api/admin/interests/:slug` (`user_interests` cascades). Block enforcement
+layered into `GET /api/profile/:handle` (404 either direction), `worker/api/users/
+search.js`, the People section of `worker/api/search.js`, and `GET
+/api/interests/:slug`. Route table: literal `/api/admin/interests/merge` before
+`/api/admin/interests/:slug`. Frontend: `renderBlocked` (Settings → Account →
+Blocked accounts, live unblock) and `renderAdmin` (Settings → Admin → Interest
+tags, shown only when `is_admin`; filter box, two-click Merge with an armed-row
+highlight, Rename via `btPrompt`, Delete with a usage-count warning); a **Block**
+button on other people's profiles (`btConfirm`, then navigate back).
+
+**Phase 1 is now feature-complete** except the two deferred items:
+**email change** and the **legal acceptance gate** (both listed "Separate"
+throughout). Phase 2 (following) is next.
 
 ---
 

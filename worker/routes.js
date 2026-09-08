@@ -32,6 +32,11 @@ import * as profileLinks from './api/profile/links.js';
 import * as profileByHandle from './api/profile/byHandle.js';
 import * as interests from './api/interests/index.js';
 import * as interest from './api/interests/slug.js';
+import * as blocks from './api/blocks/index.js';
+import * as block from './api/blocks/handle.js';
+import * as adminInterests from './api/admin/interests/index.js';
+import * as adminInterestMerge from './api/admin/interests/merge.js';
+import * as adminInterest from './api/admin/interests/slug.js';
 import * as settingsNotifPrefs from './api/settings/notif-prefs.js';
 import * as settingsExport from './api/settings/export.js';
 import * as account from './api/account.js';
@@ -69,6 +74,12 @@ export const routes = [
   ['/api/profile/:handle', profileByHandle],
   ['/api/interests', interests],
   ['/api/interests/:slug', interest],
+  ['/api/blocks', blocks],
+  ['/api/blocks/:handle', block],
+  ['/api/admin/interests', adminInterests],
+  // literal 'merge' must precede '/api/admin/interests/:slug' — first match wins
+  ['/api/admin/interests/merge', adminInterestMerge],
+  ['/api/admin/interests/:slug', adminInterest],
   ['/api/settings/notif-prefs', settingsNotifPrefs],
   ['/api/settings/export', settingsExport],
   ['/api/account', account],

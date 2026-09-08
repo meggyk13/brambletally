@@ -1,10 +1,11 @@
 import { json, error } from '../lib/http.js';
+import { notBlockedSql } from '../lib/blocks.js';
 
 // GET /api/users/search?q=…  — for the "invite an existing user" picker.
 // Signed-in only. Matches on name, display_name or @handle, and never returns
 // email: an email you already know is invited through the exact-match path in
 // collaborators.js, so there's no reason to let a signed-in user resolve or
-// enumerate addresses here.
+// enumerate addresses here. Blocked accounts (either direction) are excluded.
 export async function onRequestGet(context) {
   const user = context.data.user;
   if (!user) return error(401, 'Not signed in');
@@ -22,9 +23,10 @@ export async function onRequestGet(context) {
           OR (display_name IS NOT NULL AND lower(display_name) LIKE ?)
           OR (handle IS NOT NULL AND handle LIKE ?)
         )
+        AND ${notBlockedSql('id')}
       ORDER BY COALESCE(display_name, name, handle) LIMIT 10`
   )
-    .bind(user.id, like, like, like)
+    .bind(user.id, like, like, like, user.id, user.id)
     .all();
 
   return json({ users: results });

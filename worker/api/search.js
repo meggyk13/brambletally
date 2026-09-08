@@ -56,12 +56,16 @@ export async function onRequestGet(context) {
     .all()).results;
 
   // People: signed-in accounts with a handle, matched on handle / display_name /
-  // legacy name. Self and disabled accounts excluded. Never returns email.
+  // legacy name. Self, disabled and blocked (either direction) accounts
+  // excluded. Never returns email.
   const people = (await db.prepare(
     `SELECT handle, display_name, name FROM users
       WHERE id != ?1 AND handle IS NOT NULL AND disabled_at IS NULL
         AND (handle LIKE ?2 OR lower(COALESCE(display_name, '')) LIKE ?3
              OR lower(COALESCE(name, '')) LIKE ?3)
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b
+              WHERE (b.blocker_id = ?1 AND b.blocked_id = users.id)
+                 OR (b.blocked_id = ?1 AND b.blocker_id = users.id))
       ORDER BY COALESCE(display_name, name, handle) COLLATE NOCASE
       LIMIT 10`
   )
