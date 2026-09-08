@@ -261,7 +261,31 @@ button on other people's profiles (`btConfirm`, then navigate back).
 
 **Phase 1 is now feature-complete** except the two deferred items:
 **email change** and the **legal acceptance gate** (both listed "Separate"
-throughout). Phase 2 (following) is next.
+throughout).
+
+**Phase 2 (following) shipped in PR #TBD (2026-09-08):** `migrations/0007_social.sql`
+adds `follows` (`follower_id`, `followee_id`, PK both, `idx_follows_followee`).
+Folded into `schema.sql`. New endpoints: `GET /api/follows` (the accounts the
+caller follows, with `id` — feeds the invite picker), `POST /api/follows`
+`{ handle }` (idempotent, no accept step, block-checked, 404s a disabled/blocked
+target like the profile route), `DELETE /api/follows/:handle`,
+`GET /api/profile/:handle/followers` and `/following` (one module
+`worker/api/profile/follows.js` at both routes; block- and disabled-filtered,
+each row carries `is_following`, `?cursor=` offset paging). `GET /api/profile/:handle`
+now also returns `follower_count`, `following_count`, `is_following`,
+`follows_you` (one combined scalar query in the existing `Promise.all`).
+`POST /api/blocks` now also deletes any `follows` row in either direction
+between the two accounts (same batch). Frontend: a Follow/Following toggle
+(`followToggleBtn`, self-managing, emits `followchange`) + a **Follows you** chip
++ a tappable "N followers · M following" line on the profile; `renderFollowList`
+(`state.view === 'follows'`, reuses the Settings shell) with per-row follow
+toggles via `personRow(u, { follow: true })` (now a `<div class="bt-person-wrap">`
+so the toggle isn't a nested button); the collaborator-invite modal gains a
+**People you follow** shortcut list (hidden once the search box has text,
+already-added collaborators filtered out). **Deferred to Phase 3** (their data
+lives there): `GET /api/feed` and the "started following you" notification.
+
+Phase 3 (board + notifications) is next.
 
 ---
 

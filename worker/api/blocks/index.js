@@ -18,8 +18,8 @@ export async function onRequestGet(context) {
   return json({ blocks: results || [] });
 }
 
-// POST /api/blocks — body { handle }. Idempotent. Reciprocal follows-row
-// deletion is added with Phase 2.
+// POST /api/blocks — body { handle }. Idempotent. Also drops any follow in
+// either direction between the two accounts.
 export async function onRequestPost(context) {
   const me = context.data.user;
   if (!me) return error(401, 'Not signed in');
@@ -37,12 +37,17 @@ export async function onRequestPost(context) {
   if (!target) return error(404, 'No such account');
   if (target.id === me.id) return error(400, "You can't block yourself");
 
-  await context.env.DB.prepare(
-    `INSERT INTO user_blocks (blocker_id, blocked_id) VALUES (?, ?)
-     ON CONFLICT(blocker_id, blocked_id) DO NOTHING`
-  )
-    .bind(me.id, target.id)
-    .run();
+  await context.env.DB.batch([
+    context.env.DB.prepare(
+      `INSERT INTO user_blocks (blocker_id, blocked_id) VALUES (?, ?)
+       ON CONFLICT(blocker_id, blocked_id) DO NOTHING`
+    ).bind(me.id, target.id),
+    context.env.DB.prepare(
+      `DELETE FROM follows
+        WHERE (follower_id = ?1 AND followee_id = ?2)
+           OR (follower_id = ?2 AND followee_id = ?1)`
+    ).bind(me.id, target.id),
+  ]);
 
   return json({ ok: true, handle });
 }
