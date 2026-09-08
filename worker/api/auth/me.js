@@ -2,6 +2,8 @@ import { json, error } from '../lib/http.js';
 import { isSupporter } from '../lib/plan.js';
 import { readNotifPrefs } from '../lib/notif.js';
 import { boardActionCount, TURNSTILE_UNTIL_ACTIONS } from '../lib/board.js';
+import { needsTos } from '../lib/legal.js';
+import { TOS_VERSION } from '../lib/constants.js';
 
 export async function onRequestGet(context) {
   const user = context.data.user;
@@ -22,6 +24,8 @@ export async function onRequestGet(context) {
   return json({
     user,
     needs_handle: !user.handle,
+    needs_tos: needsTos(user),
+    tos_version: TOS_VERSION,
     supporter: isSupporter(user),
     notif_prefs: readNotifPrefs(prefs && prefs.notif_prefs),
     unread_count: (unread && unread.n) || 0,

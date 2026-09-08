@@ -212,6 +212,7 @@ const API = {
   sanctionUser: (handle, body) =>
     api('/api/admin/users/' + encodeURIComponent(handle) + '/sanction', { method: 'POST', body }),
   saveNotifPrefs: (prefs) => api('/api/settings/notif-prefs', { method: 'PATCH', body: prefs }),
+  acceptTos: () => api('/api/legal/accept', { method: 'POST' }),
   deleteAccount: () => api('/api/account', { method: 'DELETE' }),
 
   listInbox: () => api('/api/inbox'),
@@ -546,6 +547,9 @@ async function boot() {
 function render() {
   if (!state.user) return renderAuth();
   if (state.user.disabled_at) return renderSuspended();
+  // Terms first: the handle-set endpoint (and everything else) is behind the
+  // acceptance gate, so a new user must clear this before picking a handle.
+  if (state.me && state.me.needs_tos) return renderTos();
   if (state.me && state.me.needs_handle) return renderHandlePrompt();
   renderApp();
 }
@@ -618,6 +622,72 @@ function renderHandlePrompt() {
   });
   root().replaceChildren(el);
   input.focus();
+}
+
+function renderTos() {
+  const returning = !!(state.me && state.me.user && state.me.user.tos_accepted_at);
+  const el = h(`
+    <div class="bt-auth">
+      <div class="wordmark">brambletally<span>.</span></div>
+      <div class="tagline">a keeping-book for makers</div>
+      <h1>${returning ? 'Updated terms' : 'Before you start'}</h1>
+      <p class="sub">${
+        returning
+          ? 'The Terms and Acceptable Use policy have changed. Have a look and accept them to keep going.'
+          : 'Brambletally has a short set of rules — mostly "be decent on the board." Please read and accept them.'
+      }</p>
+      <div class="msg err" id="bt-tos-err" hidden></div>
+      <p class="bt-tos-links">
+        <a href="/legal/terms" target="_blank" rel="noopener">Terms of Use</a>
+        <span aria-hidden="true">·</span>
+        <a href="/legal/acceptable-use" target="_blank" rel="noopener">Acceptable Use</a>
+      </p>
+      <label class="bt-tos-check">
+        <input type="checkbox" id="bt-tos-agree" />
+        <span>I've read and agree to the Terms of Use and the Acceptable Use policy.</span>
+      </label>
+      <button class="btn-primary" id="bt-tos-submit" disabled>Accept and continue</button>
+      <a class="back" id="bt-tos-signout" href="#">Sign out</a>
+    </div>
+  `);
+  const agree = el.querySelector('#bt-tos-agree');
+  const submit = el.querySelector('#bt-tos-submit');
+  const err = el.querySelector('#bt-tos-err');
+  agree.addEventListener('change', () => {
+    submit.disabled = !agree.checked;
+    err.hidden = true;
+  });
+  submit.addEventListener('click', async () => {
+    if (!agree.checked) return;
+    submit.disabled = true;
+    submit.textContent = 'Saving…';
+    try {
+      const r = await API.acceptTos();
+      if (state.me) {
+        state.me.needs_tos = false;
+        if (state.me.user) {
+          state.me.user.tos_accepted_at = new Date().toISOString();
+          state.me.user.tos_version = r.tos_version;
+        }
+      }
+      render();
+    } catch (ex) {
+      err.textContent = ex.message || 'Could not save that just now.';
+      err.hidden = false;
+      submit.disabled = false;
+      submit.textContent = 'Accept and continue';
+    }
+  });
+  el.querySelector('#bt-tos-signout').addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+      await API.logout();
+    } catch {
+      /* ignore */
+    }
+    location.href = APP_PATH;
+  });
+  root().replaceChildren(el);
 }
 
 function renderSuspended() {

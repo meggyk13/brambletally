@@ -57,6 +57,7 @@ import * as adminUser from './api/admin/users/handle.js';
 import * as adminUserSanction from './api/admin/users/handle/sanction.js';
 import * as settingsNotifPrefs from './api/settings/notif-prefs.js';
 import * as settingsExport from './api/settings/export.js';
+import * as legalAccept from './api/legal/accept.js';
 import * as account from './api/account.js';
 
 export const routes = [
@@ -119,5 +120,6 @@ export const routes = [
   ['/api/admin/users/:handle/sanction', adminUserSanction],
   ['/api/settings/notif-prefs', settingsNotifPrefs],
   ['/api/settings/export', settingsExport],
+  ['/api/legal/accept', legalAccept],
   ['/api/account', account],
 ];

@@ -14,3 +14,7 @@ export const appOrigin = (env) => (env && env.APP_ORIGIN) || CANONICAL_ORIGIN;
 // Overridable per-environment with MAIL_FROM. The domain must be
 // verified in Resend before real sending works.
 export const FROM_EMAIL = 'Brambletally <login@brambletally.com>';
+
+// Bump when the Terms or Acceptable Use policy change materially: every user
+// re-accepts at their next load. Compared against users.tos_version.
+export const TOS_VERSION = '2026-09-07';
