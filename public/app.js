@@ -105,6 +105,7 @@ const API = {
   getProject: (id) => api('/api/projects/' + id),
   updateProject: (id, b) => api('/api/projects/' + id, { method: 'PATCH', body: b }),
   deleteProject: (id) => api('/api/projects/' + id, { method: 'DELETE' }),
+  duplicateProject: (id) => api('/api/projects/' + id + '/duplicate', { method: 'POST' }),
 
   addStep: (pid, b) => api(`/api/projects/${pid}/steps`, { method: 'POST', body: b }),
   updateStep: (pid, sid, b) =>
@@ -4079,6 +4080,7 @@ function renderProject(app) {
       <div class="detail-body">
         <div class="detail-topbar">
           <button class="detail-back" id="bt-back">← Back</button>
+          <button class="detail-back" id="bt-dupproj">Duplicate</button>
           ${canEdit ? '<button class="detail-back" id="bt-editproj">Edit</button>' : ''}
         </div>
         <h1 class="detail-title">${esc(p.title)}</h1>
@@ -4137,6 +4139,21 @@ function renderProject(app) {
   );
   if (canEdit) on(view, '#bt-editproj', 'click', () => openProjectForm(p));
   view.querySelector('#bt-sessions-slot').appendChild(sessionsBlock(b));
+  on(view, '#bt-dupproj', 'click', async () => {
+    const ok = await btConfirm(
+      `Duplicate “${p.title}”? Its steps, supplies and links copy into a new project you own — the timeline and collaborators don't come along.`,
+      { ok: 'Duplicate' }
+    );
+    if (!ok) return;
+    let res;
+    try {
+      res = await guard(() => API.duplicateProject(p.id));
+    } catch {
+      return;
+    }
+    toast('Project duplicated');
+    openProject(res.id);
+  });
   renderPickup(view.querySelector('#bt-pickup-box'), canEdit);
   on(view, '[data-tab]', 'click', (e) => {
     state.detailTab = e.currentTarget.dataset.tab;
