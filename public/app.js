@@ -138,6 +138,9 @@ const API = {
     api(`/api/projects/${pid}/transfer`, { method: 'POST', body: { toUserId } }),
   searchUsers: (q) => api('/api/users/search?q=' + encodeURIComponent(q)),
 
+  setHandle: (handle) => api('/api/profile/handle', { method: 'PUT', body: { handle } }),
+  updateProfile: (body) => api('/api/profile', { method: 'PATCH', body }),
+
   listInbox: () => api('/api/inbox'),
   addInbox: (text) => api('/api/inbox', { method: 'POST', body: { text } }),
   deleteInbox: (id) => api('/api/inbox/' + id, { method: 'DELETE' }),
@@ -442,6 +445,7 @@ function openAppearance() {
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
   user: null,
+  me: null, // the full /api/auth/me payload: { user, needs_handle, supporter }
   view: 'home', // home | next | project | inbox | review
   projects: [],
   categories: [], // [{id, name, sort_order}]
@@ -466,8 +470,10 @@ async function boot() {
   applyTheme();
   try {
     const me = await API.me();
+    state.me = me;
     state.user = me.user;
   } catch {
+    state.me = null;
     state.user = null;
   }
   render();
@@ -475,7 +481,100 @@ async function boot() {
 
 function render() {
   if (!state.user) return renderAuth();
+  if (state.user.disabled_at) return renderSuspended();
+  if (state.me && state.me.needs_handle) return renderHandlePrompt();
   renderApp();
+}
+
+// ── Handle / suspended screens ─────────────────────────────────────────────
+// Mirrors worker/api/lib/handle.js — inline feedback only, the server decides.
+function handleReason(raw) {
+  const h = String(raw || '').trim().toLowerCase();
+  if (h.length < 3) return 'At least 3 characters.';
+  if (h.length > 20) return '20 characters or fewer.';
+  if (!/^[a-z0-9_]+$/.test(h)) return 'Letters, numbers and underscores only.';
+  if (h.startsWith('_') || h.endsWith('_')) return "Can't start or end with an underscore.";
+  return null;
+}
+
+function renderHandlePrompt() {
+  const el = h(`
+    <div class="bt-auth">
+      <div class="wordmark">brambletally<span>.</span></div>
+      <div class="tagline">a keeping-book for makers</div>
+      <h1>Pick a handle</h1>
+      <p class="sub">This is how other people find you when they share a project. Letters, numbers and underscores, 3&ndash;20 characters. You can change it later.</p>
+      <div class="msg err" id="bt-h-err" hidden></div>
+      <form id="bt-h-form">
+        <label for="bt-h-input">Handle</label>
+        <div class="bt-handle-field">
+          <span aria-hidden="true">@</span>
+          <input id="bt-h-input" autocomplete="off" autocapitalize="off" spellcheck="false"
+            inputmode="text" required placeholder="yourname" />
+        </div>
+        <button type="submit" class="btn-primary" id="bt-h-submit">Continue</button>
+      </form>
+      <a class="back" id="bt-h-signout" href="#">Sign out</a>
+    </div>
+  `);
+  const input = el.querySelector('#bt-h-input');
+  const err = el.querySelector('#bt-h-err');
+  const submit = el.querySelector('#bt-h-submit');
+  const showErr = (m) => {
+    err.textContent = m;
+    err.hidden = !m;
+  };
+  input.addEventListener('input', () => {
+    input.value = input.value.replace(/[^A-Za-z0-9_]/g, '').toLowerCase();
+    showErr('');
+  });
+  el.querySelector('#bt-h-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const reason = handleReason(input.value);
+    if (reason) return showErr(reason);
+    submit.disabled = true;
+    submit.textContent = 'Saving…';
+    try {
+      await API.setHandle(input.value.trim().toLowerCase());
+      await boot();
+    } catch (ex) {
+      showErr(ex.message || 'Could not save that handle.');
+      submit.disabled = false;
+      submit.textContent = 'Continue';
+    }
+  });
+  el.querySelector('#bt-h-signout').addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+      await API.logout();
+    } catch {
+      /* ignore */
+    }
+    location.href = APP_PATH;
+  });
+  root().replaceChildren(el);
+  input.focus();
+}
+
+function renderSuspended() {
+  const el = h(`
+    <div class="bt-auth">
+      <div class="wordmark">brambletally<span>.</span></div>
+      <h1>Account suspended</h1>
+      <p class="sub">This account can't be used right now. If you think this is a mistake, reply to your sign-in email.</p>
+      <a class="back" id="bt-sus-signout" href="#">Sign out</a>
+    </div>
+  `);
+  el.querySelector('#bt-sus-signout').addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+      await API.logout();
+    } catch {
+      /* ignore */
+    }
+    location.href = APP_PATH;
+  });
+  root().replaceChildren(el);
 }
 
 // ── Sign-in ────────────────────────────────────────────────────────────────
@@ -557,7 +656,9 @@ function header() {
     <div class="header">
       <div class="header-row">
         <div>
-          <div class="wordmark">brambletally<span>.</span></div>
+          <div class="wordmark">brambletally<span>.</span>${
+            state.me && state.me.supporter ? '<span class="bt-supporter">Supporter</span>' : ''
+          }</div>
           <div class="tagline">a keeping-book for makers</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">

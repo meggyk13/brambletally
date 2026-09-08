@@ -75,6 +75,19 @@ export default {
       console.error('[brambletally] session load failed', e);
     }
 
+    // Hard sanction: a by-hand D1 edit to users.disabled_at 403s every route
+    // except the two the client needs to show the "suspended" screen and leave.
+    // Data-subject routes (export, delete) get added to the allowlist when they
+    // ship in Phase 1b.
+    if (
+      context.data.user &&
+      context.data.user.disabled_at &&
+      url.pathname !== '/api/auth/me' &&
+      url.pathname !== '/api/auth/logout'
+    ) {
+      return error(403, 'This account is suspended');
+    }
+
     let res;
     try {
       res = await handler(context);
