@@ -1,6 +1,7 @@
 import { json, error, readJson } from '../lib/http.js';
 import { requireProject } from '../lib/projects.js';
 import { STATUSES, pick, isNonEmptyString } from '../lib/validate.js';
+import { shapeSession, SESSION_SELECT, SESSION_JOINS } from '../lib/worksessions.js';
 
 // GET /api/projects/:id — full bundle for the detail view.
 export async function onRequestGet(context) {
@@ -33,6 +34,17 @@ export async function onRequestGet(context) {
     .prepare('SELECT id, status FROM project_listings WHERE project_id = ?')
     .bind(id)
     .first();
+  const sessions = (
+    await db
+      .prepare(
+        `SELECT ${SESSION_SELECT}
+           FROM work_sessions ws ${SESSION_JOINS}
+          WHERE ws.project_id = ? AND ws.ends_at > datetime('now', '-1 day')
+          ORDER BY ws.starts_at`
+      )
+      .bind(id)
+      .all()
+  ).results;
 
   return json({
     project: { ...project, role: g.role },
@@ -42,6 +54,7 @@ export async function onRequestGet(context) {
     journal,
     collaborators,
     listing: listing || null, // { id, status } when this project is on the board
+    sessions: (sessions || []).map((r) => shapeSession(r, g.user.id)),
   });
 }
 

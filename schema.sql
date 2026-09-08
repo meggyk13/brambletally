@@ -20,9 +20,11 @@ CREATE TABLE users (
   tos_version     TEXT,
   board_blocked_at TEXT,                   -- soft sanction: no board posting (guarded from Phase 3)
   disabled_at     TEXT,                    -- hard sanction: router 403s everything but /api/auth/me + logout
+  calendar_token  TEXT,                    -- keys the per-user ICS feed (migration 0012); UNIQUE via the partial index below
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX idx_users_handle ON users(handle) WHERE handle IS NOT NULL;
+CREATE UNIQUE INDEX idx_users_calendar_token ON users(calendar_token) WHERE calendar_token IS NOT NULL;
 
 -- 1:1 with users; split out so the hot auth SELECT in session.js stays lean.
 CREATE TABLE user_profiles (
@@ -326,6 +328,23 @@ CREATE TABLE project_journal (
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_journal_project ON project_journal(project_id);
+
+-- Planned focus time (migration 0012). One collaborator's intention to work on
+-- a project (optionally a step) in a window. Each collaborator plans their own.
+CREATE TABLE work_sessions (
+  id            TEXT PRIMARY KEY,        -- uuid
+  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  step_id       TEXT REFERENCES project_steps(id) ON DELETE SET NULL,  -- optional
+  starts_at     TEXT NOT NULL,           -- "YYYY-MM-DD HH:MM:SS" UTC, like datetime('now')
+  ends_at       TEXT NOT NULL,
+  note          TEXT,                    -- optional, <= 500
+  status        TEXT NOT NULL DEFAULT 'planned'
+                  CHECK(status IN ('planned','done','skipped')),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_work_sessions_user ON work_sessions(user_id, starts_at);
+CREATE INDEX idx_work_sessions_project ON work_sessions(project_id, starts_at);
 
 -- ── GTD capture ──────────────────────────────────────────────────────────
 

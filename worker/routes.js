@@ -20,6 +20,11 @@ import * as link from './api/projects/id/links/linkId.js';
 import * as journal from './api/projects/id/journal.js';
 import * as collaborators from './api/projects/id/collaborators.js';
 import * as transfer from './api/projects/id/transfer.js';
+import * as projectSessions from './api/projects/id/sessions.js';
+import * as projectSession from './api/projects/id/sessions/sessionId.js';
+import * as sessionsList from './api/sessions.js';
+import * as sessionDetail from './api/sessions/id.js';
+import * as calendarFeed from './api/calendar/token.js';
 import * as review from './api/review.js';
 import * as search from './api/search.js';
 import * as categories from './api/categories/index.js';
@@ -59,6 +64,7 @@ import * as adminUserSanction from './api/admin/users/handle/sanction.js';
 import * as settingsNotifPrefs from './api/settings/notif-prefs.js';
 import * as settingsExport from './api/settings/export.js';
 import * as settingsEmail from './api/settings/email.js';
+import * as settingsCalendarToken from './api/settings/calendar-token.js';
 import * as legalAccept from './api/legal/accept.js';
 import * as account from './api/account.js';
 
@@ -81,7 +87,12 @@ export const routes = [
   ['/api/projects/:id/journal', journal],
   ['/api/projects/:id/collaborators', collaborators],
   ['/api/projects/:id/transfer', transfer],
+  ['/api/projects/:id/sessions', projectSessions],
+  ['/api/projects/:id/sessions/:sessionId', projectSession],
 
+  ['/api/sessions', sessionsList],
+  ['/api/sessions/:id', sessionDetail],
+  ['/api/calendar/:token', calendarFeed],
   ['/api/review', review],
   ['/api/search', search],
   ['/api/categories', categories],
@@ -124,6 +135,7 @@ export const routes = [
   ['/api/settings/notif-prefs', settingsNotifPrefs],
   ['/api/settings/export', settingsExport],
   ['/api/settings/email', settingsEmail],
+  ['/api/settings/calendar-token', settingsCalendarToken],
   ['/api/legal/accept', legalAccept],
   ['/api/account', account],
 ];
