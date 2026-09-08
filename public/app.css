@@ -1853,3 +1853,30 @@ textarea{resize:vertical;min-height:60px}
 #bt-app #bt-adm-merge-state { color: var(--warn-text); font-weight: 600; padding-bottom: 8px; }
 #bt-app #bt-bl-body .sp-row .sp-row-left, #bt-app #bt-adm-list .sp-row .sp-row-left { min-width: 0; }
 #bt-app #bt-prof-block { color: var(--danger); }
+
+/* ── Following (Social Phase 2) ──────────────────────────────────────────── */
+#bt-app .bt-prof-actions { display: flex; gap: 8px; margin: 12px 20px 4px; flex-wrap: wrap; }
+#bt-app .bt-prof-actions .btn-sm { display: inline-flex; align-items: center; gap: 6px; }
+#bt-app .bt-prof-block { color: var(--danger); }
+
+.bt-follow-btn { background: var(--accent); color: var(--on-accent); border: 1px solid var(--accent); }
+.bt-follow-btn.is-following { background: transparent; color: var(--text-sub); border-color: var(--border-strong); }
+
+.bt-follows-you {
+  font-family: var(--font-ui); font-size: 10px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted);
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  padding: 1px 7px; margin-left: 6px; vertical-align: 2px;
+}
+
+.bt-prof-counts { display: flex; gap: 18px; padding: 6px 20px 0; }
+.bt-prof-counts button {
+  background: none; border: none; cursor: pointer; padding: 0;
+  font-size: 14px; color: var(--text-muted); font-family: var(--font-ui);
+}
+.bt-prof-counts button b { color: var(--text); font-weight: 700; }
+.bt-prof-counts button:hover { color: var(--text); }
+
+.bt-person-wrap { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+#bt-app .bt-person-wrap .bt-person { flex: 1; border-bottom: none; }
+#bt-app .bt-person-wrap .bt-follow-btn { flex-shrink: 0; margin-right: 20px; padding: 6px 14px; font-size: 13px; }

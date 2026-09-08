@@ -146,6 +146,14 @@ const API = {
   putInterests: (labels) => api('/api/interests', { method: 'PUT', body: { labels } }),
   discover: (slug, cursor) =>
     api('/api/interests/' + encodeURIComponent(slug) + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  listFollowing: () => api('/api/follows'),
+  follow: (handle) => api('/api/follows', { method: 'POST', body: { handle } }),
+  unfollow: (handle) => api('/api/follows/' + encodeURIComponent(handle), { method: 'DELETE' }),
+  followsList: (handle, rel, cursor) =>
+    api(
+      `/api/profile/${encodeURIComponent(handle)}/${rel}` +
+        (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')
+    ),
   listBlocks: () => api('/api/blocks'),
   block: (handle) => api('/api/blocks', { method: 'POST', body: { handle } }),
   unblock: (handle) => api('/api/blocks/' + encodeURIComponent(handle), { method: 'DELETE' }),
@@ -449,7 +457,7 @@ function appearanceControls() {
 const state = {
   user: null,
   me: null, // the full /api/auth/me payload: { user, needs_handle, supporter }
-  view: 'home', // home | next | project | inbox | review | settings | search | profile | profile-edit | discover | blocked | admin
+  view: 'home', // home | next | project | inbox | review | settings | search | profile | profile-edit | discover | follows | blocked | admin
   viewBeforeProfile: 'home', // where a Back from a profile / discover screen returns
   profileHandle: null, // handle shown by renderProfile
   discoverSlug: null, // interest slug shown by renderDiscover
@@ -883,11 +891,50 @@ function openDiscover(slug) {
   state.discoverSlug = slug;
   render();
 }
+function openFollowList(handle, rel) {
+  if (!['profile', 'follows', 'discover'].includes(state.view))
+    state.viewBeforeProfile = state.view;
+  state.view = 'follows';
+  state.followListHandle = handle;
+  state.followListRel = rel; // 'followers' | 'following'
+  render();
+}
 
-// Tappable person row — discovery list + People search results.
-function personRow(u) {
+const myHandle = () => (state.me && state.me.user && state.me.user.handle) || null;
+
+// A self-managing Follow / Following toggle button.
+function followToggleBtn(handle, following) {
+  const btn = h(
+    `<button class="btn-sm bt-follow-btn${
+      following ? ' is-following' : ''
+    }">${following ? 'Following' : 'Follow'}</button>`
+  );
+  let busy = false;
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (busy) return;
+    busy = true;
+    const next = !btn.classList.contains('is-following');
+    try {
+      await (next ? API.follow(handle) : API.unfollow(handle));
+    } catch (ex) {
+      toast(ex.message || 'Could not update follow');
+      busy = false;
+      return;
+    }
+    btn.classList.toggle('is-following', next);
+    btn.textContent = next ? 'Following' : 'Follow';
+    btn.dispatchEvent(new CustomEvent('followchange', { detail: { following: next }, bubbles: true }));
+    busy = false;
+  });
+  return btn;
+}
+
+// Tappable person row — discovery, People search, follower/following lists.
+// opts.follow adds a Follow toggle (skipped for the caller's own row).
+function personRow(u, opts = {}) {
   const name = u.display_name || u.name || '@' + u.handle;
-  const row = h(`
+  const tap = h(`
     <button class="bt-person">
       ${avatarEl(u.display_name || u.name || u.handle)}
       <span class="bt-person-main">
@@ -898,8 +945,13 @@ function personRow(u) {
       </span>
     </button>
   `);
-  row.addEventListener('click', () => openProfile(u.handle));
-  return row;
+  tap.addEventListener('click', () => openProfile(u.handle));
+  if (opts.follow && u.handle !== myHandle()) {
+    const wrap = h('<div class="bt-person-wrap"></div>');
+    wrap.append(tap, followToggleBtn(u.handle, !!u.is_following));
+    return wrap;
+  }
+  return tap;
 }
 
 async function renderProfile(app) {
@@ -941,29 +993,52 @@ async function renderProfile(app) {
         <h1 class="detail-title">${esc(name)}</h1>
         <div class="bt-prof-handle">@${esc(p.handle)}${
           p.supporter ? ' <span class="bt-supporter">Supporter</span>' : ''
-        }${p.is_admin ? ' <span class="bt-admin-tag">Admin</span>' : ''}</div>
+        }${p.is_admin ? ' <span class="bt-admin-tag">Admin</span>' : ''}${
+          p.follows_you && !p.is_self ? ' <span class="bt-follows-you">Follows you</span>' : ''
+        }</div>
         ${p.pronouns ? `<div class="bt-prof-pronouns">${esc(p.pronouns)}</div>` : ''}
       </div>
     </div>
   `)
   );
 
+  const counts = h(`
+    <div class="bt-prof-counts">
+      <button data-rel="followers"><b>${p.follower_count || 0}</b> ${
+        (p.follower_count || 0) === 1 ? 'follower' : 'followers'
+      }</button>
+      <button data-rel="following"><b>${p.following_count || 0}</b> following</button>
+    </div>
+  `);
+  on(counts, '[data-rel]', 'click', (e) =>
+    openFollowList(p.handle, e.currentTarget.dataset.rel)
+  );
+  body.appendChild(counts);
+
+  const actions = h('<div class="bt-prof-actions"></div>');
   if (p.is_self) {
     const editBtn = h(
-      `<button class="btn-sm btn-sm-ghost bt-prof-edit" id="bt-prof-edit">${icon('edit', 16)} Edit profile</button>`
+      `<button class="btn-sm btn-sm-ghost" id="bt-prof-edit">${icon('edit', 16)} Edit profile</button>`
     );
     editBtn.addEventListener('click', () => {
       state.view = 'profile-edit';
       render();
     });
-    body.appendChild(editBtn);
+    actions.appendChild(editBtn);
   } else {
-    const blockBtn = h(
-      `<button class="btn-sm btn-sm-ghost bt-prof-edit" id="bt-prof-block">Block</button>`
-    );
+    const followBtn = followToggleBtn(p.handle, p.is_following);
+    followBtn.addEventListener('followchange', (e) => {
+      const n = counts.querySelector('[data-rel="followers"] b');
+      n.textContent = String(
+        Math.max(0, parseInt(n.textContent, 10) + (e.detail.following ? 1 : -1))
+      );
+    });
+    actions.appendChild(followBtn);
+
+    const blockBtn = h(`<button class="btn-sm btn-sm-ghost bt-prof-block">Block</button>`);
     blockBtn.addEventListener('click', async () => {
       const ok = await btConfirm(
-        `Block @${p.handle}? You won't see each other in search, discovery, or profiles. You can undo this in Settings.`,
+        `Block @${p.handle}? You won't see each other in search, discovery, or profiles, and any follow between you is removed. You can undo this in Settings.`,
         { danger: true, ok: 'Block' }
       );
       if (!ok) return;
@@ -977,8 +1052,9 @@ async function renderProfile(app) {
       state.view = back;
       render();
     });
-    body.appendChild(blockBtn);
+    actions.appendChild(blockBtn);
   }
+  body.appendChild(actions);
 
   if (p.bio) {
     const sec = h(
@@ -1332,6 +1408,75 @@ async function renderDiscover(app) {
     (r.users || []).forEach((u) => listWrap.appendChild(personRow(u)));
     if (!listWrap.children.length) {
       listWrap.appendChild(h('<div class="empty">No one else yet.</div>'));
+    }
+    cursor = r.next_cursor;
+    if (cursor) {
+      const b = h('<button class="btn-sm btn-sm-ghost bt-loadmore">Load more</button>');
+      b.addEventListener('click', () => loadMore(b));
+      body.appendChild(b);
+    }
+  };
+
+  loadMore(null);
+}
+
+// ── Follower / following list ────────────────────────────────────────────
+async function renderFollowList(app) {
+  app.replaceChildren();
+  const handle = state.followListHandle;
+  const rel = state.followListRel === 'followers' ? 'followers' : 'following';
+  const el = h(`
+    <div class="settings-screen">
+      <div class="settings-body">
+        <div class="detail-topbar"><button class="detail-back" id="bt-fl-back">← Back</button></div>
+        <div id="bt-fl-body"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  `);
+  on(el, '#bt-fl-back', 'click', () => openProfile(handle));
+  app.appendChild(el);
+
+  const body = el.querySelector('#bt-fl-body');
+  let cursor = null;
+  let first = true;
+  let listWrap;
+
+  const loadMore = async (moreBtn) => {
+    let r;
+    try {
+      r = await guard(() => API.followsList(handle, rel, cursor));
+    } catch {
+      if (first) body.replaceChildren(h('<div class="empty">Not found.</div>'));
+      return;
+    }
+    if (first) {
+      body.replaceChildren();
+      body.appendChild(
+        h(
+          `<h1 class="detail-title">${rel === 'followers' ? 'Followers' : 'Following'}</h1>`
+        )
+      );
+      body.appendChild(
+        h(
+          `<div class="sp-row-sub" style="padding:0 0 10px">@${esc(
+            (r.profile && r.profile.handle) || handle
+          )}</div>`
+        )
+      );
+      listWrap = h('<div class="bt-person-list"></div>');
+      body.appendChild(listWrap);
+      first = false;
+    }
+    if (moreBtn) moreBtn.remove();
+    (r.users || []).forEach((u) => listWrap.appendChild(personRow(u, { follow: true })));
+    if (!listWrap.children.length) {
+      listWrap.appendChild(
+        h(
+          `<div class="empty">${
+            rel === 'followers' ? 'No followers yet.' : 'Not following anyone yet.'
+          }</div>`
+        )
+      );
     }
     cursor = r.next_cursor;
     if (cursor) {
@@ -1705,6 +1850,10 @@ function renderApp() {
   }
   if (state.view === 'discover') {
     renderDiscover(app);
+    return;
+  }
+  if (state.view === 'follows') {
+    renderFollowList(app);
     return;
   }
   if (state.view === 'blocked') {
@@ -2327,11 +2476,40 @@ async function openPeople(bundle) {
     const q = body.querySelector('#bt-add-q');
     const matches = body.querySelector('#bt-add-matches');
     const go = body.querySelector('#bt-add-go');
+
+    // "People you follow" — a shortcut list shown while the search box is empty.
+    const followsBox = h('<div id="bt-add-follows"></div>');
+    matches.after(followsBox);
+    const collabIds = new Set(collabs.map((c) => c.user_id));
+    (async () => {
+      let following = [];
+      try {
+        following = (await API.listFollowing()).users || [];
+      } catch {
+        return;
+      }
+      following = following.filter((u) => !collabIds.has(u.id));
+      if (!following.length) return;
+      followsBox.appendChild(
+        h('<div class="person-sub" style="margin-top:10px">People you follow</div>')
+      );
+      following.forEach((u) => {
+        const btn = h(
+          `<button class="btn-sm btn-sm-ghost bt-add-follow" style="display:block;width:100%;text-align:left;margin-top:4px">${esc(
+            u.display_name || u.name || '@' + u.handle
+          )} <span style="color:var(--text-muted)">@${esc(u.handle)}</span></button>`
+        );
+        btn.addEventListener('click', () => add({ userId: u.id }));
+        followsBox.appendChild(btn);
+      });
+    })();
+
     let timer;
     q.addEventListener('input', () => {
       clearTimeout(timer);
       const term = q.value.trim();
       matches.replaceChildren();
+      followsBox.hidden = !!term;
       if (term.length < 2 || term.includes('@')) return;
       timer = setTimeout(async () => {
         let users = [];

@@ -30,7 +30,7 @@ export async function onRequestGet(context) {
   if (!is_self && (await blockedBetween(context.env, me.id, u.id)))
     return error(404, 'No such profile');
 
-  const [{ results: links }, { results: interests }] = await Promise.all([
+  const [{ results: links }, { results: interests }, follow] = await Promise.all([
     context.env.DB.prepare(
       'SELECT platform, value FROM user_links WHERE user_id = ? ORDER BY sort_order'
     )
@@ -45,6 +45,15 @@ export async function onRequestGet(context) {
     )
       .bind(u.id)
       .all(),
+    context.env.DB.prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM follows WHERE followee_id = ?1) AS follower_count,
+         (SELECT COUNT(*) FROM follows WHERE follower_id = ?1) AS following_count,
+         EXISTS (SELECT 1 FROM follows WHERE follower_id = ?2 AND followee_id = ?1) AS is_following,
+         EXISTS (SELECT 1 FROM follows WHERE follower_id = ?1 AND followee_id = ?2) AS follows_you`
+    )
+      .bind(u.id, me.id)
+      .first(),
   ]);
 
   return json({
@@ -59,6 +68,10 @@ export async function onRequestGet(context) {
       pronouns: u.pronouns || null,
       links: links || [],
       interests: interests || [],
+      follower_count: (follow && follow.follower_count) || 0,
+      following_count: (follow && follow.following_count) || 0,
+      is_following: !!(follow && follow.is_following),
+      follows_you: !!(follow && follow.follows_you),
       is_self,
     },
   });

@@ -30,8 +30,11 @@ import * as profile from './api/profile/index.js';
 import * as profileHandle from './api/profile/handle.js';
 import * as profileLinks from './api/profile/links.js';
 import * as profileByHandle from './api/profile/byHandle.js';
+import * as profileFollows from './api/profile/follows.js';
 import * as interests from './api/interests/index.js';
 import * as interest from './api/interests/slug.js';
+import * as follows from './api/follows/index.js';
+import * as follow from './api/follows/handle.js';
 import * as blocks from './api/blocks/index.js';
 import * as block from './api/blocks/handle.js';
 import * as adminInterests from './api/admin/interests/index.js';
@@ -72,8 +75,12 @@ export const routes = [
   ['/api/profile/handle', profileHandle],
   ['/api/profile/links', profileLinks],
   ['/api/profile/:handle', profileByHandle],
+  ['/api/profile/:handle/followers', profileFollows],
+  ['/api/profile/:handle/following', profileFollows],
   ['/api/interests', interests],
   ['/api/interests/:slug', interest],
+  ['/api/follows', follows],
+  ['/api/follows/:handle', follow],
   ['/api/blocks', blocks],
   ['/api/blocks/:handle', block],
   ['/api/admin/interests', adminInterests],
