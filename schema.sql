@@ -129,6 +129,23 @@ CREATE TABLE contributor_requests (
 );
 CREATE INDEX idx_contrib_req_listing ON contributor_requests(listing_id, status);
 
+-- One row per notifiable event. In-app always; email is immediate, weekly-digest,
+-- or off per the recipient's notif_prefs (an 'off' type writes no row).
+CREATE TABLE notifications (
+  id           TEXT PRIMARY KEY,            -- uuid
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- recipient
+  type         TEXT NOT NULL,               -- follow | contributor_request | contributor_decided | board_comment | board_reply
+  actor_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+  subject_type TEXT,                        -- listing | comment | request | profile
+  subject_id   TEXT,
+  preview      TEXT,
+  read_at      TEXT,
+  emailed_at   TEXT,                        -- set once the immediate email or the digest goes out
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_notifications_user ON notifications(user_id, read_at, created_at);
+CREATE INDEX idx_notifications_undelivered ON notifications(emailed_at, created_at);
+
 CREATE TABLE sessions (
   id            TEXT PRIMARY KEY,        -- random token, stored as httpOnly cookie
   user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

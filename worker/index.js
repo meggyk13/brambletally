@@ -7,6 +7,7 @@
 import { routes } from './routes.js';
 import { loadSession } from './api/session.js';
 import { error } from './api/lib/http.js';
+import { runWeeklyDigest } from './api/lib/digest.js';
 
 // decodeURIComponent throws on a malformed %-escape; a bad path segment should
 // just fail to match (-> 404), never crash the request.
@@ -102,5 +103,16 @@ export default {
       res.headers.append('Set-Cookie', slideCookie);
     }
     return res;
+  },
+
+  // Cron Trigger. wrangler.jsonc schedules "0 15 * * 0" — Sunday 15:00 UTC,
+  // roughly 08:00 America/Los_Angeles (drifts one hour across the DST boundary;
+  // Cloudflare cron has no timezone support).
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(
+      runWeeklyDigest(env).catch((e) =>
+        console.error('[brambletally] weekly digest failed', e)
+      )
+    );
   },
 };

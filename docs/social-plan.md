@@ -321,6 +321,34 @@ detail view's **List on the board** / **On the board** control. **Deferred to
 3b:** every notification write (follow, contributor_request, contributor_decided,
 board_comment, board_reply) and the emails.
 
+**Phase 3b shipped in PR #TBD (2026-09-08):** `migrations/0009_social.sql` adds
+`notifications` (recipient, type, actor, subject_type/id, preview, read_at,
+emailed_at) + a user/read index and an undelivered index. Folded into
+`schema.sql`. `worker/api/lib/email.js` generalised — `sendEmail(env, {to,
+subject, text, html})` + `emailShell()`, with `sendMagicLink` now calling it.
+New `worker/api/lib/notify.js` — `notify(context, { recipientId, actorId, type,
+subjectType, subjectId, preview })`: skips self / disabled recipient / a type
+turned off in `notif_prefs` (no row at all) / a block either direction; inserts
+the row; for `mode: 'immediate'` builds the email and sends it in
+`context.waitUntil`, stamping `emailed_at` only on a real send. `notifCopy()` is
+the shared subject/line table. New `worker/api/lib/digest.js` —
+`runWeeklyDigest(env)`: pulls unemailed notifications from the last 8 days,
+keeps the `mode: 'weekly'` recipients (JS filter — prefs are JSON), sends one
+grouped summary per user, stamps `emailed_at`. `worker/index.js` gains a
+`scheduled()` handler; `wrangler.jsonc` gains `triggers.crons: ["0 15 * * 0"]`
+(Sunday 15:00 UTC ≈ 08:00 PT, one-hour DST drift accepted). `notify()` wired
+into `POST /api/follows` (new follow only), `POST /api/board/:id/comments`
+(reply → parent author `board_reply`; top-level → listing owner `board_comment`),
+`POST .../requests` (owner `contributor_request`), `PATCH .../requests/:rid`
+(requester `contributor_decided`, preview `accepted`/`declined`). New endpoints:
+`GET /api/notifications` (newest first, `?cursor=` paged, `unread_count`),
+`POST /api/notifications/read` (`{ ids? }`, all when omitted). `/api/auth/me`
+now also returns `unread_count`. Frontend: a header **bell** with an unread
+badge; `openNotifPanel` — a dropdown that lists recent notifications, marks them
+all read on open (clearing the badge), and routes on click (follow → profile,
+board_* → the listing). The Settings → Notifications helper text updated to
+describe the live behaviour.
+
 ---
 
 Today `users.name` is nullable, unverified, non-unique, and defaults to the

@@ -1,6 +1,7 @@
 import { json, error, readJson } from '../lib/http.js';
 import { blockedBetween } from '../lib/blocks.js';
 import { isSupporter } from '../lib/plan.js';
+import { notify } from '../lib/notify.js';
 
 // GET /api/follows — the accounts the caller follows. Used by the
 // collaborator-invite picker ("people you follow") so it returns `id`, like
@@ -54,12 +55,22 @@ export async function onRequestPost(context) {
   if (await blockedBetween(context.env, me.id, target.id))
     return error(404, 'No such account');
 
-  await context.env.DB.prepare(
+  const res = await context.env.DB.prepare(
     `INSERT INTO follows (follower_id, followee_id) VALUES (?, ?)
      ON CONFLICT(follower_id, followee_id) DO NOTHING`
   )
     .bind(me.id, target.id)
     .run();
+
+  if (res.meta.changes) {
+    await notify(context, {
+      recipientId: target.id,
+      actorId: me.id,
+      type: 'follow',
+      subjectType: 'profile',
+      subjectId: me.id,
+    });
+  }
 
   return json({ ok: true, following: true, handle });
 }

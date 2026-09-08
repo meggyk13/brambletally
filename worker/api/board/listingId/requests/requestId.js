@@ -1,4 +1,5 @@
 import { json, error, readJson } from '../../../lib/http.js';
+import { notify } from '../../../lib/notify.js';
 
 async function loadRequest(env, listingId, requestId) {
   return env.DB.prepare(
@@ -38,6 +39,14 @@ export async function onRequestPatch(context) {
     )
       .bind(me.id, requestId)
       .run();
+    await notify(context, {
+      recipientId: r.requester_id,
+      actorId: me.id,
+      type: 'contributor_decided',
+      subjectType: 'listing',
+      subjectId: listingId,
+      preview: 'declined',
+    });
     return json({ ok: true, status: 'declined' });
   }
 
@@ -53,6 +62,14 @@ export async function onRequestPatch(context) {
        ON CONFLICT(project_id, user_id) DO NOTHING`
     ).bind(r.project_id, r.requester_id),
   ]);
+  await notify(context, {
+    recipientId: r.requester_id,
+    actorId: me.id,
+    type: 'contributor_decided',
+    subjectType: 'listing',
+    subjectId: listingId,
+    preview: 'accepted',
+  });
   return json({ ok: true, status: 'accepted' });
 }
 

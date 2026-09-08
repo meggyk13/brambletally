@@ -3,6 +3,9 @@ import { uuid } from '../../lib/id.js';
 import { blockedBetween } from '../../lib/blocks.js';
 import { trimOrNull } from '../../lib/validate.js';
 import { COMMENT_MAX, loadListing, requireBoardOk } from '../../lib/board.js';
+import { notify } from '../../lib/notify.js';
+
+const excerpt = (s) => (s.length > 80 ? s.slice(0, 79) + '…' : s);
 
 // POST /api/board/:listingId/comments — { body, parentCommentId? }.
 // One level of replies: a parentCommentId must be a top-level comment on this
@@ -25,15 +28,17 @@ export async function onRequestPost(context) {
   if (!text) return error(400, 'Say something first');
 
   let parentId = null;
+  let parentAuthorId = null;
   if (body && body.parentCommentId) {
     const parent = await context.env.DB.prepare(
-      `SELECT id FROM listing_comments
+      `SELECT id, user_id FROM listing_comments
         WHERE id = ? AND listing_id = ? AND parent_comment_id IS NULL AND deleted_at IS NULL`
     )
       .bind(body.parentCommentId, listingId)
       .first();
     if (!parent) return error(400, 'That comment can’t be replied to');
     parentId = parent.id;
+    parentAuthorId = parent.user_id;
   }
 
   const id = uuid();
@@ -43,6 +48,26 @@ export async function onRequestPost(context) {
   )
     .bind(id, listingId, me.id, parentId, text)
     .run();
+
+  if (parentId) {
+    await notify(context, {
+      recipientId: parentAuthorId,
+      actorId: me.id,
+      type: 'board_reply',
+      subjectType: 'listing',
+      subjectId: listingId,
+      preview: excerpt(text),
+    });
+  } else {
+    await notify(context, {
+      recipientId: listing.owner_id,
+      actorId: me.id,
+      type: 'board_comment',
+      subjectType: 'listing',
+      subjectId: listingId,
+      preview: excerpt(text),
+    });
+  }
 
   const row = await context.env.DB.prepare(
     `SELECT c.*, u.handle AS a_handle, u.display_name AS a_display_name,

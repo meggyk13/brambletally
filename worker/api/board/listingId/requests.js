@@ -4,6 +4,7 @@ import { projectRole } from '../../lib/projects.js';
 import { blockedBetween } from '../../lib/blocks.js';
 import { trimOrNull } from '../../lib/validate.js';
 import { REQUEST_MSG_MAX, REQUEST_DAILY_CAP, loadListing, requireBoardOk } from '../../lib/board.js';
+import { notify } from '../../lib/notify.js';
 
 // POST /api/board/:listingId/requests — { message? }. Ask to contribute.
 // Reuses a prior declined/withdrawn row (back to 'pending'); a live pending or
@@ -67,6 +68,15 @@ export async function onRequestPost(context) {
       .bind(id, listingId, me.id, message)
       .run();
   }
+
+  await notify(context, {
+    recipientId: listing.owner_id,
+    actorId: me.id,
+    type: 'contributor_request',
+    subjectType: 'listing',
+    subjectId: listingId,
+    preview: message ? (message.length > 80 ? message.slice(0, 79) + '…' : message) : null,
+  });
 
   const row = await context.env.DB.prepare(
     'SELECT id, status, message, created_at FROM contributor_requests WHERE id = ?'
