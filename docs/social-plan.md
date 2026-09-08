@@ -212,9 +212,34 @@ Notifications (mode segmented control + per-type toggles, saved live), Your data
 (export / delete), Plan (status). The header `#bt-theme` button reverts to a
 blind light/dark flip.
 
-**Still Phase 1b-ii:** profile view/edit, `user_links`, interest tags +
-discovery, `user_blocks`, `requireAdmin` + admin tag tool. **Separate:** email
-change, the legal acceptance gate.
+**Phase 1b-ii PR 1 shipped in PR #TBD (2026-09-07):** `migrations/0005_social.sql`
+adds `user_links` (platform + full https `value` + `sort_order`), `interest_tags`
+(slug/label/`usage_count`) and `user_interests`. Folded into `schema.sql`. New
+`worker/api/lib/profile.js` — `LINK_PLATFORMS` + `httpsUrlOrNull` + `normalizeLinks`,
+and `slugify` + `normalizeInterestLabels` (NFKD diacritic fold, `MAX_INTERESTS`
+15, label cap 30). `PATCH /api/profile` extended to `bio` + `pronouns` (upsert on
+`user_profiles`, read-modify-write so an absent key isn't nulled). New endpoints:
+`GET /api/profile/:handle` (the bundle — identity, `supporter`, `is_admin`, bio,
+pronouns, links, interests, `is_self`; 404 on a disabled account unless self),
+`PUT /api/profile/links` (replace-set, non-https dropped), `GET /api/interests?q=`
+(autocomplete; empty `q` → top by `usage_count`), `PUT /api/interests` (replace-set
+by label; upserts tags, keeps `usage_count` exact for every touched tag in one
+batch), `GET /api/interests/:slug` (discovery list, `?cursor=` offset paging,
+disabled excluded). `worker/api/search.js` gains a `people` section (handle /
+display_name / name; self + disabled excluded; leading `@` scopes to people).
+Route table: literal `/api/profile/links` + `/api/profile/handle` registered
+before `/api/profile/:handle` (first match wins); handle reserved-word list
+extended (`links`, `blocks`, `follows`, `interests`, …). Frontend: `renderProfile`
+/ `renderProfileEdit` / `renderDiscover` views (reusing the Settings shell),
+`interestEditor` (removable chips + server autocomplete) and `linksEditor`
+(platform select + URL rows) components, initials `avatarEl`, `personRow`. Reached
+from global search (People) and Settings → Account → Profile. **Also fixed:**
+`worker/api/account.js` had `../lib/` imports (should be `./lib/`) — the build /
+`wrangler dev` failed on `main` before this.
+
+**Still Phase 1b-ii PR 2:** `user_blocks` + block/unblock + enforcement (search,
+profile, discovery, feed later), `requireAdmin` helper + admin interest-tag tool
+(merge / rename / delete). **Separate:** email change, the legal acceptance gate.
 
 ---
 

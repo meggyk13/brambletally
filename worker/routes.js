@@ -28,6 +28,10 @@ import * as inboxItem from './api/inbox/itemId.js';
 import * as usersSearch from './api/users/search.js';
 import * as profile from './api/profile/index.js';
 import * as profileHandle from './api/profile/handle.js';
+import * as profileLinks from './api/profile/links.js';
+import * as profileByHandle from './api/profile/byHandle.js';
+import * as interests from './api/interests/index.js';
+import * as interest from './api/interests/slug.js';
 import * as settingsNotifPrefs from './api/settings/notif-prefs.js';
 import * as settingsExport from './api/settings/export.js';
 import * as account from './api/account.js';
@@ -59,7 +63,12 @@ export const routes = [
   ['/api/inbox/:itemId', inboxItem],
   ['/api/users/search', usersSearch],
   ['/api/profile', profile],
+  // literal 4-segment paths must precede '/api/profile/:handle' — first match wins
   ['/api/profile/handle', profileHandle],
+  ['/api/profile/links', profileLinks],
+  ['/api/profile/:handle', profileByHandle],
+  ['/api/interests', interests],
+  ['/api/interests/:slug', interest],
   ['/api/settings/notif-prefs', settingsNotifPrefs],
   ['/api/settings/export', settingsExport],
   ['/api/account', account],

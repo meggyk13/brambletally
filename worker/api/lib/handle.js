@@ -2,11 +2,12 @@
 // format checks in public/app.js for inline feedback.
 
 const RESERVED = new Set([
-  'admin', 'administrator', 'api', 'app', 'auth', 'about', 'board', 'brambletally',
-  'contact', 'cookies', 'feed', 'help', 'home', 'legal', 'login', 'logout', 'me',
-  'mod', 'moderator', 'notifications', 'privacy', 'profile', 'profiles', 'root',
-  'settings', 'signin', 'signup', 'staff', 'support', 'system', 'team', 'terms',
-  'user', 'users', 'you',
+  'admin', 'administrator', 'api', 'app', 'auth', 'about', 'block', 'blocks',
+  'board', 'brambletally', 'contact', 'cookies', 'feed', 'follow', 'follows',
+  'followers', 'following', 'handle', 'help', 'home', 'interest', 'interests',
+  'legal', 'links', 'login', 'logout', 'me', 'mod', 'moderator', 'notifications',
+  'privacy', 'profile', 'profiles', 'root', 'settings', 'signin', 'signup',
+  'staff', 'support', 'system', 'team', 'terms', 'user', 'users', 'you',
 ]);
 
 // -> { handle } on success, or { error } with a human-readable reason.
