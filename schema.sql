@@ -21,6 +21,7 @@ CREATE TABLE users (
   board_blocked_at TEXT,                   -- soft sanction: no board posting (guarded from Phase 3)
   disabled_at     TEXT,                    -- hard sanction: router 403s everything but /api/auth/me + logout
   calendar_token  TEXT,                    -- keys the per-user ICS feed (migration 0012); UNIQUE via the partial index below
+  timezone        TEXT,                    -- IANA name (migration 0013); NULL falls back to DEFAULT_TZ
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX idx_users_handle ON users(handle) WHERE handle IS NOT NULL;
@@ -238,6 +239,7 @@ CREATE TABLE projects (
                   CHECK(status IN ('Active','Waiting For','Someday','Paused','Done')),
   deadline      TEXT,                    -- ISO date, nullable
   pickup_note   TEXT,                    -- freeform "Project notes" box (legacy column name)
+  archived_at   TEXT,                    -- ISO datetime (migration 0013); NULL = active. Orthogonal to status.
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -288,11 +290,13 @@ CREATE TABLE project_steps (
   due_date      TEXT,                    -- ISO date, nullable
   notes         TEXT,                    -- free-text working notes for this step
   estimate_minutes INTEGER,             -- NULL = no estimate; else one of 5/15/30/60/120/240/480
+  assignee_id   TEXT REFERENCES users(id) ON DELETE SET NULL,  -- migration 0013; NULL = unassigned
   sort_order    INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_steps_project ON project_steps(project_id);
 CREATE INDEX idx_steps_parent ON project_steps(parent_step_id);
+CREATE INDEX idx_steps_assignee ON project_steps(assignee_id);
 
 CREATE TABLE project_supplies (
   id            TEXT PRIMARY KEY,        -- uuid

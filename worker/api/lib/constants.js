@@ -18,3 +18,8 @@ export const FROM_EMAIL = 'Brambletally <login@brambletally.com>';
 // Bump when the Terms or Acceptable Use policy change materially: every user
 // re-accepts at their next load. Compared against users.tos_version.
 export const TOS_VERSION = '2026-09-07';
+
+// Fallback zone for a user with no `users.timezone` set (migration 0013).
+// Used to compute "today / tomorrow" for due-date reminders and to render
+// server-side dates. Matches the app's historical implicit default.
+export const DEFAULT_TZ = 'America/Los_Angeles';
