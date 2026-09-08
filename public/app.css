@@ -1928,3 +1928,35 @@ textarea{resize:vertical;min-height:60px}
 .bt-linkbtn { background: none; border: none; padding: 0; cursor: pointer; font-size: 13px; color: var(--text-muted); font-family: var(--font-ui); }
 .bt-linkbtn:hover { color: var(--accent); text-decoration: underline; }
 .bt-linkbtn-danger:hover { color: var(--danger); }
+
+/* ── Notifications (Phase 3b) ────────────────────────────────────────────── */
+.bt-bell { position: relative; }
+.bt-bell-dot {
+  position: absolute; top: 2px; right: 2px; min-width: 15px; height: 15px;
+  padding: 0 3px; border-radius: 999px; background: var(--danger); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 15px; text-align: center;
+  font-family: var(--font-ui);
+}
+.bt-notif-pop {
+  position: fixed; top: 56px; right: 12px; z-index: 60; width: min(360px, calc(100vw - 24px));
+  background: var(--card); border: 1px solid var(--border-strong); border-radius: 12px;
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.bt-notif-head {
+  padding: 12px 16px; font-family: var(--font-ui); font-weight: 700; font-size: 13px;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.bt-notif-list { max-height: min(60vh, 460px); overflow-y: auto; }
+.bt-notif-list .empty-section { padding: 20px 16px; }
+#bt-app .bt-notif-row, .bt-notif-row {
+  display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left;
+  background: none; border: none; border-bottom: 1px solid var(--border);
+  padding: 12px 16px; cursor: pointer;
+}
+.bt-notif-row:hover { background: var(--elevated); }
+.bt-notif-row.is-unread { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.bt-notif-row .bt-avatar { width: 30px; height: 30px; font-size: 12px; flex-shrink: 0; }
+.bt-notif-main { display: flex; flex-direction: column; min-width: 0; }
+.bt-notif-text { font-size: 14px; color: var(--text); line-height: 1.4; }
+.bt-notif-time { font-size: 12px; color: var(--text-muted); margin-top: 2px; }

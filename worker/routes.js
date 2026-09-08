@@ -37,6 +37,8 @@ import * as follows from './api/follows/index.js';
 import * as follow from './api/follows/handle.js';
 import * as blocks from './api/blocks/index.js';
 import * as block from './api/blocks/handle.js';
+import * as notifications from './api/notifications/index.js';
+import * as notificationsRead from './api/notifications/read.js';
 import * as board from './api/board/index.js';
 import * as boardListing from './api/board/listingId.js';
 import * as boardComments from './api/board/listingId/comments.js';
@@ -89,6 +91,8 @@ export const routes = [
   ['/api/follows/:handle', follow],
   ['/api/blocks', blocks],
   ['/api/blocks/:handle', block],
+  ['/api/notifications', notifications],
+  ['/api/notifications/read', notificationsRead],
   ['/api/board', board],
   ['/api/board/:listingId', boardListing],
   ['/api/board/:listingId/comments', boardComments],

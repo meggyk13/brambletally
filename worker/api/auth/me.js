@@ -6,16 +6,22 @@ export async function onRequestGet(context) {
   const user = context.data.user;
   if (!user) return error(401, 'Not signed in');
 
-  const prefs = await context.env.DB.prepare(
-    'SELECT notif_prefs FROM user_profiles WHERE user_id = ?'
-  )
-    .bind(user.id)
-    .first();
+  const [prefs, unread] = await Promise.all([
+    context.env.DB.prepare('SELECT notif_prefs FROM user_profiles WHERE user_id = ?')
+      .bind(user.id)
+      .first(),
+    context.env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL'
+    )
+      .bind(user.id)
+      .first(),
+  ]);
 
   return json({
     user,
     needs_handle: !user.handle,
     supporter: isSupporter(user),
     notif_prefs: readNotifPrefs(prefs && prefs.notif_prefs),
+    unread_count: (unread && unread.n) || 0,
   });
 }

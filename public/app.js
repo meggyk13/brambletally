@@ -146,6 +146,11 @@ const API = {
   putInterests: (labels) => api('/api/interests', { method: 'PUT', body: { labels } }),
   discover: (slug, cursor) =>
     api('/api/interests/' + encodeURIComponent(slug) + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  notifications: (cursor) =>
+    api('/api/notifications' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  markNotificationsRead: (ids) =>
+    api('/api/notifications/read', { method: 'POST', body: ids ? { ids } : {} }),
+
   board: (cursor) => api('/api/board' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
   listing: (id) => api('/api/board/' + encodeURIComponent(id)),
   createListing: (body) => api('/api/board', { method: 'POST', body }),
@@ -237,6 +242,7 @@ const ICONS = {
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.5 4 5.7 4 9s-1.4 6.5-4 9c-2.6-2.5-4-5.7-4-9s1.4-6.5 4-9z"/>',
   at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/>',
+  bell: '<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
 };
 function icon(name, size = 20) {
   return `<svg class="bt-ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -690,7 +696,7 @@ function renderSettings(app) {
                 role="switch" aria-checked="${!!prefs.types[k]}" aria-label="${l}"></button>
             </div>`
           ).join('')}
-          <div class="sp-row-sub" style="padding:8px 20px 0">Saved now — notifications start sending in a later update.</div>
+          <div class="sp-row-sub" style="padding:8px 20px 0">In-app notifications always show. “Right away” also emails immediately; “Weekly digest” sends one summary each Sunday.</div>
         </div>
 
         <div class="sp-section">
@@ -2188,6 +2194,100 @@ async function renderListing(app) {
   body.appendChild(cSec);
 }
 
+// ── Notifications ───────────────────────────────────────────────────────
+function notifLine(n) {
+  const who = n.actor ? (n.actor.display_name || n.actor.name || '@' + n.actor.handle) : 'Someone';
+  const p = n.preview ? ` “${n.preview}”` : '';
+  switch (n.type) {
+    case 'follow':
+      return `${who} started following you`;
+    case 'contributor_request':
+      return `${who} asked to contribute${p}`;
+    case 'contributor_decided':
+      return `Your contributor request was ${n.preview || 'decided'}`;
+    case 'board_comment':
+      return `${who} commented on your listing${p}`;
+    case 'board_reply':
+      return `${who} replied to your comment${p}`;
+    default:
+      return 'New activity';
+  }
+}
+function notifNav(n) {
+  if (n.type === 'follow' && n.actor) return () => openProfile(n.actor.handle);
+  if (n.subject_type === 'listing' && n.subject_id) return () => openListing(n.subject_id);
+  return null;
+}
+
+function openNotifPanel(anchorBtn) {
+  const existing = document.querySelector('.bt-notif-pop');
+  if (existing) {
+    existing.remove();
+    return;
+  }
+  const pop = h(`
+    <div class="bt-notif-pop">
+      <div class="bt-notif-head">Notifications</div>
+      <div class="bt-notif-list"><div class="empty-section">Loading…</div></div>
+    </div>
+  `);
+  document.body.appendChild(pop);
+  const listEl = pop.querySelector('.bt-notif-list');
+
+  const closeOnOutside = (e) => {
+    if (!pop.contains(e.target) && e.target !== anchorBtn && !anchorBtn.contains(e.target)) {
+      pop.remove();
+      document.removeEventListener('mousedown', closeOnOutside);
+    }
+  };
+  setTimeout(() => document.addEventListener('mousedown', closeOnOutside), 0);
+
+  (async () => {
+    let r;
+    try {
+      r = await API.notifications();
+    } catch {
+      listEl.replaceChildren(h('<div class="empty-section">Could not load notifications.</div>'));
+      return;
+    }
+    listEl.replaceChildren();
+    if (!r.notifications.length) {
+      listEl.appendChild(h('<div class="empty-section">Nothing yet.</div>'));
+    } else {
+      r.notifications.forEach((n) => {
+        const row = h(`
+          <button class="bt-notif-row${n.read_at ? '' : ' is-unread'}">
+            ${n.actor ? avatarEl(n.actor.display_name || n.actor.name || n.actor.handle) : ''}
+            <span class="bt-notif-main">
+              <span class="bt-notif-text"></span>
+              <span class="bt-notif-time">${esc(timeAgo(n.created_at))}</span>
+            </span>
+          </button>
+        `);
+        row.querySelector('.bt-notif-text').textContent = notifLine(n);
+        const nav = notifNav(n);
+        row.addEventListener('click', () => {
+          pop.remove();
+          document.removeEventListener('mousedown', closeOnOutside);
+          if (nav) nav();
+        });
+        listEl.appendChild(row);
+      });
+    }
+    // Opening the panel clears the unread state.
+    if (state.me && state.me.unread_count) {
+      try {
+        await API.markNotificationsRead();
+      } catch {
+        /* leave the badge; it'll clear next load */
+      }
+      state.me.unread_count = 0;
+      const dot = anchorBtn.querySelector('.bt-bell-dot');
+      if (dot) dot.remove();
+    }
+  })();
+}
+
 // ── Sign-in ────────────────────────────────────────────────────────────────
 let tsWidgetId = null;
 
@@ -2277,6 +2377,13 @@ function header() {
           <button class="btn-icon" id="bt-theme" title="Light / dark" aria-label="Toggle light or dark">${
             effectiveTheme() === 'dark' ? icon('sun') : icon('moon')
           }</button>
+          <button class="btn-icon bt-bell" id="bt-notif" title="Notifications" aria-label="Notifications">${icon(
+            'bell'
+          )}${
+            state.me && state.me.unread_count
+              ? `<span class="bt-bell-dot">${state.me.unread_count > 9 ? '9+' : state.me.unread_count}</span>`
+              : ''
+          }</button>
           <button class="btn-icon" id="bt-search" title="Search" aria-label="Search">${icon('search')}</button>
           <button class="btn-icon" id="bt-settings" title="Settings" aria-label="Settings">${icon('settings')}</button>
           <button class="btn-sm btn-sm-ghost" id="bt-signout">Sign out</button>
@@ -2301,6 +2408,7 @@ function header() {
     location.href = APP_PATH;
   });
   on(el, '#bt-theme', 'click', toggleTheme);
+  on(el, '#bt-notif', 'click', (e) => openNotifPanel(e.currentTarget));
   on(el, '#bt-settings', 'click', () => {
     state.view = 'settings';
     state.project = null;
