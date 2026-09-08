@@ -146,6 +146,40 @@ CREATE TABLE notifications (
 CREATE INDEX idx_notifications_user ON notifications(user_id, read_at, created_at);
 CREATE INDEX idx_notifications_undelivered ON notifications(emailed_at, created_at);
 
+-- Report queue. target_id is a loose ref (no FK) so a report outlives its
+-- target; reporter_id nulls out if that account is deleted.
+CREATE TABLE reports (
+  id              TEXT PRIMARY KEY,          -- uuid
+  reporter_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+  target_type     TEXT NOT NULL,             -- listing | comment | profile
+  target_id       TEXT NOT NULL,
+  category        TEXT NOT NULL,             -- spam | harassment | illegal | other
+  detail          TEXT,                      -- optional, <= 1000
+  status          TEXT NOT NULL DEFAULT 'open'
+                    CHECK(status IN ('open','actioned','dismissed')),
+  resolved_by     TEXT REFERENCES users(id),
+  resolved_at     TEXT,
+  resolution_note TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_reports_status ON reports(status, created_at);
+CREATE UNIQUE INDEX idx_reports_one_open
+  ON reports(reporter_id, target_type, target_id) WHERE status = 'open';
+
+-- Audit trail for admin sanctions.
+CREATE TABLE moderation_actions (
+  id             TEXT PRIMARY KEY,           -- uuid
+  admin_id       TEXT NOT NULL REFERENCES users(id),
+  target_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  report_id      TEXT REFERENCES reports(id) ON DELETE SET NULL,
+  action         TEXT NOT NULL
+                   CHECK(action IN ('board_block','board_unblock',
+                                    'disable','enable','content_removed')),
+  note           TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_mod_actions_target ON moderation_actions(target_user_id, created_at);
+
 CREATE TABLE sessions (
   id            TEXT PRIMARY KEY,        -- random token, stored as httpOnly cookie
   user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

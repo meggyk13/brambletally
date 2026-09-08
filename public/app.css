@@ -1960,3 +1960,31 @@ textarea{resize:vertical;min-height:60px}
 .bt-notif-main { display: flex; flex-direction: column; min-width: 0; }
 .bt-notif-text { font-size: 14px; color: var(--text); line-height: 1.4; }
 .bt-notif-time { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Admin panel + reporting (Phase 3c) ─────────────────────────────────── */
+.bt-radio { display: flex; gap: 8px; align-items: center; font-size: 15px; margin: 4px 0; }
+#bt-app .modal-overlay .bt-radio { margin-left: 20px; margin-right: 20px; }
+
+.bt-rep-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--card); }
+.bt-rep-top { display: flex; justify-content: space-between; align-items: center; }
+.bt-rep-cat {
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--danger); border: 1px solid var(--danger);
+  border-radius: 999px; padding: 1px 8px;
+}
+.bt-rep-time { font-size: 12px; color: var(--text-muted); }
+.bt-rep-target { font-size: 15px; color: var(--text); margin-top: 8px; line-height: 1.4; }
+.bt-rep-detail { font-size: 14px; color: var(--text-sub); margin-top: 6px; white-space: pre-wrap;
+  border-left: 2px solid var(--border); padding-left: 10px; }
+.bt-rep-meta { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+.bt-rep-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.bt-rep-actions .btn-sm { padding: 6px 10px; font-size: 13px; }
+
+.bt-au-card { border: 1px solid var(--border); border-radius: 10px; padding: 14px; background: var(--card); }
+.bt-au-head { display: flex; gap: 14px; align-items: flex-start; }
+.bt-au-name { font-family: var(--font-head); font-size: 20px; font-weight: 600; color: var(--text); }
+.bt-au-state { margin: 12px 0 6px; font-size: 14px; color: var(--text-sub); }
+.bt-au-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.bt-au-history { display: flex; flex-direction: column; gap: 4px; }
+.bt-au-hrow { font-size: 13px; color: var(--text-sub); }
+.bt-au-hrow span { color: var(--text-muted); }

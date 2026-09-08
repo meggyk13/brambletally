@@ -6,7 +6,26 @@ export const HELP_WANTED_MAX = 2000;
 export const COMMENT_MAX = 2000;
 export const REQUEST_MSG_MAX = 1000;
 export const REQUEST_DAILY_CAP = 10; // contributor requests per user per rolling 24h
+export const REPORT_DAILY_CAP = 10; // reports per user per rolling 24h
 export const LISTING_STATUSES = ['open', 'closed', 'archived'];
+
+// A Turnstile challenge guards a caller's first few board writes (requests +
+// reports). Below this many lifetime board actions, a token is required.
+export const TURNSTILE_UNTIL_ACTIONS = 3;
+
+// Lifetime board-action count for `me` — requests sent + comments posted +
+// reports filed. Drives the "board_new" flag on /api/auth/me.
+export async function boardActionCount(env, userId) {
+  const row = await env.DB.prepare(
+    `SELECT
+       (SELECT COUNT(*) FROM contributor_requests WHERE requester_id = ?1) +
+       (SELECT COUNT(*) FROM listing_comments WHERE user_id = ?1) +
+       (SELECT COUNT(*) FROM reports WHERE reporter_id = ?1) AS n`
+  )
+    .bind(userId)
+    .first();
+  return (row && row.n) || 0;
+}
 
 // Active-listing cap: the one supporter gate on the board.
 export const activeListingCap = (user) => (isSupporter(user) ? 3 : 1);

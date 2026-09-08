@@ -349,6 +349,38 @@ all read on open (clearing the badge), and routes on click (follow → profile,
 board_* → the listing). The Settings → Notifications helper text updated to
 describe the live behaviour.
 
+**Phase 3c shipped in PR #TBD (2026-09-08):** `migrations/0010_social.sql` adds
+`reports` (loose `target_id`, partial UNIQUE `idx_reports_one_open` on
+`(reporter_id, target_type, target_id) WHERE status='open'`) and
+`moderation_actions` (the sanction audit trail). Folded into `schema.sql`.
+`worker/api/lib/board.js` gains `REPORT_DAILY_CAP` (10/24h), `boardActionCount`
+(requests + comments + reports), and `TURNSTILE_UNTIL_ACTIONS` (3);
+`/api/auth/me` now returns `board_new` (below that many lifetime board actions).
+New endpoints: `POST /api/reports` (`{ targetType, targetId, category, detail?,
+turnstileToken? }` — board block does NOT stop reporting; resolves the target +
+its author; can't report your own; Turnstile verified for `board_new` callers;
+rolling daily cap; one open report per reporter+target; optional `ADMIN_EMAIL`
+ping), `GET /api/admin/reports?status=` (queue with each target resolved to a
+preview + author), `PATCH /api/admin/reports/:reportId`
+(`{ status, note?, removed? }` — `removed` also logs a `content_removed`
+moderation action), `GET /api/admin/listings` (every listing, any status),
+`GET /api/admin/users/:handle` (account detail + counts + moderation history),
+`POST /api/admin/users/:handle/sanction` (`{ action, note?, reportId? }` —
+`board_block`/`board_unblock` toggles `board_blocked_at`, `disable`/`enable`
+toggles `disabled_at`; refuses self and other admins; every call logged). All
+`/api/admin/*` behind `requireAdmin`. Takedown reuses the owner-or-admin board
+DELETEs. Frontend: `renderAdmin` is now a **4-tab panel** — Reports (status
+filter, per-report Open target / Remove content / board-block / disable /
+dismiss with a note), Users (handle lookup → detail card with sanction toggles +
+history), Listings (all listings, Open / Delete), Tags (the existing tool,
+extracted to `adminTagsSection`). `openReportModal(targetType, targetId)` —
+category radios + optional detail + a Turnstile widget when `me.board_new` —
+wired to a **Report** control on listings, comments, and profiles.
+
+**Phase 3 is complete.** Remaining social scope: **email change** and the
+**legal acceptance gate** (both "Separate" throughout). Phase 4 is R2 media
+(avatars + project photos).
+
 ---
 
 Today `users.name` is nullable, unverified, non-unique, and defaults to the
