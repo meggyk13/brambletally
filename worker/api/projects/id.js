@@ -29,6 +29,10 @@ export async function onRequestGet(context) {
        FROM project_collaborators pc JOIN users u ON u.id = pc.user_id
       WHERE pc.project_id = ? ORDER BY pc.added_at`
   ).bind(id).all()).results;
+  const listing = await db
+    .prepare('SELECT id, status FROM project_listings WHERE project_id = ?')
+    .bind(id)
+    .first();
 
   return json({
     project: { ...project, role: g.role },
@@ -37,6 +41,7 @@ export async function onRequestGet(context) {
     links,
     journal,
     collaborators,
+    listing: listing || null, // { id, status } when this project is on the board
   });
 }
 

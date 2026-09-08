@@ -37,6 +37,12 @@ import * as follows from './api/follows/index.js';
 import * as follow from './api/follows/handle.js';
 import * as blocks from './api/blocks/index.js';
 import * as block from './api/blocks/handle.js';
+import * as board from './api/board/index.js';
+import * as boardListing from './api/board/listingId.js';
+import * as boardComments from './api/board/listingId/comments.js';
+import * as boardComment from './api/board/listingId/comments/commentId.js';
+import * as boardRequests from './api/board/listingId/requests.js';
+import * as boardRequest from './api/board/listingId/requests/requestId.js';
 import * as adminInterests from './api/admin/interests/index.js';
 import * as adminInterestMerge from './api/admin/interests/merge.js';
 import * as adminInterest from './api/admin/interests/slug.js';
@@ -83,6 +89,12 @@ export const routes = [
   ['/api/follows/:handle', follow],
   ['/api/blocks', blocks],
   ['/api/blocks/:handle', block],
+  ['/api/board', board],
+  ['/api/board/:listingId', boardListing],
+  ['/api/board/:listingId/comments', boardComments],
+  ['/api/board/:listingId/comments/:commentId', boardComment],
+  ['/api/board/:listingId/requests', boardRequests],
+  ['/api/board/:listingId/requests/:requestId', boardRequest],
   ['/api/admin/interests', adminInterests],
   // literal 'merge' must precede '/api/admin/interests/:slug' — first match wins
   ['/api/admin/interests/merge', adminInterestMerge],

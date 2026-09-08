@@ -146,6 +146,28 @@ const API = {
   putInterests: (labels) => api('/api/interests', { method: 'PUT', body: { labels } }),
   discover: (slug, cursor) =>
     api('/api/interests/' + encodeURIComponent(slug) + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  board: (cursor) => api('/api/board' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  listing: (id) => api('/api/board/' + encodeURIComponent(id)),
+  createListing: (body) => api('/api/board', { method: 'POST', body }),
+  updateListing: (id, body) =>
+    api('/api/board/' + encodeURIComponent(id), { method: 'PATCH', body }),
+  deleteListing: (id) => api('/api/board/' + encodeURIComponent(id), { method: 'DELETE' }),
+  addListingComment: (id, body, parentCommentId) =>
+    api(`/api/board/${encodeURIComponent(id)}/comments`, {
+      method: 'POST',
+      body: { body, parentCommentId },
+    }),
+  editListingComment: (id, cid, body) =>
+    api(`/api/board/${encodeURIComponent(id)}/comments/${cid}`, { method: 'PATCH', body: { body } }),
+  deleteListingComment: (id, cid) =>
+    api(`/api/board/${encodeURIComponent(id)}/comments/${cid}`, { method: 'DELETE' }),
+  requestContribute: (id, message) =>
+    api(`/api/board/${encodeURIComponent(id)}/requests`, { method: 'POST', body: { message } }),
+  decideRequest: (id, rid, status) =>
+    api(`/api/board/${encodeURIComponent(id)}/requests/${rid}`, { method: 'PATCH', body: { status } }),
+  withdrawRequest: (id, rid) =>
+    api(`/api/board/${encodeURIComponent(id)}/requests/${rid}`, { method: 'DELETE' }),
+
   listFollowing: () => api('/api/follows'),
   follow: (handle) => api('/api/follows', { method: 'POST', body: { handle } }),
   unfollow: (handle) => api('/api/follows/' + encodeURIComponent(handle), { method: 'DELETE' }),
@@ -457,7 +479,7 @@ function appearanceControls() {
 const state = {
   user: null,
   me: null, // the full /api/auth/me payload: { user, needs_handle, supporter }
-  view: 'home', // home | next | project | inbox | review | settings | search | profile | profile-edit | discover | follows | blocked | admin
+  view: 'home', // home | next | project | inbox | review | settings | search | profile | profile-edit | discover | follows | blocked | admin | board | listing
   viewBeforeProfile: 'home', // where a Back from a profile / discover screen returns
   profileHandle: null, // handle shown by renderProfile
   discoverSlug: null, // interest slug shown by renderDiscover
@@ -1695,6 +1717,477 @@ async function renderAdmin(app) {
   load();
 }
 
+// ── Board ───────────────────────────────────────────────────────────────
+function openListing(id) {
+  state.view = 'listing';
+  state.listingId = id;
+  state.project = null;
+  render();
+}
+
+const ownerName = (o) => (o && (o.display_name || o.name || '@' + o.handle)) || 'someone';
+
+function taskSummaryText(l) {
+  const n = l.step_count || 0;
+  if (!n) return 'No tasks yet';
+  return `${n} task${n === 1 ? '' : 's'} · ${l.step_done || 0} done`;
+}
+
+function upcomingStepsEl(steps) {
+  if (!steps || !steps.length) return null;
+  const wrap = h('<ul class="bt-listing-steps"></ul>');
+  steps.forEach((s) => {
+    wrap.appendChild(
+      h(
+        `<li>${esc(s.title)}${
+          s.due_date ? ` <span class="bt-step-due">due ${esc(fmtDate(s.due_date))}</span>` : ''
+        }</li>`
+      )
+    );
+  });
+  return wrap;
+}
+
+function listingCard(l) {
+  const card = h(`
+    <button class="bt-listing-card">
+      <div class="bt-listing-head">${esc(l.headline)}</div>
+      <div class="bt-listing-meta">
+        ${avatarEl(ownerName(l.owner))}
+        <span>${esc(ownerName(l.owner))}${
+          l.owner && l.owner.supporter ? ' <span class="bt-supporter">Supporter</span>' : ''
+        } · ${esc(l.project_title)}</span>
+      </div>
+      <div class="bt-listing-sub">${esc(taskSummaryText(l))} · listed ${esc(
+        fmtDate((l.listed_at || '').slice(0, 10))
+      )}</div>
+    </button>
+  `);
+  const steps = upcomingStepsEl(l.upcoming_steps);
+  if (steps) card.appendChild(steps);
+  card.addEventListener('click', () => openListing(l.id));
+  return card;
+}
+
+async function renderBoard(main) {
+  main.replaceChildren(h('<div class="empty">Loading…</div>'));
+  let cursor = null;
+  let first = true;
+  let wrap;
+
+  const loadMore = async (btn) => {
+    let r;
+    try {
+      r = await guard(() => API.board(cursor));
+    } catch {
+      if (first) main.replaceChildren(h('<div class="empty">Could not load the board.</div>'));
+      return;
+    }
+    if (first) {
+      main.replaceChildren();
+      main.appendChild(
+        h(
+          '<div class="bt-board-intro">Projects looking for a hand. Comment, or ask to contribute — an accepted request adds you as a viewer.</div>'
+        )
+      );
+      wrap = h('<div class="bt-listing-list"></div>');
+      main.appendChild(wrap);
+      first = false;
+    }
+    if (btn) btn.remove();
+    (r.listings || []).forEach((l) => wrap.appendChild(listingCard(l)));
+    if (!wrap.children.length) {
+      wrap.appendChild(h('<div class="empty">No open listings right now.</div>'));
+    }
+    cursor = r.next_cursor;
+    if (cursor) {
+      const b = h('<button class="btn-sm btn-sm-ghost bt-loadmore">Load more</button>');
+      b.addEventListener('click', () => loadMore(b));
+      main.appendChild(b);
+    }
+  };
+
+  loadMore(null);
+}
+
+// headline + body editor for a listing. `existing` is a listing object for edit,
+// or null to create for `projectId`.
+function openListingForm(projectId, existing, onDone) {
+  const overlay = h(`
+    <div class="modal-overlay open">
+      <div class="modal">
+        <div class="modal-header"><span class="modal-title">${
+          existing ? 'Edit listing' : 'List on the board'
+        }</span>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
+        <form id="bt-lf">
+          <label class="sp-label">Headline</label>
+          <input class="sp-input" name="headline" maxlength="120" required
+            value="${esc(existing ? existing.headline : '')}" placeholder="One line — what you're after" />
+          <label class="sp-label">What do you need help with?</label>
+          <textarea class="sp-input bt-textarea" name="help_wanted" maxlength="2000" rows="5"
+            required placeholder="Tasks, skills, time commitment — whatever helps someone decide.">${esc(
+              existing ? existing.help_wanted : ''
+            )}</textarea>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button type="submit" class="btn-sm btn-sm-sage">${existing ? 'Save' : 'Post listing'}</button>
+            <button type="button" class="btn-sm btn-sm-ghost" data-cancel>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `);
+  const close = () => overlay.remove();
+  on(overlay, '.modal-close, [data-cancel]', 'click', close);
+  overlay.addEventListener('click', (e) => e.target === overlay && close());
+  on(overlay, '#bt-lf', 'submit', async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const payload = {
+      headline: f.get('headline').trim(),
+      help_wanted: f.get('help_wanted').trim(),
+    };
+    try {
+      if (existing) {
+        await API.updateListing(existing.id, payload);
+        toast('Listing updated');
+        close();
+        onDone && onDone(existing.id);
+      } else {
+        const r = await API.createListing({ ...payload, projectId });
+        close();
+        onDone && onDone(r.listing.id);
+      }
+    } catch (ex) {
+      toast(ex.message || 'Could not save the listing');
+    }
+  });
+  document.body.appendChild(overlay);
+  overlay.querySelector('input[name=headline]').focus();
+}
+
+function openRequestModal(listingId, onDone) {
+  const overlay = h(`
+    <div class="modal-overlay open">
+      <div class="modal">
+        <div class="modal-header"><span class="modal-title">Ask to contribute</span>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
+        <form id="bt-rq">
+          <label class="sp-label">Message to the owner <span class="bt-count">optional</span></label>
+          <textarea class="sp-input bt-textarea" name="message" maxlength="1000" rows="4"
+            placeholder="How you'd like to help, relevant experience…"></textarea>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button type="submit" class="btn-sm btn-sm-sage">Send request</button>
+            <button type="button" class="btn-sm btn-sm-ghost" data-cancel>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `);
+  const close = () => overlay.remove();
+  on(overlay, '.modal-close, [data-cancel]', 'click', close);
+  overlay.addEventListener('click', (e) => e.target === overlay && close());
+  on(overlay, '#bt-rq', 'submit', async (e) => {
+    e.preventDefault();
+    const msg = new FormData(e.target).get('message').trim();
+    try {
+      await API.requestContribute(listingId, msg || null);
+      close();
+      toast('Request sent');
+      onDone && onDone();
+    } catch (ex) {
+      toast(ex.message || 'Could not send the request');
+    }
+  });
+  document.body.appendChild(overlay);
+  overlay.querySelector('textarea').focus();
+}
+
+function listingCommentEl(c, listingId, rerender) {
+  const who = c.author ? ownerName(c.author) : 'removed';
+  const el = h(`
+    <div class="bt-cmt${c.parent_comment_id ? ' bt-cmt-reply' : ''}">
+      <div class="bt-cmt-head">
+        ${c.author ? avatarEl(who) : ''}
+        <span class="bt-cmt-who">${c.deleted ? '<i>comment removed</i>' : esc(who)}</span>
+        <span class="bt-cmt-time">${esc(timeAgo(c.created_at))}${c.edited_at ? ' · edited' : ''}</span>
+      </div>
+      ${c.deleted ? '' : `<div class="bt-cmt-body"></div>`}
+      <div class="bt-cmt-actions"></div>
+    </div>
+  `);
+  if (!c.deleted) el.querySelector('.bt-cmt-body').textContent = c.body;
+  const actions = el.querySelector('.bt-cmt-actions');
+
+  if (!c.deleted && !c.parent_comment_id) {
+    const reply = h('<button class="bt-linkbtn">Reply</button>');
+    reply.addEventListener('click', () => {
+      if (el.querySelector('.bt-cmt-replybox')) return;
+      const box = h(`
+        <div class="bt-cmt-replybox">
+          <textarea class="sp-input bt-textarea" rows="2" maxlength="2000" placeholder="Reply…"></textarea>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn-sm btn-sm-sage" data-send>Reply</button>
+            <button class="btn-sm btn-sm-ghost" data-cancel>Cancel</button>
+          </div>
+        </div>
+      `);
+      on(box, '[data-cancel]', 'click', () => box.remove());
+      on(box, '[data-send]', 'click', async () => {
+        const v = box.querySelector('textarea').value.trim();
+        if (!v) return;
+        try {
+          await API.addListingComment(listingId, v, c.id);
+        } catch (ex) {
+          toast(ex.message || 'Could not reply');
+          return;
+        }
+        rerender();
+      });
+      el.appendChild(box);
+      box.querySelector('textarea').focus();
+    });
+    actions.appendChild(reply);
+  }
+  if (!c.deleted && c.is_mine) {
+    const edit = h('<button class="bt-linkbtn">Edit</button>');
+    edit.addEventListener('click', async () => {
+      const next = await btPrompt('Edit comment', c.body);
+      if (next == null || !next.trim() || next.trim() === c.body) return;
+      try {
+        await API.editListingComment(listingId, c.id, next.trim());
+      } catch (ex) {
+        toast(ex.message || 'Could not edit');
+        return;
+      }
+      rerender();
+    });
+    actions.appendChild(edit);
+  }
+  if (!c.deleted && c.can_delete) {
+    const del = h('<button class="bt-linkbtn bt-linkbtn-danger">Delete</button>');
+    del.addEventListener('click', async () => {
+      if (!(await btConfirm('Delete this comment?', { danger: true, ok: 'Delete' }))) return;
+      try {
+        await API.deleteListingComment(listingId, c.id);
+      } catch (ex) {
+        toast(ex.message || 'Could not delete');
+        return;
+      }
+      rerender();
+    });
+    actions.appendChild(del);
+  }
+
+  (c.replies || []).forEach((r) => el.appendChild(listingCommentEl(r, listingId, rerender)));
+  return el;
+}
+
+async function renderListing(app) {
+  app.replaceChildren();
+  const el = h(`
+    <div class="settings-screen">
+      <div class="settings-body">
+        <div class="detail-topbar"><button class="detail-back" id="bt-lst-back">← Board</button></div>
+        <div id="bt-lst-body"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  `);
+  on(el, '#bt-lst-back', 'click', () => {
+    state.view = 'board';
+    render();
+  });
+  app.appendChild(el);
+
+  const rerender = () => renderListing(app);
+  let d;
+  try {
+    d = await guard(() => API.listing(state.listingId));
+  } catch {
+    el.querySelector('#bt-lst-body').replaceChildren(h('<div class="empty">Listing not found.</div>'));
+    return;
+  }
+  const l = d.listing;
+  const body = el.querySelector('#bt-lst-body');
+  body.replaceChildren();
+
+  const head = h(`
+    <div>
+      <h1 class="detail-title">${esc(l.headline)}${
+        l.status !== 'open' ? ` <span class="bt-listing-status">${esc(l.status)}</span>` : ''
+      }</h1>
+      <div class="bt-listing-meta">
+        ${avatarEl(ownerName(l.owner))}
+        <span>${esc(ownerName(l.owner))}${
+          l.owner.supporter ? ' <span class="bt-supporter">Supporter</span>' : ''
+        } · ${esc(l.project_title)} · started ${esc(
+          fmtDate((l.project_created_at || '').slice(0, 10))
+        )}</span>
+      </div>
+      <div class="bt-listing-sub">${esc(taskSummaryText(l))}</div>
+    </div>
+  `);
+  const steps = upcomingStepsEl(l.upcoming_steps);
+  if (steps) head.appendChild(steps);
+  body.appendChild(head);
+
+  const bodyText = h('<div class="sp-section"><div class="sp-label">Help wanted</div><div class="bt-prof-bio"></div></div>');
+  bodyText.querySelector('.bt-prof-bio').textContent = l.help_wanted;
+  body.appendChild(bodyText);
+
+  // action area
+  const act = h('<div class="bt-prof-actions"></div>');
+  if (d.is_owner) {
+    const edit = h(`<button class="btn-sm btn-sm-ghost">${icon('edit', 16)} Edit</button>`);
+    edit.addEventListener('click', () => openListingForm(l.project_id, l, rerender));
+    const statusSel = h(`
+      <select class="sp-select" style="width:auto;margin:0">
+        ${['open', 'closed', 'archived']
+          .map((s) => `<option value="${s}"${l.status === s ? ' selected' : ''}>${s}</option>`)
+          .join('')}
+      </select>
+    `);
+    statusSel.addEventListener('change', async (e) => {
+      try {
+        await API.updateListing(l.id, { status: e.target.value });
+        toast('Status updated');
+        rerender();
+      } catch (ex) {
+        toast(ex.message || 'Could not update');
+      }
+    });
+    const del = h('<button class="btn-sm btn-danger">Delete</button>');
+    del.addEventListener('click', async () => {
+      if (
+        !(await btConfirm('Delete this listing? Comments and requests go with it.', {
+          danger: true,
+          ok: 'Delete',
+        }))
+      )
+        return;
+      try {
+        await API.deleteListing(l.id);
+      } catch (ex) {
+        toast(ex.message || 'Could not delete');
+        return;
+      }
+      state.view = 'board';
+      render();
+    });
+    act.append(edit, statusSel, del);
+  } else if (d.my_role) {
+    act.appendChild(
+      h(`<div class="sp-row-sub">You have ${esc(d.my_role)} access to this project.</div>`)
+    );
+    const open = h('<button class="btn-sm btn-sm-ghost">Open project</button>');
+    open.addEventListener('click', () => openProject(l.project_id));
+    act.appendChild(open);
+  } else if (d.my_request && d.my_request.status === 'pending') {
+    act.appendChild(h('<div class="sp-row-sub">Your request is pending.</div>'));
+    const wd = h('<button class="btn-sm btn-sm-ghost">Withdraw request</button>');
+    wd.addEventListener('click', async () => {
+      try {
+        await API.withdrawRequest(l.id, d.my_request.id);
+        toast('Request withdrawn');
+        rerender();
+      } catch (ex) {
+        toast(ex.message || 'Could not withdraw');
+      }
+    });
+    act.appendChild(wd);
+  } else {
+    if (d.my_request && (d.my_request.status === 'declined' || d.my_request.status === 'withdrawn')) {
+      act.appendChild(
+        h(
+          `<div class="sp-row-sub">Your earlier request was ${esc(d.my_request.status)}.</div>`
+        )
+      );
+    }
+    if (l.status === 'open') {
+      const req = h('<button class="btn-sm btn-sm-sage">Ask to contribute</button>');
+      req.addEventListener('click', () => openRequestModal(l.id, rerender));
+      act.appendChild(req);
+    } else {
+      act.appendChild(h('<div class="sp-row-sub">This listing isn’t taking requests.</div>'));
+    }
+  }
+  body.appendChild(act);
+
+  // pending requests (owner)
+  if (d.is_owner && d.requests) {
+    const sec = h(
+      `<div class="sp-section"><div class="sp-label">Requests${
+        d.requests.length ? ` (${d.requests.length})` : ''
+      }</div><div id="bt-lst-reqs"></div></div>`
+    );
+    const rl = sec.querySelector('#bt-lst-reqs');
+    if (!d.requests.length) rl.appendChild(h('<div class="empty-section">No pending requests.</div>'));
+    d.requests.forEach((rq) => {
+      const row = h(`
+        <div class="bt-req-row">
+          <div class="bt-req-main">
+            ${avatarEl(ownerName(rq.requester))}
+            <div>
+              <div class="bt-req-who">${esc(ownerName(rq.requester))}${
+                rq.requester.supporter ? ' <span class="bt-supporter">Supporter</span>' : ''
+              }</div>
+              ${rq.message ? `<div class="bt-req-msg"></div>` : ''}
+            </div>
+          </div>
+          <div class="bt-req-actions">
+            <button class="btn-sm btn-sm-sage" data-accept>Accept</button>
+            <button class="btn-sm btn-sm-ghost" data-decline>Decline</button>
+          </div>
+        </div>
+      `);
+      if (rq.message) row.querySelector('.bt-req-msg').textContent = rq.message;
+      const decide = async (status) => {
+        try {
+          await API.decideRequest(l.id, rq.id, status);
+          toast(status === 'accepted' ? 'Added as a viewer' : 'Request declined');
+          rerender();
+        } catch (ex) {
+          toast(ex.message || 'Could not update the request');
+        }
+      };
+      row.querySelector('[data-accept]').addEventListener('click', () => decide('accepted'));
+      row.querySelector('[data-decline]').addEventListener('click', () => decide('declined'));
+      rl.appendChild(row);
+    });
+    body.appendChild(sec);
+  }
+
+  // comments
+  const cSec = h(
+    '<div class="sp-section"><div class="sp-label">Comments</div><div id="bt-lst-comments"></div></div>'
+  );
+  const cList = cSec.querySelector('#bt-lst-comments');
+  const composer = h(`
+    <div class="bt-cmt-composer">
+      <textarea class="sp-input bt-textarea" rows="3" maxlength="2000" placeholder="Add a comment…"></textarea>
+      <button class="btn-sm btn-sm-sage" data-send style="margin-top:6px">Comment</button>
+    </div>
+  `);
+  on(composer, '[data-send]', 'click', async () => {
+    const v = composer.querySelector('textarea').value.trim();
+    if (!v) return;
+    try {
+      await API.addListingComment(l.id, v);
+    } catch (ex) {
+      toast(ex.message || 'Could not comment');
+      return;
+    }
+    rerender();
+  });
+  cList.appendChild(composer);
+  if (!d.comments.length) {
+    cList.appendChild(h('<div class="empty-section">No comments yet.</div>'));
+  } else {
+    d.comments.forEach((c) => cList.appendChild(listingCommentEl(c, l.id, rerender)));
+  }
+  body.appendChild(cSec);
+}
+
 // ── Sign-in ────────────────────────────────────────────────────────────────
 let tsWidgetId = null;
 
@@ -1769,6 +2262,7 @@ function header() {
     ['next', 'Next'],
     ['inbox', 'Inbox'],
     ['review', 'Review'],
+    ['board', 'Board'],
   ];
   const el = h(`
     <div class="header">
@@ -1864,6 +2358,10 @@ function renderApp() {
     renderAdmin(app);
     return;
   }
+  if (state.view === 'listing') {
+    renderListing(app);
+    return;
+  }
   app.appendChild(header());
   const main = h(`<div class="project-list${state.view === 'home' ? ' is-home' : ''}"></div>`);
   app.appendChild(main);
@@ -1871,6 +2369,7 @@ function renderApp() {
   else if (state.view === 'next') renderNext(main);
   else if (state.view === 'inbox') renderInbox(main);
   else if (state.view === 'review') renderReview(main);
+  else if (state.view === 'board') renderBoard(main);
 }
 
 // ── Home / project list ────────────────────────────────────────────────────
@@ -2601,6 +3100,16 @@ function renderProject(app) {
           <button class="meta-people" id="bt-people">${icon('people', 16)} ${b.collaborators.length}${
             p.role !== 'owner' ? ` &middot; ${esc(p.role)}` : ''
           }</button>
+          ${
+            b.listing
+              ? `<button class="meta-people" id="bt-board-listing">${icon(
+                  'people',
+                  16
+                )} On the board${b.listing.status !== 'open' ? ` &middot; ${esc(b.listing.status)}` : ''}</button>`
+              : p.role === 'owner'
+                ? `<button class="meta-people" id="bt-board-list">${icon('people', 16)} List on the board</button>`
+                : ''
+          }
         </div>
         ${p.description ? `<p style="color:var(--text-muted);font-size:16px;line-height:1.55;margin-bottom:14px">${esc(p.description)}</p>` : ''}
         <div class="pickup-box" id="bt-pickup-box"></div>
@@ -2632,6 +3141,10 @@ function renderProject(app) {
   });
   on(view, '#bt-focus', 'click', () => openFocusSession(state.project));
   on(view, '#bt-people', 'click', () => openPeople(state.project));
+  on(view, '#bt-board-listing', 'click', () => b.listing && openListing(b.listing.id));
+  on(view, '#bt-board-list', 'click', () =>
+    openListingForm(p.id, null, (id) => openListing(id))
+  );
   if (canEdit) on(view, '#bt-editproj', 'click', () => openProjectForm(p));
   renderPickup(view.querySelector('#bt-pickup-box'), canEdit);
   on(view, '[data-tab]', 'click', (e) => {

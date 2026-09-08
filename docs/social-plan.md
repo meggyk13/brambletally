@@ -285,7 +285,41 @@ so the toggle isn't a nested button); the collaborator-invite modal gains a
 already-added collaborators filtered out). **Deferred to Phase 3** (their data
 lives there): `GET /api/feed` and the "started following you" notification.
 
-Phase 3 (board + notifications) is next.
+Phase 3 (board + notifications) is being built in three PRs — **3a board core**,
+**3b notifications** (incl. the weekly-digest cron), **3c reports + full admin
+panel + rate limits/Turnstile**.
+
+**Phase 3a shipped in PR #TBD (2026-09-08):** `migrations/0008_social.sql` adds
+`project_listings` (one per project, UNIQUE `project_id`), `listing_comments`
+(one level of replies, soft delete), `contributor_requests` (UNIQUE
+`(listing_id, requester_id)`, reused on re-request). Folded into `schema.sql`.
+`session.js` now also loads `board_blocked_at` onto `context.data.user`. New
+`worker/api/lib/board.js` — `requireBoardOk` (403 when `board_blocked_at` set),
+`activeListingCap` (1 free / 3 supporter), `CARD_COLUMNS` (leaf-only step
+counts), `fetchUpcomingSteps` (≤3 open leaf steps per project by due date, via a
+`ROW_NUMBER()` window), `loadListing`, `shapeComment`. Endpoints:
+`GET /api/board` (open listings, cursor-paged card bundles, owner disabled/blocked
+filtered), `POST /api/board` (`{ projectId, headline, help_wanted }`, owner only,
+board-ok, one-per-project, listing cap), `GET /api/board/:listingId` (card bundle
++ threaded comments + the caller's `my_role` / `my_request` + pending `requests`
+when owner), `PATCH`/`DELETE /api/board/:listingId` (owner or admin),
+`POST /api/board/:listingId/comments` (`{ body, parentCommentId? }`, board-ok,
+block-checked, one reply level), `PATCH`/`DELETE .../comments/:commentId` (author
+edit; author/owner/admin soft-delete), `POST .../requests` (`{ message? }`,
+board-ok, not-owner, not-already-a-collaborator, block-checked, ~10/day cap,
+reuses a declined/withdrawn row), `PATCH .../requests/:requestId`
+(`accepted`→batch: request + `INSERT project_collaborators … 'viewer'`;
+`declined`), `DELETE .../requests/:requestId` (requester withdraws).
+`GET /api/projects/:id` now returns `listing: { id, status } | null`. Frontend: a
+**Board** nav tab; `renderBoard` (listing cards — headline, owner, task summary,
+next ≤3 due steps); `renderListing` (`state.view === 'listing'`) with the
+help-wanted body, owner controls (edit / status select / delete + a pending-
+requests list with Accept/Decline), the request-to-contribute flow (modal +
+pending/withdraw/re-request states), and a one-level comment thread with a
+composer, replies, edit, and delete; `openListingForm` reused from the project
+detail view's **List on the board** / **On the board** control. **Deferred to
+3b:** every notification write (follow, contributor_request, contributor_decided,
+board_comment, board_reply) and the emails.
 
 ---
 
