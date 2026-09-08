@@ -35,6 +35,7 @@ import * as interests from './api/interests/index.js';
 import * as interest from './api/interests/slug.js';
 import * as follows from './api/follows/index.js';
 import * as follow from './api/follows/handle.js';
+import * as feed from './api/feed/index.js';
 import * as blocks from './api/blocks/index.js';
 import * as block from './api/blocks/handle.js';
 import * as notifications from './api/notifications/index.js';
@@ -95,6 +96,7 @@ export const routes = [
   ['/api/interests/:slug', interest],
   ['/api/follows', follows],
   ['/api/follows/:handle', follow],
+  ['/api/feed', feed],
   ['/api/blocks', blocks],
   ['/api/blocks/:handle', block],
   ['/api/notifications', notifications],

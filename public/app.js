@@ -152,6 +152,12 @@ const API = {
     api('/api/notifications/read', { method: 'POST', body: ids ? { ids } : {} }),
 
   board: (cursor) => api('/api/board' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  feed: (filter, cursor) =>
+    api(
+      '/api/feed?filter=' +
+        (filter === 'following' ? 'following' : 'all') +
+        (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')
+    ),
   listing: (id) => api('/api/board/' + encodeURIComponent(id)),
   createListing: (body) => api('/api/board', { method: 'POST', body }),
   updateListing: (id, body) =>
@@ -509,6 +515,8 @@ const state = {
   filterCategory: 'all', // 'all' | 'none' | a category name
   homeMode: 'projects', // 'projects' | 'quick'
   quickCap: 30, // minutes ceiling for the Quick tasks list; Infinity = all
+  boardMode: 'listings', // 'listings' | 'activity'
+  feedFilter: 'all', // 'all' | 'following'
   project: null, // full bundle when view === 'project'
   detailTab: 'steps',
   doneThisSession: 0,
@@ -2122,7 +2130,26 @@ function listingCard(l) {
   return card;
 }
 
-async function renderBoard(main) {
+function renderBoard(main) {
+  main.replaceChildren();
+  const modeBar = h(`
+    <div class="bt-home-modes">
+      <button class="bt-home-mode${state.boardMode !== 'activity' ? ' active' : ''}" data-bmode="listings">Listings</button>
+      <button class="bt-home-mode${state.boardMode === 'activity' ? ' active' : ''}" data-bmode="activity">Activity</button>
+    </div>
+  `);
+  const body = h('<div class="bt-board-body"></div>');
+  on(modeBar, '[data-bmode]', 'click', (e) => {
+    state.boardMode = e.currentTarget.dataset.bmode;
+    renderBoard(main);
+  });
+  main.appendChild(modeBar);
+  main.appendChild(body);
+  if (state.boardMode === 'activity') renderBoardActivity(body);
+  else renderBoardListings(body);
+}
+
+async function renderBoardListings(main) {
   main.replaceChildren(h('<div class="empty">Loading…</div>'));
   let cursor = null;
   let first = true;
@@ -2159,6 +2186,85 @@ async function renderBoard(main) {
       main.appendChild(b);
     }
   };
+
+  loadMore(null);
+}
+
+const FEED_VERB = { listing: 'listed a project', comment: 'commented on a listing' };
+
+function feedEventEl(ev) {
+  const who = ownerName(ev.actor);
+  const el = h(`
+    <button class="bt-feed-row${ev.from_followed ? ' is-followed' : ''}">
+      <div class="bt-feed-head">
+        ${avatarEl(who)}
+        <span class="bt-feed-who">${esc(who)}${
+          ev.actor && ev.actor.supporter ? ' <span class="bt-supporter">Supporter</span>' : ''
+        }</span>
+        ${ev.from_followed ? '<span class="bt-feed-tag">you follow</span>' : ''}
+        <span class="bt-feed-time">${esc(timeAgo(ev.created_at))}</span>
+      </div>
+      <div class="bt-feed-line">${esc(FEED_VERB[ev.kind] || 'posted')} · <b>${esc(ev.project_title)}</b></div>
+      ${ev.preview ? '<div class="bt-feed-preview"></div>' : ''}
+    </button>
+  `);
+  if (ev.preview) el.querySelector('.bt-feed-preview').textContent = ev.preview;
+  el.addEventListener('click', () => openListing(ev.listing_id));
+  return el;
+}
+
+async function renderBoardActivity(main) {
+  main.replaceChildren();
+  const filterBar = h(`
+    <div class="bt-feed-filter">
+      <button class="bt-quick-cap${state.feedFilter !== 'following' ? ' active' : ''}" data-ffilter="all">All activity</button>
+      <button class="bt-quick-cap${state.feedFilter === 'following' ? ' active' : ''}" data-ffilter="following">Following</button>
+    </div>
+  `);
+  const list = h('<div class="bt-feed-list"><div class="empty">Loading…</div></div>');
+  main.appendChild(filterBar);
+  main.appendChild(list);
+
+  let cursor = null;
+  let first = true;
+
+  const loadMore = async (btn) => {
+    let r;
+    try {
+      r = await guard(() => API.feed(state.feedFilter, cursor));
+    } catch {
+      if (first) list.replaceChildren(h('<div class="empty">Could not load activity.</div>'));
+      return;
+    }
+    if (first) {
+      list.replaceChildren();
+      first = false;
+    }
+    if (btn) btn.remove();
+    (r.events || []).forEach((ev) => list.appendChild(feedEventEl(ev)));
+    if (!list.children.length) {
+      list.appendChild(
+        h(
+          `<div class="empty">${
+            state.feedFilter === 'following'
+              ? 'No recent activity from people you follow.'
+              : 'No board activity yet.'
+          }</div>`
+        )
+      );
+    }
+    cursor = r.next_cursor;
+    if (cursor) {
+      const b = h('<button class="btn-sm btn-sm-ghost bt-loadmore">Load more</button>');
+      b.addEventListener('click', () => loadMore(b));
+      main.appendChild(b);
+    }
+  };
+
+  on(filterBar, '[data-ffilter]', 'click', (e) => {
+    state.feedFilter = e.currentTarget.dataset.ffilter;
+    renderBoardActivity(main);
+  });
 
   loadMore(null);
 }
