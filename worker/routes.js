@@ -5,6 +5,7 @@
 
 import * as authRequestLink from './api/auth/request-link.js';
 import * as authCallback from './api/auth/callback.js';
+import * as authEmailChange from './api/auth/email-change.js';
 import * as authLogout from './api/auth/logout.js';
 import * as authMe from './api/auth/me.js';
 import * as projects from './api/projects/index.js';
@@ -57,12 +58,14 @@ import * as adminUser from './api/admin/users/handle.js';
 import * as adminUserSanction from './api/admin/users/handle/sanction.js';
 import * as settingsNotifPrefs from './api/settings/notif-prefs.js';
 import * as settingsExport from './api/settings/export.js';
+import * as settingsEmail from './api/settings/email.js';
 import * as legalAccept from './api/legal/accept.js';
 import * as account from './api/account.js';
 
 export const routes = [
   ['/api/auth/request-link', authRequestLink],
   ['/api/auth/callback', authCallback],
+  ['/api/auth/email-change', authEmailChange],
   ['/api/auth/logout', authLogout],
   ['/api/auth/me', authMe],
 
@@ -120,6 +123,7 @@ export const routes = [
   ['/api/admin/users/:handle/sanction', adminUserSanction],
   ['/api/settings/notif-prefs', settingsNotifPrefs],
   ['/api/settings/export', settingsExport],
+  ['/api/settings/email', settingsEmail],
   ['/api/legal/accept', legalAccept],
   ['/api/account', account],
 ];

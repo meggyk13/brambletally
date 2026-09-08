@@ -198,6 +198,20 @@ CREATE TABLE magic_links (
 );
 CREATE INDEX idx_magic_links_email ON magic_links(email);
 
+-- Pending email changes (migration 0011). The confirm link goes to the NEW
+-- address; the token proves control of it. One live request per user — the
+-- endpoint marks older ones used before inserting.
+CREATE TABLE email_change_requests (
+  id            TEXT PRIMARY KEY,        -- uuid
+  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  new_email     TEXT NOT NULL,           -- lower-cased, trimmed
+  token_hash    TEXT NOT NULL,           -- sha256 of the token in the link
+  expires_at    TEXT NOT NULL,
+  used_at       TEXT,                    -- set when claimed, or when superseded
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_email_change_user ON email_change_requests(user_id, used_at);
+
 -- ── Projects ─────────────────────────────────────────────────────────────
 
 -- Per-user pick list for the project "category" field. Managed by the owner;

@@ -212,6 +212,7 @@ const API = {
   sanctionUser: (handle, body) =>
     api('/api/admin/users/' + encodeURIComponent(handle) + '/sanction', { method: 'POST', body }),
   saveNotifPrefs: (prefs) => api('/api/settings/notif-prefs', { method: 'PATCH', body: prefs }),
+  changeEmail: (email) => api('/api/settings/email', { method: 'POST', body: { email } }),
   acceptTos: () => api('/api/legal/accept', { method: 'POST' }),
   deleteAccount: () => api('/api/account', { method: 'DELETE' }),
 
@@ -531,6 +532,12 @@ async function loadCategories() {
   }
 }
 
+const EMAIL_RESULT_MSG = {
+  changed: 'Your email address has been updated.',
+  invalid: 'That email-change link has expired or was already used.',
+  taken: 'That address was taken before you confirmed it. Nothing changed.',
+};
+
 async function boot() {
   applyTheme();
   try {
@@ -542,6 +549,15 @@ async function boot() {
     state.user = null;
   }
   render();
+
+  const params = new URLSearchParams(location.search);
+  const emailResult = params.get('email');
+  if (emailResult && EMAIL_RESULT_MSG[emailResult]) {
+    toast(EMAIL_RESULT_MSG[emailResult]);
+    params.delete('email');
+    const qs = params.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+  }
 }
 
 function render() {
@@ -742,7 +758,10 @@ function renderSettings(app) {
 
         <div class="sp-section">
           <div class="sp-label">Account</div>
-          <div class="sp-row"><div class="sp-row-left"><div>Email<div class="sp-row-sub">${esc(u.email)}</div></div></div></div>
+          <div class="sp-row">
+            <div class="sp-row-left"><div>Email<div class="sp-row-sub">${esc(u.email)}</div></div></div>
+            <button class="btn-sm btn-sm-ghost" id="bt-set-email">Change</button>
+          </div>
           <div class="sp-row">
             <div class="sp-row-left"><div>Handle<div class="sp-row-sub">@${esc(u.handle || '')}</div></div></div>
             <button class="btn-sm btn-sm-ghost" id="bt-set-handle">Change</button>
@@ -835,6 +854,20 @@ function renderSettings(app) {
     render();
   });
   on(el, '#bt-set-handle', 'click', openHandleChange);
+  on(el, '#bt-set-email', 'click', async () => {
+    const next = await btPrompt('New email address', '');
+    if (!next) return;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(next)) {
+      toast('Enter a valid email address');
+      return;
+    }
+    try {
+      await API.changeEmail(next);
+      toast(`Check ${next} for a link to confirm the change.`);
+    } catch (ex) {
+      toast(ex.message || 'Could not start the email change');
+    }
+  });
   on(el, '#bt-set-profile', 'click', () => {
     state.viewBeforeProfile = 'settings';
     state.view = 'profile-edit';

@@ -16,6 +16,7 @@ import { needsTos } from './api/lib/legal.js';
 const DISABLED_OK = new Set([
   '/api/auth/me',
   '/api/auth/logout',
+  '/api/auth/email-change',
   '/api/settings/export',
   '/api/account',
 ]);
