@@ -1842,3 +1842,14 @@ textarea{resize:vertical;min-height:60px}
 }
 .bt-link-rm:hover { color: var(--danger); }
 #bt-app .bt-links-add { margin-top: 2px; display: inline-flex; align-items: center; gap: 4px; }
+
+/* ── Blocking + admin tag tool (Social 1b-ii PR 2) ────────────────────── */
+#bt-app .bt-adm-actions { display: flex; gap: 6px; flex-shrink: 0; }
+#bt-app .bt-adm-actions .btn-sm { padding: 6px 10px; font-size: 13px; }
+#bt-app .bt-adm-row.is-merge-from {
+  background: var(--warn-bg);
+  box-shadow: inset 3px 0 0 var(--warn-border);
+}
+#bt-app #bt-adm-merge-state { color: var(--warn-text); font-weight: 600; padding-bottom: 8px; }
+#bt-app #bt-bl-body .sp-row .sp-row-left, #bt-app #bt-adm-list .sp-row .sp-row-left { min-width: 0; }
+#bt-app #bt-prof-block { color: var(--danger); }

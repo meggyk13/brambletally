@@ -146,6 +146,16 @@ const API = {
   putInterests: (labels) => api('/api/interests', { method: 'PUT', body: { labels } }),
   discover: (slug, cursor) =>
     api('/api/interests/' + encodeURIComponent(slug) + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  listBlocks: () => api('/api/blocks'),
+  block: (handle) => api('/api/blocks', { method: 'POST', body: { handle } }),
+  unblock: (handle) => api('/api/blocks/' + encodeURIComponent(handle), { method: 'DELETE' }),
+  adminInterests: (q) => api('/api/admin/interests' + (q ? '?q=' + encodeURIComponent(q) : '')),
+  adminRenameInterest: (slug, body) =>
+    api('/api/admin/interests/' + encodeURIComponent(slug), { method: 'PATCH', body }),
+  adminDeleteInterest: (slug) =>
+    api('/api/admin/interests/' + encodeURIComponent(slug), { method: 'DELETE' }),
+  adminMergeInterests: (fromSlug, toSlug) =>
+    api('/api/admin/interests/merge', { method: 'POST', body: { fromSlug, toSlug } }),
   saveNotifPrefs: (prefs) => api('/api/settings/notif-prefs', { method: 'PATCH', body: prefs }),
   deleteAccount: () => api('/api/account', { method: 'DELETE' }),
 
@@ -439,7 +449,7 @@ function appearanceControls() {
 const state = {
   user: null,
   me: null, // the full /api/auth/me payload: { user, needs_handle, supporter }
-  view: 'home', // home | next | project | inbox | review | settings | search | profile | profile-edit | discover
+  view: 'home', // home | next | project | inbox | review | settings | search | profile | profile-edit | discover | blocked | admin
   viewBeforeProfile: 'home', // where a Back from a profile / discover screen returns
   profileHandle: null, // handle shown by renderProfile
   discoverSlug: null, // interest slug shown by renderDiscover
@@ -613,6 +623,10 @@ function renderSettings(app) {
             <div class="sp-row-left"><div>Profile<div class="sp-row-sub">Bio, pronouns, interests, and links.</div></div></div>
             <button class="btn-sm btn-sm-ghost" id="bt-set-profile">Edit</button>
           </div>
+          <div class="sp-row">
+            <div class="sp-row-left"><div>Blocked accounts<div class="sp-row-sub">People you’ve blocked.</div></div></div>
+            <button class="btn-sm btn-sm-ghost" id="bt-set-blocked">Manage</button>
+          </div>
           <div class="sp-field">
             <div class="sp-field-label">Display name</div>
             <div style="display:flex;gap:8px">
@@ -671,6 +685,17 @@ function renderSettings(app) {
               : 'Brambletally is free. A Supporter tier with extra themes and a badge is coming.'
           }</div></div></div></div>
         </div>
+        ${
+          u.is_admin
+            ? `<div class="sp-section">
+          <div class="sp-label">Admin</div>
+          <div class="sp-row">
+            <div class="sp-row-left"><div>Interest tags<div class="sp-row-sub">Rename, merge, or delete tags across all profiles.</div></div></div>
+            <button class="btn-sm btn-sm-ghost" id="bt-set-admin">Open</button>
+          </div>
+        </div>`
+            : ''
+        }
       </div>
     </div>
   `);
@@ -685,6 +710,14 @@ function renderSettings(app) {
   on(el, '#bt-set-profile', 'click', () => {
     state.viewBeforeProfile = 'settings';
     state.view = 'profile-edit';
+    render();
+  });
+  on(el, '#bt-set-blocked', 'click', () => {
+    state.view = 'blocked';
+    render();
+  });
+  on(el, '#bt-set-admin', 'click', () => {
+    state.view = 'admin';
     render();
   });
   on(el, '#bt-set-dname-save', 'click', async () => {
@@ -924,6 +957,27 @@ async function renderProfile(app) {
       render();
     });
     body.appendChild(editBtn);
+  } else {
+    const blockBtn = h(
+      `<button class="btn-sm btn-sm-ghost bt-prof-edit" id="bt-prof-block">Block</button>`
+    );
+    blockBtn.addEventListener('click', async () => {
+      const ok = await btConfirm(
+        `Block @${p.handle}? You won't see each other in search, discovery, or profiles. You can undo this in Settings.`,
+        { danger: true, ok: 'Block' }
+      );
+      if (!ok) return;
+      try {
+        await API.block(p.handle);
+      } catch (ex) {
+        toast(ex.message || 'Could not block');
+        return;
+      }
+      toast(`Blocked @${p.handle}`);
+      state.view = back;
+      render();
+    });
+    body.appendChild(blockBtn);
   }
 
   if (p.bio) {
@@ -1290,6 +1344,212 @@ async function renderDiscover(app) {
   loadMore(null);
 }
 
+// ── Blocked accounts (Settings) ──────────────────────────────────────────
+async function renderBlocked(app) {
+  app.replaceChildren();
+  const el = h(`
+    <div class="settings-screen">
+      <div class="settings-body">
+        <div class="detail-topbar"><button class="detail-back" id="bt-bl-back">← Back</button></div>
+        <h1 class="detail-title">Blocked accounts</h1>
+        <div id="bt-bl-body"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  `);
+  on(el, '#bt-bl-back', 'click', () => {
+    state.view = 'settings';
+    render();
+  });
+  app.appendChild(el);
+
+  const body = el.querySelector('#bt-bl-body');
+  let data;
+  try {
+    data = await guard(() => API.listBlocks());
+  } catch {
+    body.replaceChildren(h('<div class="empty">Could not load your block list.</div>'));
+    return;
+  }
+  const fill = (blocks) => {
+    body.replaceChildren();
+    if (!blocks.length) {
+      body.appendChild(h('<div class="empty">You haven’t blocked anyone.</div>'));
+      return;
+    }
+    blocks.forEach((u) => {
+      const row = h(`
+        <div class="sp-row">
+          <div class="sp-row-left">
+            ${avatarEl(u.display_name || u.name || u.handle)}
+            <div>${esc(u.display_name || u.name || '@' + u.handle)}<div class="sp-row-sub">@${esc(
+              u.handle
+            )}</div></div>
+          </div>
+          <button class="btn-sm btn-sm-ghost" data-unblock>Unblock</button>
+        </div>
+      `);
+      row.querySelector('[data-unblock]').addEventListener('click', async (e) => {
+        e.currentTarget.disabled = true;
+        try {
+          await API.unblock(u.handle);
+        } catch (ex) {
+          toast(ex.message || 'Could not unblock');
+          e.currentTarget.disabled = false;
+          return;
+        }
+        data.blocks = data.blocks.filter((b) => b.handle !== u.handle);
+        fill(data.blocks);
+        toast(`Unblocked @${u.handle}`);
+      });
+      body.appendChild(row);
+    });
+  };
+  fill(data.blocks || []);
+}
+
+// ── Admin: interest-tag tool ─────────────────────────────────────────────
+async function renderAdmin(app) {
+  app.replaceChildren();
+  if (!(state.me && state.me.user && state.me.user.is_admin)) {
+    state.view = 'settings';
+    render();
+    return;
+  }
+  const el = h(`
+    <div class="settings-screen">
+      <div class="settings-body">
+        <div class="detail-topbar"><button class="detail-back" id="bt-adm-back">← Back</button></div>
+        <h1 class="detail-title">Interest tags</h1>
+        <div class="sp-field">
+          <input class="sp-input" id="bt-adm-q" autocomplete="off" placeholder="Filter tags…" />
+        </div>
+        <div class="sp-row-sub" id="bt-adm-merge-state" style="padding:0 20px" hidden></div>
+        <div id="bt-adm-list"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  `);
+  on(el, '#bt-adm-back', 'click', () => {
+    state.view = 'settings';
+    render();
+  });
+  app.appendChild(el);
+
+  const listEl = el.querySelector('#bt-adm-list');
+  const qInput = el.querySelector('#bt-adm-q');
+  const mergeState = el.querySelector('#bt-adm-merge-state');
+  let mergeFrom = null; // { slug, label } armed for merge
+
+  const setMerge = (tag) => {
+    mergeFrom = tag;
+    if (tag) {
+      mergeState.hidden = false;
+      mergeState.textContent = `Merging “${tag.label}” — pick the tag to merge it into.`;
+    } else {
+      mergeState.hidden = true;
+    }
+    listEl.querySelectorAll('.bt-adm-row').forEach((r) => {
+      r.classList.toggle('is-merge-from', !!tag && r.dataset.slug === tag.slug);
+    });
+  };
+
+  const load = async () => {
+    let r;
+    try {
+      r = await guard(() => API.adminInterests(qInput.value.trim()));
+    } catch {
+      return;
+    }
+    const tags = r.tags || [];
+    listEl.replaceChildren();
+    if (!tags.length) {
+      listEl.appendChild(h('<div class="empty">No tags.</div>'));
+      return;
+    }
+    tags.forEach((t) => {
+      const row = h(`
+        <div class="sp-row bt-adm-row" data-slug="${esc(t.slug)}">
+          <div class="sp-row-left">
+            <div>${esc(t.label)}<div class="sp-row-sub">@${esc(t.slug)} · ${t.usage_count} ${
+              t.usage_count === 1 ? 'profile' : 'profiles'
+            }</div></div>
+          </div>
+          <div class="bt-adm-actions">
+            <button class="btn-sm btn-sm-ghost" data-rename>Rename</button>
+            <button class="btn-sm btn-sm-ghost" data-merge>Merge</button>
+            <button class="btn-sm btn-danger" data-del>Delete</button>
+          </div>
+        </div>
+      `);
+      row.querySelector('[data-rename]').addEventListener('click', async () => {
+        const next = await btPrompt('New label', t.label);
+        if (next == null) return;
+        const label = next.trim();
+        if (!label || label === t.label) return;
+        try {
+          await API.adminRenameInterest(t.slug, { label });
+        } catch (ex) {
+          toast(ex.message || 'Rename failed');
+          return;
+        }
+        toast('Renamed');
+        load();
+      });
+      row.querySelector('[data-del]').addEventListener('click', async () => {
+        const ok = await btConfirm(
+          `Delete “${t.label}”? It’s removed from ${t.usage_count} ${
+            t.usage_count === 1 ? 'profile' : 'profiles'
+          }.`,
+          { danger: true, ok: 'Delete' }
+        );
+        if (!ok) return;
+        try {
+          await API.adminDeleteInterest(t.slug);
+        } catch (ex) {
+          toast(ex.message || 'Delete failed');
+          return;
+        }
+        if (mergeFrom && mergeFrom.slug === t.slug) setMerge(null);
+        toast('Deleted');
+        load();
+      });
+      row.querySelector('[data-merge]').addEventListener('click', async () => {
+        if (!mergeFrom) {
+          setMerge({ slug: t.slug, label: t.label });
+          return;
+        }
+        if (mergeFrom.slug === t.slug) {
+          setMerge(null);
+          return;
+        }
+        const from = mergeFrom;
+        const ok = await btConfirm(
+          `Merge “${from.label}” into “${t.label}”? “${from.label}” is removed and everyone tagged with it becomes tagged “${t.label}”.`,
+          { danger: true, ok: 'Merge' }
+        );
+        if (!ok) return;
+        try {
+          await API.adminMergeInterests(from.slug, t.slug);
+        } catch (ex) {
+          toast(ex.message || 'Merge failed');
+          return;
+        }
+        setMerge(null);
+        toast('Merged');
+        load();
+      });
+      listEl.appendChild(row);
+    });
+    if (mergeFrom) setMerge(mergeFrom);
+  };
+
+  let timer;
+  qInput.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(load, 200);
+  });
+  load();
+}
+
 // ── Sign-in ────────────────────────────────────────────────────────────────
 let tsWidgetId = null;
 
@@ -1445,6 +1705,14 @@ function renderApp() {
   }
   if (state.view === 'discover') {
     renderDiscover(app);
+    return;
+  }
+  if (state.view === 'blocked') {
+    renderBlocked(app);
+    return;
+  }
+  if (state.view === 'admin') {
+    renderAdmin(app);
     return;
   }
   app.appendChild(header());

@@ -1,9 +1,10 @@
 import { json, error } from '../lib/http.js';
 import { isSupporter } from '../lib/plan.js';
+import { blockedBetween } from '../lib/blocks.js';
 
 // GET /api/profile/:handle — the public-within-login profile bundle. Signed-in
-// only. A disabled account's profile is hidden from everyone but the account
-// itself. Block enforcement is layered on in Phase 1b-ii PR 2.
+// only. A disabled account's profile — and either party of a block — 404s to
+// everyone but the account itself.
 export async function onRequestGet(context) {
   const me = context.data.user;
   if (!me) return error(401, 'Not signed in');
@@ -26,6 +27,8 @@ export async function onRequestGet(context) {
   if (!u) return error(404, 'No such profile');
   const is_self = u.id === me.id;
   if (u.disabled_at && !is_self) return error(404, 'No such profile');
+  if (!is_self && (await blockedBetween(context.env, me.id, u.id)))
+    return error(404, 'No such profile');
 
   const [{ results: links }, { results: interests }] = await Promise.all([
     context.env.DB.prepare(

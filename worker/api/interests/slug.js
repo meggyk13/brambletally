@@ -1,10 +1,12 @@
 import { json, error } from '../lib/http.js';
 import { isSupporter } from '../lib/plan.js';
+import { notBlockedSql } from '../lib/blocks.js';
 
 const PAGE = 30;
 
 // GET /api/interests/:slug — discovery list: signed-in users who share this
-// interest tag. Paged with ?cursor=<offset>. Disabled accounts are excluded.
+// interest tag. Paged with ?cursor=<offset>. Disabled and blocked (either
+// direction) accounts are excluded.
 export async function onRequestGet(context) {
   const me = context.data.user;
   if (!me) return error(401, 'Not signed in');
@@ -25,10 +27,11 @@ export async function onRequestGet(context) {
        JOIN interest_tags t ON t.id = ui.tag_id
        JOIN users u ON u.id = ui.user_id
       WHERE t.slug = ? AND u.disabled_at IS NULL AND u.handle IS NOT NULL
+        AND ${notBlockedSql('u.id')}
       ORDER BY COALESCE(u.display_name, u.name, u.handle) COLLATE NOCASE
       LIMIT ? OFFSET ?`
   )
-    .bind(slug, PAGE + 1, offset)
+    .bind(slug, me.id, me.id, PAGE + 1, offset)
     .all();
 
   const hasMore = results.length > PAGE;
