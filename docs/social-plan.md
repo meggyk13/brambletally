@@ -197,8 +197,24 @@ a **"Pick a handle"** screen when `needs_handle`, an **"Account suspended"**
 screen when `disabled_at`, else the app. A gold **Supporter** pill in the
 header when `state.me.supporter`. `handleReason` mirrors the server format
 rules for inline feedback.
-**Still Phase 1b:** `user_profiles`, the profile view/edit, the Settings shell
-(handle/display-name editing moves there), legal acceptance gate.
+**Phase 1b-i shipped in PR #10 (2026-09-07):** `migrations/0004_social.sql`
+adds `user_profiles` (bio, pronouns, notif_prefs, updated_at). New
+`worker/api/lib/notif.js` (modes / types / `sanitizeNotifPrefs` /
+`readNotifPrefs`). `/api/auth/me` now also returns `notif_prefs`. New endpoints:
+`PATCH /api/settings/notif-prefs` (upsert), `GET /api/settings/export` (JSON
+attachment — profile, categories, inbox, owned projects with full contents, a
+reference list of shared projects), `DELETE /api/account` (permanent; 409 while
+an owned project still has another collaborator). Frontend: a **Settings**
+screen (`state.view === 'settings'`, gear button in the header) with sections
+Appearance (the picker moved out of its modal into `appearanceControls()`),
+Account (email, handle change via `openHandleChange`, display-name edit),
+Notifications (mode segmented control + per-type toggles, saved live), Your data
+(export / delete), Plan (status). The header `#bt-theme` button reverts to a
+blind light/dark flip.
+
+**Still Phase 1b-ii:** profile view/edit, `user_links`, interest tags +
+discovery, `user_blocks`, `requireAdmin` + admin tag tool. **Separate:** email
+change, the legal acceptance gate.
 
 ---
 

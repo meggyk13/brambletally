@@ -28,6 +28,9 @@ import * as inboxItem from './api/inbox/itemId.js';
 import * as usersSearch from './api/users/search.js';
 import * as profile from './api/profile/index.js';
 import * as profileHandle from './api/profile/handle.js';
+import * as settingsNotifPrefs from './api/settings/notif-prefs.js';
+import * as settingsExport from './api/settings/export.js';
+import * as account from './api/account.js';
 
 export const routes = [
   ['/api/auth/request-link', authRequestLink],
@@ -57,4 +60,7 @@ export const routes = [
   ['/api/users/search', usersSearch],
   ['/api/profile', profile],
   ['/api/profile/handle', profileHandle],
+  ['/api/settings/notif-prefs', settingsNotifPrefs],
+  ['/api/settings/export', settingsExport],
+  ['/api/account', account],
 ];

@@ -140,6 +140,8 @@ const API = {
 
   setHandle: (handle) => api('/api/profile/handle', { method: 'PUT', body: { handle } }),
   updateProfile: (body) => api('/api/profile', { method: 'PATCH', body }),
+  saveNotifPrefs: (prefs) => api('/api/settings/notif-prefs', { method: 'PATCH', body: prefs }),
+  deleteAccount: () => api('/api/account', { method: 'DELETE' }),
 
   listInbox: () => api('/api/inbox'),
   addInbox: (text) => api('/api/inbox', { method: 'POST', body: { text } }),
@@ -185,6 +187,7 @@ const ICONS = {
   moon: '<path d="M19 13.5A7.5 7.5 0 1 1 10.5 5a6 6 0 0 0 8.5 8.5z"/>',
   chevron: '<path d="M6 9l6 6 6-6"/>',
   link: '<path d="M9.5 13.5a3.5 3.5 0 0 0 5 .3l3-3a3.5 3.5 0 0 0-5-5l-1.2 1.1"/><path d="M14.5 10.5a3.5 3.5 0 0 0-5-.3l-3 3a3.5 3.5 0 0 0 5 5l1.2-1.1"/>',
+  settings: '<path d="M4 8h9M17 8h3"/><path d="M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2.3"/><circle cx="9" cy="16" r="2.3"/>',
 };
 function icon(name, size = 20) {
   return `<svg class="bt-ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -360,8 +363,8 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
   if (currentMode() === 'system') applyTheme();
 });
 
-// Settings → Appearance. No Settings shell yet, so the header button opens this
-// directly; it moves into Settings when that lands. Live-applies on tap.
+// Appearance controls — the Mode segmented control + palette swatches. Lives in
+// the Settings screen (renderSettings); live-applies on tap.
 const MODES = [
   ['light', 'Light'],
   ['dark', 'Dark'],
@@ -375,71 +378,52 @@ const PALETTE_CARDS = [
   { id: 'fen', name: 'Fen', note: 'misty marsh', c: ['#e9ece4', '#2f6b6b', '#54763a'] },
 ];
 
-function openAppearance() {
-  const overlay = h(`
-    <div class="modal-overlay open bt-ask bt-appearance">
-      <div class="modal">
-        <div class="bt-appr-head">
-          <span class="bt-appr-title">Appearance</span>
-          <button class="modal-close" data-close aria-label="Close">${icon('close')}</button>
-        </div>
-
-        <div class="bt-appr-label">Mode</div>
-        <div class="bt-seg" role="group" aria-label="Mode">
-          ${MODES.map(
-            ([v, label]) =>
-              `<button type="button" data-mode="${v}" class="bt-seg-btn${
-                currentMode() === v ? ' is-sel' : ''
-              }">${label}</button>`
-          ).join('')}
-        </div>
-
-        <div class="bt-appr-label">Theme</div>
-        <div class="bt-swatches">
-          ${PALETTE_CARDS.map(
-            (p) => `
-            <button type="button" data-palette="${p.id}" class="bt-swatch${
-              currentPalette() === p.id ? ' is-sel' : ''
-            }" aria-pressed="${currentPalette() === p.id}">
-              <span class="bt-swatch-chip" style="background:${p.c[0]}">
-                <i style="background:${p.c[1]}"></i><i style="background:${p.c[2]}"></i>
-              </span>
-              <span class="bt-swatch-name">${p.name}</span>
-              <span class="bt-swatch-note">${p.note}</span>
-            </button>`
-          ).join('')}
-        </div>
+function appearanceControls() {
+  const wrap = h(`
+    <div class="bt-appr">
+      <div class="bt-appr-label">Mode</div>
+      <div class="bt-seg" role="group" aria-label="Mode">
+        ${MODES.map(
+          ([v, label]) =>
+            `<button type="button" data-mode="${v}" class="bt-seg-btn${
+              currentMode() === v ? ' is-sel' : ''
+            }">${label}</button>`
+        ).join('')}
+      </div>
+      <div class="bt-appr-label">Theme</div>
+      <div class="bt-swatches">
+        ${PALETTE_CARDS.map(
+          (p) => `
+          <button type="button" data-palette="${p.id}" class="bt-swatch${
+            currentPalette() === p.id ? ' is-sel' : ''
+          }" aria-pressed="${currentPalette() === p.id}">
+            <span class="bt-swatch-chip" style="background:${p.c[0]}">
+              <i style="background:${p.c[1]}"></i><i style="background:${p.c[2]}"></i>
+            </span>
+            <span class="bt-swatch-name">${p.name}</span>
+            <span class="bt-swatch-note">${p.note}</span>
+          </button>`
+        ).join('')}
       </div>
     </div>
   `);
-
-  const close = () => {
-    overlay.remove();
-    document.removeEventListener('keydown', onKey);
-  };
-  const onKey = (e) => e.key === 'Escape' && close();
-
-  on(overlay, '[data-mode]', 'click', (e) => {
+  on(wrap, '[data-mode]', 'click', (e) => {
     lsSet('bt-mode', e.currentTarget.dataset.mode);
     applyTheme();
-    overlay
+    wrap
       .querySelectorAll('[data-mode]')
       .forEach((b) => b.classList.toggle('is-sel', b.dataset.mode === currentMode()));
-    render(); // header moon/sun icon follows the mode
   });
-  on(overlay, '[data-palette]', 'click', (e) => {
+  on(wrap, '[data-palette]', 'click', (e) => {
     lsSet('bt-palette', e.currentTarget.dataset.palette);
     applyTheme();
-    overlay.querySelectorAll('[data-palette]').forEach((b) => {
+    wrap.querySelectorAll('[data-palette]').forEach((b) => {
       const sel = b.dataset.palette === currentPalette();
       b.classList.toggle('is-sel', sel);
       b.setAttribute('aria-pressed', String(sel));
     });
   });
-  on(overlay, '[data-close]', 'click', close);
-  overlay.addEventListener('click', (e) => e.target === overlay && close());
-  document.addEventListener('keydown', onKey);
-  document.body.appendChild(overlay);
+  return wrap;
 }
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -577,6 +561,219 @@ function renderSuspended() {
   root().replaceChildren(el);
 }
 
+// ── Settings ──────────────────────────────────────────────────────────────
+const NOTIF_TYPE_LABELS = [
+  ['follow', 'New follower'],
+  ['contributor_request', 'Contributor request on your listing'],
+  ['contributor_decided', 'Your request is accepted or declined'],
+  ['board_comment', 'Comment on your board listing'],
+  ['board_reply', 'Reply to your comment'],
+];
+
+function renderSettings(app) {
+  app.replaceChildren();
+  const me = state.me;
+  const u = me.user;
+  me.notif_prefs = me.notif_prefs || { mode: 'immediate', types: {} };
+  me.notif_prefs.types = me.notif_prefs.types || {};
+  const prefs = me.notif_prefs;
+  const saveNotif = () => guard(() => API.saveNotifPrefs(prefs));
+
+  const el = h(`
+    <div class="settings-screen">
+      <div class="settings-body">
+        <div class="detail-topbar"><button class="detail-back" id="bt-set-back">← Back</button></div>
+        <h1 class="detail-title">Settings</h1>
+
+        <div class="sp-section">
+          <div class="sp-label">Appearance</div>
+          <div id="bt-appr-slot" style="padding:4px 20px 8px"></div>
+        </div>
+
+        <div class="sp-section">
+          <div class="sp-label">Account</div>
+          <div class="sp-row"><div class="sp-row-left"><div>Email<div class="sp-row-sub">${esc(u.email)}</div></div></div></div>
+          <div class="sp-row">
+            <div class="sp-row-left"><div>Handle<div class="sp-row-sub">@${esc(u.handle || '')}</div></div></div>
+            <button class="btn-sm btn-sm-ghost" id="bt-set-handle">Change</button>
+          </div>
+          <div class="sp-field">
+            <div class="sp-field-label">Display name</div>
+            <div style="display:flex;gap:8px">
+              <input class="sp-input" id="bt-set-dname" maxlength="50"
+                value="${esc(u.display_name || '')}" placeholder="Optional — shown instead of your handle" />
+              <button class="btn-sm btn-sm-sage" id="bt-set-dname-save">Save</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sp-section">
+          <div class="sp-label">Notifications</div>
+          <div class="sp-field">
+            <div class="sp-field-label">When something happens</div>
+            <div class="bt-seg" id="bt-notif-mode">
+              ${[['immediate', 'Right away'], ['weekly', 'Weekly digest'], ['off', 'Off']]
+                .map(
+                  ([v, l]) =>
+                    `<button type="button" data-nmode="${v}" class="bt-seg-btn${
+                      prefs.mode === v ? ' is-sel' : ''
+                    }">${l}</button>`
+                )
+                .join('')}
+            </div>
+          </div>
+          ${NOTIF_TYPE_LABELS.map(
+            ([k, l]) => `
+            <div class="sp-row">
+              <div class="sp-row-left"><div>${l}</div></div>
+              <button class="profile-toggle${prefs.types[k] ? ' on' : ''}" data-ntype="${k}"
+                role="switch" aria-checked="${!!prefs.types[k]}" aria-label="${l}"></button>
+            </div>`
+          ).join('')}
+          <div class="sp-row-sub" style="padding:8px 20px 0">Saved now — notifications start sending in a later update.</div>
+        </div>
+
+        <div class="sp-section">
+          <div class="sp-label">Your data</div>
+          <div class="sp-row">
+            <div class="sp-row-left"><div>Export everything<div class="sp-row-sub">Your projects, notes, and account as a JSON file.</div></div></div>
+            <button class="btn-sm btn-sm-ghost" id="bt-export">Export</button>
+          </div>
+          <div class="sp-row">
+            <div class="sp-row-left"><div style="color:var(--danger)">Delete account<div class="sp-row-sub">Permanent. Removes your projects and everything in them.</div></div></div>
+            <button class="btn-sm btn-danger" id="bt-delete-acct">Delete</button>
+          </div>
+        </div>
+
+        <div class="sp-section">
+          <div class="sp-label">Plan</div>
+          <div class="sp-row"><div class="sp-row-left"><div>${
+            me.supporter ? 'Supporter' : 'Free'
+          }<div class="sp-row-sub">${
+            me.supporter
+              ? 'Thank you for supporting Brambletally.'
+              : 'Brambletally is free. A Supporter tier with extra themes and a badge is coming.'
+          }</div></div></div></div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  el.querySelector('#bt-appr-slot').appendChild(appearanceControls());
+
+  on(el, '#bt-set-back', 'click', () => {
+    state.view = 'home';
+    render();
+  });
+  on(el, '#bt-set-handle', 'click', openHandleChange);
+  on(el, '#bt-set-dname-save', 'click', async () => {
+    const v = el.querySelector('#bt-set-dname').value.trim();
+    await guard(() => API.updateProfile({ display_name: v || null }));
+    state.me.user.display_name = v || null;
+    toast('Display name saved');
+  });
+  on(el, '#bt-notif-mode [data-nmode]', 'click', (e) => {
+    prefs.mode = e.currentTarget.dataset.nmode;
+    el.querySelectorAll('#bt-notif-mode [data-nmode]').forEach((b) =>
+      b.classList.toggle('is-sel', b.dataset.nmode === prefs.mode)
+    );
+    saveNotif();
+  });
+  on(el, '[data-ntype]', 'click', (e) => {
+    const k = e.currentTarget.dataset.ntype;
+    const next = !e.currentTarget.classList.contains('on');
+    e.currentTarget.classList.toggle('on', next);
+    e.currentTarget.setAttribute('aria-checked', String(next));
+    prefs.types[k] = next;
+    saveNotif();
+  });
+  on(el, '#bt-export', 'click', async () => {
+    try {
+      const res = await fetch('/api/settings/export', { credentials: 'same-origin' });
+      if (!res.ok) throw new Error('Export failed');
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'brambletally-export.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (ex) {
+      toast(ex.message || 'Export failed');
+    }
+  });
+  on(el, '#bt-delete-acct', 'click', async () => {
+    const ok = await btConfirm(
+      'Delete your account? This removes your projects and everything in them. It cannot be undone.',
+      { danger: true, ok: 'Delete account' }
+    );
+    if (!ok) return;
+    try {
+      await API.deleteAccount();
+      location.href = APP_PATH;
+    } catch (ex) {
+      toast(ex.message);
+    }
+  });
+
+  app.appendChild(el);
+}
+
+function openHandleChange() {
+  const overlay = h(`
+    <div class="modal-overlay open bt-ask">
+      <div class="modal">
+        <div class="modal-header"><span class="modal-title">Change handle</span>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
+        <div class="msg err" id="bt-hc-err" hidden></div>
+        <form id="bt-hc-form">
+          <label class="sp-label" style="padding-left:0">New handle</label>
+          <div class="bt-handle-field"><span aria-hidden="true">@</span>
+            <input id="bt-hc-input" class="sp-input" autocomplete="off" autocapitalize="off"
+              spellcheck="false" value="${esc(state.me.user.handle || '')}" />
+          </div>
+          <p class="sp-row-sub" style="margin:0 0 14px">Letters, numbers and underscores, 3&ndash;20 characters. You can change it again after 30 days.</p>
+          <div style="display:flex;gap:8px">
+            <button type="submit" class="btn-sm btn-sm-sage">Save</button>
+            <button type="button" class="btn-sm btn-sm-ghost" data-cancel>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `);
+  const close = () => overlay.remove();
+  const err = overlay.querySelector('#bt-hc-err');
+  const input = overlay.querySelector('#bt-hc-input');
+  input.addEventListener('input', () => {
+    input.value = input.value.replace(/[^A-Za-z0-9_]/g, '').toLowerCase();
+    err.hidden = true;
+  });
+  on(overlay, '.modal-close, [data-cancel]', 'click', close);
+  overlay.addEventListener('click', (e) => e.target === overlay && close());
+  on(overlay, '#bt-hc-form', 'submit', async (e) => {
+    e.preventDefault();
+    const reason = handleReason(input.value);
+    if (reason) {
+      err.textContent = reason;
+      err.hidden = false;
+      return;
+    }
+    try {
+      const r = await API.setHandle(input.value.trim().toLowerCase());
+      state.me.user.handle = r.handle;
+      close();
+      render();
+      toast('Handle changed');
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.hidden = false;
+    }
+  });
+  document.body.appendChild(overlay);
+  input.focus();
+}
+
 // ── Sign-in ────────────────────────────────────────────────────────────────
 let tsWidgetId = null;
 
@@ -662,10 +859,11 @@ function header() {
           <div class="tagline">a keeping-book for makers</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn-icon" id="bt-theme" title="Appearance" aria-label="Appearance">${
+          <button class="btn-icon" id="bt-theme" title="Light / dark" aria-label="Toggle light or dark">${
             effectiveTheme() === 'dark' ? icon('sun') : icon('moon')
           }</button>
           <button class="btn-icon" id="bt-search" title="Search" aria-label="Search">${icon('search')}</button>
+          <button class="btn-icon" id="bt-settings" title="Settings" aria-label="Settings">${icon('settings')}</button>
           <button class="btn-sm btn-sm-ghost" id="bt-signout">Sign out</button>
         </div>
       </div>
@@ -687,7 +885,12 @@ function header() {
     }
     location.href = APP_PATH;
   });
-  on(el, '#bt-theme', 'click', openAppearance);
+  on(el, '#bt-theme', 'click', toggleTheme);
+  on(el, '#bt-settings', 'click', () => {
+    state.view = 'settings';
+    state.project = null;
+    render();
+  });
   on(el, '#bt-search', 'click', () => {
     state.viewBeforeSearch = state.view;
     state.view = 'search';
@@ -710,6 +913,10 @@ function renderApp() {
   }
   if (state.view === 'search') {
     renderSearch(app);
+    return;
+  }
+  if (state.view === 'settings') {
+    renderSettings(app);
     return;
   }
   app.appendChild(header());
