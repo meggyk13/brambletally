@@ -100,7 +100,7 @@ const API = {
   requestLink: (email, turnstileToken) =>
     api('/api/auth/request-link', { method: 'POST', body: { email, turnstileToken } }),
 
-  listProjects: () => api('/api/projects'),
+  listProjects: (opts = {}) => api('/api/projects' + (opts.archived ? '?archived=1' : '')),
   createProject: (b) => api('/api/projects', { method: 'POST', body: b }),
   getProject: (id) => api('/api/projects/' + id),
   updateProject: (id, b) => api('/api/projects/' + id, { method: 'PATCH', body: b }),
@@ -3245,10 +3245,59 @@ function renderApp() {
   const main = h(`<div class="project-list${state.view === 'home' ? ' is-home' : ''}"></div>`);
   app.appendChild(main);
   if (state.view === 'home') renderHome(main);
+  else if (state.view === 'archived') renderArchived(main);
   else if (state.view === 'next') renderNext(main);
   else if (state.view === 'inbox') renderInbox(main);
   else if (state.view === 'review') renderReview(main);
   else if (state.view === 'board') renderBoard(main);
+}
+
+// ── Archived projects ─────────────────────────────────────────────────────
+async function renderArchived(main) {
+  main.replaceChildren(h('<div class="empty">Loading…</div>'));
+  let projects;
+  try {
+    ({ projects } = await guard(() => API.listProjects({ archived: true })));
+  } catch {
+    return;
+  }
+
+  const wrap = h('<div></div>');
+  const bar = h(
+    `<div class="detail-topbar"><button class="detail-back" id="bt-arch-back">← Back</button></div>`
+  );
+  on(bar, '#bt-arch-back', 'click', () => {
+    state.view = 'home';
+    renderApp();
+  });
+  wrap.appendChild(bar);
+  wrap.appendChild(h('<h1 class="detail-title">Archived</h1>'));
+
+  if (!projects.length) {
+    wrap.appendChild(h('<div class="empty">No archived projects.</div>'));
+  } else {
+    const grid = h('<div class="cards-grid"></div>');
+    projects.forEach((p) => {
+      const card = projectCard(p);
+      const un = h(
+        '<button class="btn-sm btn-sm-ghost" style="margin-top:8px">Unarchive</button>'
+      );
+      un.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+          await guard(() => API.updateProject(p.id, { archived: false }));
+        } catch {
+          return;
+        }
+        toast('Unarchived');
+        renderArchived(main);
+      });
+      card.appendChild(un);
+      grid.appendChild(card);
+    });
+    wrap.appendChild(grid);
+  }
+  main.replaceChildren(wrap);
 }
 
 // ── Home / project list ────────────────────────────────────────────────────
@@ -3362,6 +3411,14 @@ async function renderHome(main) {
     });
     statusTabs.appendChild(b);
   });
+  const archTab = h(
+    `<button class="tab" style="--tab-color:var(--text-muted)">Archived</button>`
+  );
+  archTab.addEventListener('click', () => {
+    state.view = 'archived';
+    renderApp();
+  });
+  statusTabs.appendChild(archTab);
   wrap.appendChild(statusTabs);
 
   const catFilters = [['all', 'All']];
@@ -3580,7 +3637,12 @@ async function openProjectForm(existing, opts = {}) {
           </div>
           ${
             existing && existing.role === 'owner'
-              ? '<button type="button" class="btn-sm btn-danger" data-delete style="margin-top:18px">Delete project</button>'
+              ? `<div style="display:flex;gap:8px;margin-top:18px">
+            <button type="button" class="btn-sm btn-sm-ghost" data-archive>${
+              existing.archived_at ? 'Unarchive' : 'Archive'
+            }</button>
+            <button type="button" class="btn-sm btn-danger" data-delete>Delete project</button>
+          </div>`
               : ''
           }
         </form>
@@ -3603,6 +3665,29 @@ async function openProjectForm(existing, opts = {}) {
     state.view = 'home';
     state.project = null;
     renderApp();
+  });
+  on(overlay, '[data-archive]', 'click', async () => {
+    const archiving = !existing.archived_at;
+    if (archiving) {
+      const ok = await btConfirm(
+        `Archive “${existing.title}”? It leaves your project lists and any board listing is closed. You can bring it back any time.`,
+        { ok: 'Archive' }
+      );
+      if (!ok) return;
+    }
+    try {
+      await guard(() => API.updateProject(existing.id, { archived: archiving }));
+    } catch {
+      return;
+    }
+    close();
+    if (archiving) {
+      state.view = 'home';
+      state.project = null;
+      renderApp();
+    } else {
+      openProject(existing.id);
+    }
   });
   on(overlay, '.modal-close, [data-cancel]', 'click', close);
   overlay.addEventListener('click', (e) => {

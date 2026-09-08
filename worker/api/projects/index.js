@@ -3,9 +3,13 @@ import { uuid } from '../lib/id.js';
 import { STATUSES, isNonEmptyString } from '../lib/validate.js';
 
 // GET /api/projects — every project the signed-in user collaborates on.
+// Archived projects are excluded by default; `?archived=1` returns only those.
 export async function onRequestGet(context) {
   const user = context.data.user;
   if (!user) return error(401, 'Not signed in');
+
+  const onlyArchived =
+    new URL(context.request.url).searchParams.get('archived') === '1';
 
   // Counts and the time-left sum are leaf-only: a step that has sub-steps is a
   // container whose state is derived, so it must not be tallied itself.
@@ -21,6 +25,7 @@ export async function onRequestGet(context) {
               WHERE s.project_id = p.id AND s.completed = 0 AND ${NOT_CONTAINER}) AS open_estimate_minutes
        FROM projects p
        JOIN project_collaborators pc ON pc.project_id = p.id AND pc.user_id = ?
+      WHERE p.archived_at IS ${onlyArchived ? 'NOT NULL' : 'NULL'}
       ORDER BY p.updated_at DESC`
   )
     .bind(user.id)

@@ -11,7 +11,7 @@ export async function onRequestGet(context) {
     `SELECT p.id, p.title, p.category, p.status, p.deadline, pc.role
        FROM projects p
        JOIN project_collaborators pc ON pc.project_id = p.id AND pc.user_id = ?
-      WHERE p.status IN ('Active', 'Waiting For')
+      WHERE p.status IN ('Active', 'Waiting For') AND p.archived_at IS NULL
       ORDER BY p.status, p.updated_at DESC`
   ).bind(user.id).all()).results;
 

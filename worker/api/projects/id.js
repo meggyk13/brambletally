@@ -67,6 +67,34 @@ export async function onRequestPatch(context) {
   const body = await readJson(context.request);
   if (!body) return error(400, 'Body required');
 
+  const db = context.env.DB;
+
+  // Archive / unarchive rides on the same PATCH but is owner-only, and archiving
+  // also closes an open board listing so a shelved project stops asking for help.
+  if ('archived' in body) {
+    if (g.role !== 'owner') return error(403, 'Only the owner can archive a project');
+    const archived = !!body.archived;
+    const stmts = [
+      db
+        .prepare(
+          `UPDATE projects SET archived_at = ${archived ? "datetime('now')" : 'NULL'},
+                  updated_at = datetime('now') WHERE id = ?`
+        )
+        .bind(id),
+    ];
+    if (archived) {
+      stmts.push(
+        db
+          .prepare(
+            `UPDATE project_listings SET status = 'closed', updated_at = datetime('now')
+              WHERE project_id = ? AND status = 'open'`
+          )
+          .bind(id)
+      );
+    }
+    await db.batch(stmts);
+  }
+
   const fields = pick(body, ['title', 'description', 'status', 'deadline', 'category', 'pickup_note']);
   if ('title' in fields && !isNonEmptyString(fields.title)) return error(400, 'Title cannot be empty');
   if ('title' in fields) fields.title = fields.title.trim();
@@ -75,19 +103,23 @@ export async function onRequestPatch(context) {
     fields.category =
       typeof fields.category === 'string' && fields.category.trim() ? fields.category.trim() : null;
   }
-  if (Object.keys(fields).length === 0) return error(400, 'Nothing to update');
+
+  if (Object.keys(fields).length === 0) {
+    if ('archived' in body) {
+      const project = await db.prepare('SELECT * FROM projects WHERE id = ?').bind(id).first();
+      return json({ project: { ...project, role: g.role } });
+    }
+    return error(400, 'Nothing to update');
+  }
 
   const cols = Object.keys(fields);
   const set = cols.map((c) => `${c} = ?`).join(', ');
-  await context.env.DB.prepare(
-    `UPDATE projects SET ${set}, updated_at = datetime('now') WHERE id = ?`
-  )
+  await db
+    .prepare(`UPDATE projects SET ${set}, updated_at = datetime('now') WHERE id = ?`)
     .bind(...cols.map((c) => fields[c]), id)
     .run();
 
-  const project = await context.env.DB.prepare('SELECT * FROM projects WHERE id = ?')
-    .bind(id)
-    .first();
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').bind(id).first();
   return json({ project: { ...project, role: g.role } });
 }
 
