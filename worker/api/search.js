@@ -5,10 +5,12 @@ export async function onRequestGet(context) {
   const user = context.data.user;
   if (!user) return error(401, 'Not signed in');
 
-  const q = (new URL(context.request.url).searchParams.get('q') || '').trim().toLowerCase();
-  if (q.length < 2) return json({ projects: [], steps: [], inbox: [] });
+  let q = (new URL(context.request.url).searchParams.get('q') || '').trim().toLowerCase();
+  if (q.length < 2) return json({ projects: [], steps: [], inbox: [], people: [] });
   const like = `%${q}%`;
   const db = context.env.DB;
+  // A leading "@" scopes the search to people.
+  const handleLike = `%${q.startsWith('@') ? q.slice(1) : q}%`;
 
   // ?1 = user id, ?2 = LIKE pattern
   // Leaf-only, matching the home list: a step with sub-steps is a derived
@@ -53,5 +55,18 @@ export async function onRequestGet(context) {
     .bind(user.id, like)
     .all()).results;
 
-  return json({ projects, steps, inbox });
+  // People: signed-in accounts with a handle, matched on handle / display_name /
+  // legacy name. Self and disabled accounts excluded. Never returns email.
+  const people = (await db.prepare(
+    `SELECT handle, display_name, name FROM users
+      WHERE id != ?1 AND handle IS NOT NULL AND disabled_at IS NULL
+        AND (handle LIKE ?2 OR lower(COALESCE(display_name, '')) LIKE ?3
+             OR lower(COALESCE(name, '')) LIKE ?3)
+      ORDER BY COALESCE(display_name, name, handle) COLLATE NOCASE
+      LIMIT 10`
+  )
+    .bind(user.id, handleLike, like)
+    .all()).results;
+
+  return json({ projects, steps, inbox, people });
 }

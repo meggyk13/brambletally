@@ -140,6 +140,12 @@ const API = {
 
   setHandle: (handle) => api('/api/profile/handle', { method: 'PUT', body: { handle } }),
   updateProfile: (body) => api('/api/profile', { method: 'PATCH', body }),
+  getProfile: (handle) => api('/api/profile/' + encodeURIComponent(handle)),
+  putLinks: (links) => api('/api/profile/links', { method: 'PUT', body: { links } }),
+  suggestInterests: (q) => api('/api/interests?q=' + encodeURIComponent(q)),
+  putInterests: (labels) => api('/api/interests', { method: 'PUT', body: { labels } }),
+  discover: (slug, cursor) =>
+    api('/api/interests/' + encodeURIComponent(slug) + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
   saveNotifPrefs: (prefs) => api('/api/settings/notif-prefs', { method: 'PATCH', body: prefs }),
   deleteAccount: () => api('/api/account', { method: 'DELETE' }),
 
@@ -188,6 +194,9 @@ const ICONS = {
   chevron: '<path d="M6 9l6 6 6-6"/>',
   link: '<path d="M9.5 13.5a3.5 3.5 0 0 0 5 .3l3-3a3.5 3.5 0 0 0-5-5l-1.2 1.1"/><path d="M14.5 10.5a3.5 3.5 0 0 0-5-.3l-3 3a3.5 3.5 0 0 0 5 5l1.2-1.1"/>',
   settings: '<path d="M4 8h9M17 8h3"/><path d="M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2.3"/><circle cx="9" cy="16" r="2.3"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.5 4 5.7 4 9s-1.4 6.5-4 9c-2.6-2.5-4-5.7-4-9s1.4-6.5 4-9z"/>',
+  at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/>',
 };
 function icon(name, size = 20) {
   return `<svg class="bt-ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -430,7 +439,10 @@ function appearanceControls() {
 const state = {
   user: null,
   me: null, // the full /api/auth/me payload: { user, needs_handle, supporter }
-  view: 'home', // home | next | project | inbox | review
+  view: 'home', // home | next | project | inbox | review | settings | search | profile | profile-edit | discover
+  viewBeforeProfile: 'home', // where a Back from a profile / discover screen returns
+  profileHandle: null, // handle shown by renderProfile
+  discoverSlug: null, // interest slug shown by renderDiscover
   projects: [],
   categories: [], // [{id, name, sort_order}]
   filterStatus: 'Active',
@@ -597,6 +609,10 @@ function renderSettings(app) {
             <div class="sp-row-left"><div>Handle<div class="sp-row-sub">@${esc(u.handle || '')}</div></div></div>
             <button class="btn-sm btn-sm-ghost" id="bt-set-handle">Change</button>
           </div>
+          <div class="sp-row">
+            <div class="sp-row-left"><div>Profile<div class="sp-row-sub">Bio, pronouns, interests, and links.</div></div></div>
+            <button class="btn-sm btn-sm-ghost" id="bt-set-profile">Edit</button>
+          </div>
           <div class="sp-field">
             <div class="sp-field-label">Display name</div>
             <div style="display:flex;gap:8px">
@@ -666,6 +682,11 @@ function renderSettings(app) {
     render();
   });
   on(el, '#bt-set-handle', 'click', openHandleChange);
+  on(el, '#bt-set-profile', 'click', () => {
+    state.viewBeforeProfile = 'settings';
+    state.view = 'profile-edit';
+    render();
+  });
   on(el, '#bt-set-dname-save', 'click', async () => {
     const v = el.querySelector('#bt-set-dname').value.trim();
     await guard(() => API.updateProfile({ display_name: v || null }));
@@ -772,6 +793,501 @@ function openHandleChange() {
   });
   document.body.appendChild(overlay);
   input.focus();
+}
+
+// ── Profile ───────────────────────────────────────────────────────────────
+// platform -> [value, label, icon]. Mirrors LINK_PLATFORMS in
+// worker/api/lib/profile.js; the server folds anything unknown to 'other'.
+const LINK_PLATFORMS = [
+  ['website', 'Website', 'globe'],
+  ['instagram', 'Instagram', 'link'],
+  ['bluesky', 'Bluesky', 'at'],
+  ['mastodon', 'Mastodon', 'at'],
+  ['github', 'GitHub', 'link'],
+  ['etsy', 'Etsy', 'link'],
+  ['ravelry', 'Ravelry', 'link'],
+  ['youtube', 'YouTube', 'link'],
+  ['other', 'Other', 'link'],
+];
+const MAX_LINKS = 8;
+const MAX_INTERESTS = 15;
+const MAX_INTEREST_LABEL = 30;
+
+const platformMeta = (p) => LINK_PLATFORMS.find((x) => x[0] === p) || ['other', 'Link', 'link'];
+
+// Client-side mirror of the server slugify — used only for the local cap /
+// dedupe while editing. The server re-slugs authoritatively on save.
+function slugifyInterest(label) {
+  return String(label || '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+const avatarEl = (nameForInitials, extra = '') =>
+  `<span class="bt-avatar ${extra}">${esc(initials(nameForInitials))}</span>`;
+
+function openProfile(handle) {
+  if (!handle) return;
+  if (!['profile', 'profile-edit', 'discover'].includes(state.view))
+    state.viewBeforeProfile = state.view;
+  state.view = 'profile';
+  state.profileHandle = handle;
+  state.project = null;
+  render();
+}
+function openDiscover(slug) {
+  if (!['profile', 'discover'].includes(state.view)) state.viewBeforeProfile = state.view;
+  state.view = 'discover';
+  state.discoverSlug = slug;
+  render();
+}
+
+// Tappable person row — discovery list + People search results.
+function personRow(u) {
+  const name = u.display_name || u.name || '@' + u.handle;
+  const row = h(`
+    <button class="bt-person">
+      ${avatarEl(u.display_name || u.name || u.handle)}
+      <span class="bt-person-main">
+        <span class="bt-person-name">${esc(name)}${
+          u.supporter ? ' <span class="bt-supporter">Supporter</span>' : ''
+        }</span>
+        <span class="bt-person-sub">@${esc(u.handle)}</span>
+      </span>
+    </button>
+  `);
+  row.addEventListener('click', () => openProfile(u.handle));
+  return row;
+}
+
+async function renderProfile(app) {
+  app.replaceChildren();
+  const back = state.viewBeforeProfile || 'home';
+  const el = h(`
+    <div class="settings-screen">
+      <div class="settings-body">
+        <div class="detail-topbar"><button class="detail-back" id="bt-prof-back">← Back</button></div>
+        <div id="bt-prof-body"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  `);
+  on(el, '#bt-prof-back', 'click', () => {
+    state.view = back;
+    render();
+  });
+  app.appendChild(el);
+
+  let data;
+  try {
+    data = await guard(() => API.getProfile(state.profileHandle));
+  } catch {
+    el.querySelector('#bt-prof-body').replaceChildren(
+      h('<div class="empty">Profile not found.</div>')
+    );
+    return;
+  }
+  const p = data.profile;
+  const name = p.display_name || '@' + p.handle;
+  const body = el.querySelector('#bt-prof-body');
+  body.replaceChildren();
+
+  body.appendChild(
+    h(`
+    <div class="bt-prof-head">
+      ${avatarEl(p.display_name || p.name || p.handle, 'bt-avatar-lg')}
+      <div class="bt-prof-id">
+        <h1 class="detail-title">${esc(name)}</h1>
+        <div class="bt-prof-handle">@${esc(p.handle)}${
+          p.supporter ? ' <span class="bt-supporter">Supporter</span>' : ''
+        }${p.is_admin ? ' <span class="bt-admin-tag">Admin</span>' : ''}</div>
+        ${p.pronouns ? `<div class="bt-prof-pronouns">${esc(p.pronouns)}</div>` : ''}
+      </div>
+    </div>
+  `)
+  );
+
+  if (p.is_self) {
+    const editBtn = h(
+      `<button class="btn-sm btn-sm-ghost bt-prof-edit" id="bt-prof-edit">${icon('edit', 16)} Edit profile</button>`
+    );
+    editBtn.addEventListener('click', () => {
+      state.view = 'profile-edit';
+      render();
+    });
+    body.appendChild(editBtn);
+  }
+
+  if (p.bio) {
+    const sec = h(
+      '<div class="sp-section"><div class="sp-label">About</div><div class="bt-prof-bio"></div></div>'
+    );
+    sec.querySelector('.bt-prof-bio').textContent = p.bio;
+    body.appendChild(sec);
+  }
+
+  if (p.interests && p.interests.length) {
+    const sec = h(
+      '<div class="sp-section"><div class="sp-label">Interests</div><div class="bt-chips"></div></div>'
+    );
+    const chips = sec.querySelector('.bt-chips');
+    p.interests.forEach((t) => {
+      const c = h(`<button class="bt-chip">${esc(t.label)}</button>`);
+      c.addEventListener('click', () => openDiscover(t.slug));
+      chips.appendChild(c);
+    });
+    body.appendChild(sec);
+  }
+
+  if (p.links && p.links.length) {
+    const sec = h(
+      '<div class="sp-section"><div class="sp-label">Links</div><div class="bt-prof-links"></div></div>'
+    );
+    const wrap = sec.querySelector('.bt-prof-links');
+    p.links.forEach((l) => {
+      const [, label, ic] = platformMeta(l.platform);
+      const text = l.platform === 'other' || l.platform === 'website' ? linkHost(l.value) : label;
+      wrap.appendChild(
+        h(`
+        <a class="bt-prof-link" href="${esc(l.value)}" target="_blank" rel="me nofollow noopener">
+          ${icon(ic, 18)}<span>${esc(text)}</span>
+        </a>
+      `)
+      );
+    });
+    body.appendChild(sec);
+  }
+
+  if (!p.bio && !(p.interests || []).length && !(p.links || []).length) {
+    body.appendChild(
+      h(
+        `<div class="empty">${
+          p.is_self ? 'Your profile is empty. Add a bio, interests, or links.' : 'Nothing here yet.'
+        }</div>`
+      )
+    );
+  }
+}
+
+async function renderProfileEdit(app) {
+  app.replaceChildren();
+  const myHandle = state.me.user.handle;
+  const el = h(`
+    <div class="settings-screen">
+      <div class="settings-body">
+        <div class="detail-topbar"><button class="detail-back" id="bt-pe-back">← Back</button></div>
+        <h1 class="detail-title">Edit profile</h1>
+        <div id="bt-pe-body"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  `);
+  on(el, '#bt-pe-back', 'click', () => openProfile(myHandle));
+  app.appendChild(el);
+
+  let data;
+  try {
+    data = await guard(() => API.getProfile(myHandle));
+  } catch {
+    el.querySelector('#bt-pe-body').replaceChildren(
+      h('<div class="empty">Could not load your profile.</div>')
+    );
+    return;
+  }
+  const p = data.profile;
+  const bodyEl = el.querySelector('#bt-pe-body');
+  bodyEl.replaceChildren();
+
+  const form = h(`
+    <div>
+      <div class="sp-field">
+        <div class="sp-field-label">Display name</div>
+        <input class="sp-input" id="bt-pe-dname" maxlength="50" value="${esc(p.display_name || '')}"
+          placeholder="Shown instead of your handle" />
+      </div>
+      <div class="sp-field">
+        <div class="sp-field-label">Pronouns</div>
+        <input class="sp-input" id="bt-pe-pronouns" maxlength="40" value="${esc(p.pronouns || '')}"
+          placeholder="e.g. she/her" />
+      </div>
+      <div class="sp-field">
+        <div class="sp-field-label">About <span class="bt-count" id="bt-pe-biocount"></span></div>
+        <textarea class="sp-input bt-textarea" id="bt-pe-bio" maxlength="500" rows="4"
+          placeholder="A few lines about you and what you make.">${esc(p.bio || '')}</textarea>
+      </div>
+      <div class="sp-field">
+        <div class="sp-field-label">Interests</div>
+        <div id="bt-pe-interests"></div>
+      </div>
+      <div class="sp-field">
+        <div class="sp-field-label">Links</div>
+        <div id="bt-pe-links"></div>
+      </div>
+      <div class="bt-pe-actions">
+        <button class="btn-sm btn-sm-sage" id="bt-pe-save">Save</button>
+        <button class="btn-sm btn-sm-ghost" id="bt-pe-cancel">Cancel</button>
+      </div>
+    </div>
+  `);
+  bodyEl.appendChild(form);
+
+  const bio = form.querySelector('#bt-pe-bio');
+  const bioCount = form.querySelector('#bt-pe-biocount');
+  const updCount = () => (bioCount.textContent = `${bio.value.length}/500`);
+  bio.addEventListener('input', updCount);
+  updCount();
+
+  const interests = interestEditor(p.interests || []);
+  form.querySelector('#bt-pe-interests').appendChild(interests.el);
+  const links = linksEditor(p.links || []);
+  form.querySelector('#bt-pe-links').appendChild(links.el);
+
+  on(form, '#bt-pe-cancel', 'click', () => openProfile(myHandle));
+  on(form, '#bt-pe-save', 'click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const dn = form.querySelector('#bt-pe-dname').value.trim();
+      await guard(() =>
+        API.updateProfile({
+          display_name: dn || null,
+          bio: bio.value.trim() || null,
+          pronouns: form.querySelector('#bt-pe-pronouns').value.trim() || null,
+        })
+      );
+      await guard(() => API.putInterests(interests.values()));
+      await guard(() => API.putLinks(links.values()));
+      state.me.user.display_name = dn || null;
+      toast('Profile saved');
+      openProfile(myHandle);
+    } catch {
+      btn.disabled = false;
+    }
+  });
+}
+
+// Removable-chip interest editor with server-backed autocomplete.
+// Returns { el, values() -> [label] }.
+function interestEditor(initial) {
+  const values = (initial || []).map((t) => t.label);
+  const el = h(`
+    <div class="bt-tag-editor">
+      <div class="bt-chips" id="bt-tag-chips"></div>
+      <div class="bt-tag-inputwrap">
+        <input class="sp-input" id="bt-tag-input" maxlength="${MAX_INTEREST_LABEL}" autocomplete="off"
+          placeholder="Add an interest, press Enter" />
+        <div class="bt-tag-suggest" id="bt-tag-suggest" hidden></div>
+      </div>
+      <div class="sp-row-sub" id="bt-tag-hint"></div>
+    </div>
+  `);
+  const chipsEl = el.querySelector('#bt-tag-chips');
+  const input = el.querySelector('#bt-tag-input');
+  const suggest = el.querySelector('#bt-tag-suggest');
+  const hint = el.querySelector('#bt-tag-hint');
+
+  const hideSuggest = () => {
+    suggest.hidden = true;
+    suggest.replaceChildren();
+  };
+  const renderChips = () => {
+    chipsEl.replaceChildren();
+    values.forEach((label, i) => {
+      const c = h(
+        `<span class="bt-chip bt-chip-rm">${esc(label)}<button aria-label="Remove">${icon(
+          'close',
+          14
+        )}</button></span>`
+      );
+      c.querySelector('button').addEventListener('click', () => {
+        values.splice(i, 1);
+        renderChips();
+      });
+      chipsEl.appendChild(c);
+    });
+    hint.textContent = `${values.length}/${MAX_INTERESTS}`;
+    input.disabled = values.length >= MAX_INTERESTS;
+  };
+  const add = (label) => {
+    const clean = String(label || '').trim().slice(0, MAX_INTEREST_LABEL);
+    const slug = slugifyInterest(clean);
+    input.value = '';
+    hideSuggest();
+    if (!clean || !slug || values.length >= MAX_INTERESTS) return;
+    if (values.some((v) => slugifyInterest(v) === slug)) return;
+    values.push(clean);
+    renderChips();
+  };
+
+  let timer;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 1) return hideSuggest();
+    timer = setTimeout(async () => {
+      let r;
+      try {
+        r = await API.suggestInterests(q);
+      } catch {
+        return;
+      }
+      const tags = (r.tags || []).filter(
+        (t) => !values.some((v) => slugifyInterest(v) === t.slug)
+      );
+      if (!tags.length) return hideSuggest();
+      suggest.replaceChildren();
+      tags.forEach((t) => {
+        const b = h(
+          `<button class="bt-tag-suggest-item">${esc(t.label)} <span>${t.usage_count}</span></button>`
+        );
+        b.addEventListener('click', () => {
+          add(t.label);
+          input.focus();
+        });
+        suggest.appendChild(b);
+      });
+      suggest.hidden = false;
+    }, 200);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      add(input.value);
+    } else if (e.key === 'Backspace' && !input.value && values.length) {
+      values.pop();
+      renderChips();
+    }
+  });
+  input.addEventListener('blur', () => setTimeout(hideSuggest, 150));
+
+  renderChips();
+  return { el, values: () => values.slice() };
+}
+
+// Platform-select + URL rows. Returns { el, values() -> [{platform, value}] }.
+function linksEditor(initial) {
+  const rows = (initial || []).map((l) => ({
+    platform: l.platform || 'website',
+    value: l.value || '',
+  }));
+  if (!rows.length) rows.push({ platform: 'website', value: '' });
+  const el = h('<div class="bt-links-editor"></div>');
+  const list = h('<div></div>');
+  const addBtn = h(
+    `<button class="btn-sm btn-sm-ghost bt-links-add" id="bt-links-add">${icon('plus', 14)} Add link</button>`
+  );
+  el.append(list, addBtn);
+
+  const renderRows = () => {
+    list.replaceChildren();
+    rows.forEach((r, i) => {
+      const row = h(`
+        <div class="bt-link-row">
+          <select class="sp-input bt-link-platform">
+            ${LINK_PLATFORMS.map(
+              ([v, label]) =>
+                `<option value="${v}"${r.platform === v ? ' selected' : ''}>${label}</option>`
+            ).join('')}
+          </select>
+          <input class="sp-input bt-link-url" type="url" inputmode="url" placeholder="https://…"
+            value="${esc(r.value)}" />
+          <button class="bt-link-rm" aria-label="Remove link">${icon('close', 16)}</button>
+        </div>
+      `);
+      row.querySelector('.bt-link-platform').addEventListener('change', (e) => {
+        r.platform = e.target.value;
+      });
+      row.querySelector('.bt-link-url').addEventListener('input', (e) => {
+        r.value = e.target.value;
+      });
+      row.querySelector('.bt-link-rm').addEventListener('click', () => {
+        rows.splice(i, 1);
+        if (!rows.length) rows.push({ platform: 'website', value: '' });
+        renderRows();
+      });
+      list.appendChild(row);
+    });
+    addBtn.disabled = rows.length >= MAX_LINKS;
+  };
+  addBtn.addEventListener('click', () => {
+    if (rows.length >= MAX_LINKS) return;
+    rows.push({ platform: 'website', value: '' });
+    renderRows();
+  });
+
+  renderRows();
+  return {
+    el,
+    values: () =>
+      rows.map((r) => ({ platform: r.platform, value: r.value.trim() })).filter((r) => r.value),
+  };
+}
+
+async function renderDiscover(app) {
+  app.replaceChildren();
+  const back = state.viewBeforeProfile || 'home';
+  const el = h(`
+    <div class="settings-screen">
+      <div class="settings-body">
+        <div class="detail-topbar"><button class="detail-back" id="bt-disc-back">← Back</button></div>
+        <div id="bt-disc-body"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  `);
+  on(el, '#bt-disc-back', 'click', () => {
+    state.view = back;
+    render();
+  });
+  app.appendChild(el);
+
+  const body = el.querySelector('#bt-disc-body');
+  let cursor = null;
+  let first = true;
+  let listWrap;
+
+  const loadMore = async (moreBtn) => {
+    let r;
+    try {
+      r = await guard(() => API.discover(state.discoverSlug, cursor));
+    } catch {
+      if (first) body.replaceChildren(h('<div class="empty">Interest not found.</div>'));
+      return;
+    }
+    if (first) {
+      body.replaceChildren();
+      body.appendChild(h(`<h1 class="detail-title">${esc(r.tag.label)}</h1>`));
+      body.appendChild(
+        h(
+          `<div class="sp-row-sub" style="padding:0 0 10px">${r.tag.usage_count} ${
+            r.tag.usage_count === 1 ? 'person' : 'people'
+          }</div>`
+        )
+      );
+      listWrap = h('<div class="bt-person-list"></div>');
+      body.appendChild(listWrap);
+      first = false;
+    }
+    if (moreBtn) moreBtn.remove();
+    (r.users || []).forEach((u) => listWrap.appendChild(personRow(u)));
+    if (!listWrap.children.length) {
+      listWrap.appendChild(h('<div class="empty">No one else yet.</div>'));
+    }
+    cursor = r.next_cursor;
+    if (cursor) {
+      const b = h('<button class="btn-sm btn-sm-ghost bt-loadmore">Load more</button>');
+      b.addEventListener('click', () => loadMore(b));
+      body.appendChild(b);
+    }
+  };
+
+  loadMore(null);
 }
 
 // ── Sign-in ────────────────────────────────────────────────────────────────
@@ -917,6 +1433,18 @@ function renderApp() {
   }
   if (state.view === 'settings') {
     renderSettings(app);
+    return;
+  }
+  if (state.view === 'profile') {
+    renderProfile(app);
+    return;
+  }
+  if (state.view === 'profile-edit') {
+    renderProfileEdit(app);
+    return;
+  }
+  if (state.view === 'discover') {
+    renderDiscover(app);
     return;
   }
   app.appendChild(header());
@@ -2472,7 +3000,11 @@ async function runSearch(main, q) {
   } catch {
     return;
   }
-  const total = (r.projects?.length || 0) + (r.steps?.length || 0) + (r.inbox?.length || 0);
+  const total =
+    (r.projects?.length || 0) +
+    (r.steps?.length || 0) +
+    (r.inbox?.length || 0) +
+    (r.people?.length || 0);
   if (!total) {
     main.replaceChildren(h(`<div class="empty">No matches for “${esc(q)}”.</div>`));
     return;
@@ -2507,6 +3039,10 @@ async function runSearch(main, q) {
       row.appendChild(h(`<div class="s-result-title">${esc(it.text)}</div>`));
       wrap.appendChild(row);
     });
+  }
+  if (r.people?.length) {
+    wrap.appendChild(head('People', r.people.length));
+    r.people.forEach((u) => wrap.appendChild(personRow(u)));
   }
   main.replaceChildren(wrap);
 }

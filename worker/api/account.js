@@ -1,6 +1,6 @@
-import { json, error } from '../lib/http.js';
-import { readCookie, clearCookie } from '../lib/sessions.js';
-import { SESSION_COOKIE } from '../lib/constants.js';
+import { json, error } from './lib/http.js';
+import { readCookie, clearCookie } from './lib/sessions.js';
+import { SESSION_COOKIE } from './lib/constants.js';
 
 // DELETE /api/account — permanent. `projects` cascades from `owner_id`, so an
 // unguarded delete would wipe every shared project the caller owns and revoke
