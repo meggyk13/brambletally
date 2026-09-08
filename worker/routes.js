@@ -45,9 +45,15 @@ import * as boardComments from './api/board/listingId/comments.js';
 import * as boardComment from './api/board/listingId/comments/commentId.js';
 import * as boardRequests from './api/board/listingId/requests.js';
 import * as boardRequest from './api/board/listingId/requests/requestId.js';
+import * as reports from './api/reports/index.js';
 import * as adminInterests from './api/admin/interests/index.js';
 import * as adminInterestMerge from './api/admin/interests/merge.js';
 import * as adminInterest from './api/admin/interests/slug.js';
+import * as adminReports from './api/admin/reports/index.js';
+import * as adminReport from './api/admin/reports/reportId.js';
+import * as adminListings from './api/admin/listings.js';
+import * as adminUser from './api/admin/users/handle.js';
+import * as adminUserSanction from './api/admin/users/handle/sanction.js';
 import * as settingsNotifPrefs from './api/settings/notif-prefs.js';
 import * as settingsExport from './api/settings/export.js';
 import * as account from './api/account.js';
@@ -99,10 +105,16 @@ export const routes = [
   ['/api/board/:listingId/comments/:commentId', boardComment],
   ['/api/board/:listingId/requests', boardRequests],
   ['/api/board/:listingId/requests/:requestId', boardRequest],
+  ['/api/reports', reports],
   ['/api/admin/interests', adminInterests],
   // literal 'merge' must precede '/api/admin/interests/:slug' — first match wins
   ['/api/admin/interests/merge', adminInterestMerge],
   ['/api/admin/interests/:slug', adminInterest],
+  ['/api/admin/reports', adminReports],
+  ['/api/admin/reports/:reportId', adminReport],
+  ['/api/admin/listings', adminListings],
+  ['/api/admin/users/:handle', adminUser],
+  ['/api/admin/users/:handle/sanction', adminUserSanction],
   ['/api/settings/notif-prefs', settingsNotifPrefs],
   ['/api/settings/export', settingsExport],
   ['/api/account', account],

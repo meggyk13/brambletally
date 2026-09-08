@@ -191,6 +191,20 @@ const API = {
     api('/api/admin/interests/' + encodeURIComponent(slug), { method: 'DELETE' }),
   adminMergeInterests: (fromSlug, toSlug) =>
     api('/api/admin/interests/merge', { method: 'POST', body: { fromSlug, toSlug } }),
+  report: (body) => api('/api/reports', { method: 'POST', body }),
+  adminReports: (status, cursor) =>
+    api(
+      '/api/admin/reports?status=' +
+        encodeURIComponent(status || 'open') +
+        (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')
+    ),
+  resolveReport: (id, body) =>
+    api('/api/admin/reports/' + encodeURIComponent(id), { method: 'PATCH', body }),
+  adminListings: (cursor) =>
+    api('/api/admin/listings' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  adminUser: (handle) => api('/api/admin/users/' + encodeURIComponent(handle)),
+  sanctionUser: (handle, body) =>
+    api('/api/admin/users/' + encodeURIComponent(handle) + '/sanction', { method: 'POST', body }),
   saveNotifPrefs: (prefs) => api('/api/settings/notif-prefs', { method: 'PATCH', body: prefs }),
   deleteAccount: () => api('/api/account', { method: 'DELETE' }),
 
@@ -1081,6 +1095,10 @@ async function renderProfile(app) {
       render();
     });
     actions.appendChild(blockBtn);
+
+    const repBtn = h('<button class="btn-sm btn-sm-ghost">Report</button>');
+    repBtn.addEventListener('click', () => openReportModal('profile', p.handle));
+    actions.appendChild(repBtn);
   }
   body.appendChild(actions);
 
@@ -1580,7 +1598,14 @@ async function renderBlocked(app) {
   fill(data.blocks || []);
 }
 
-// ── Admin: interest-tag tool ─────────────────────────────────────────────
+// ── Admin panel ─────────────────────────────────────────────────────────
+const ADMIN_TABS = [
+  ['reports', 'Reports'],
+  ['users', 'Users'],
+  ['listings', 'Listings'],
+  ['tags', 'Tags'],
+];
+
 async function renderAdmin(app) {
   app.replaceChildren();
   if (!(state.me && state.me.user && state.me.user.is_admin)) {
@@ -1588,16 +1613,21 @@ async function renderAdmin(app) {
     render();
     return;
   }
+  if (!ADMIN_TABS.some(([t]) => t === state.adminTab)) state.adminTab = 'reports';
   const el = h(`
     <div class="settings-screen">
       <div class="settings-body">
         <div class="detail-topbar"><button class="detail-back" id="bt-adm-back">← Back</button></div>
-        <h1 class="detail-title">Interest tags</h1>
-        <div class="sp-field">
-          <input class="sp-input" id="bt-adm-q" autocomplete="off" placeholder="Filter tags…" />
+        <h1 class="detail-title">Admin</h1>
+        <div class="bt-seg" id="bt-adm-tabs" style="margin:4px 20px 12px">
+          ${ADMIN_TABS.map(
+            ([t, l]) =>
+              `<button type="button" data-atab="${t}" class="bt-seg-btn${
+                state.adminTab === t ? ' is-sel' : ''
+              }">${l}</button>`
+          ).join('')}
         </div>
-        <div class="sp-row-sub" id="bt-adm-merge-state" style="padding:0 20px" hidden></div>
-        <div id="bt-adm-list"><div class="empty">Loading…</div></div>
+        <div id="bt-adm-panel"><div class="empty">Loading…</div></div>
       </div>
     </div>
   `);
@@ -1605,7 +1635,324 @@ async function renderAdmin(app) {
     state.view = 'settings';
     render();
   });
+  on(el, '#bt-adm-tabs [data-atab]', 'click', (e) => {
+    state.adminTab = e.currentTarget.dataset.atab;
+    render();
+  });
   app.appendChild(el);
+
+  const host = el.querySelector('#bt-adm-panel');
+  if (state.adminTab === 'reports') adminReportsSection(host);
+  else if (state.adminTab === 'users') adminUsersSection(host);
+  else if (state.adminTab === 'listings') adminListingsSection(host);
+  else adminTagsSection(host);
+}
+
+// ── Admin: reports queue ────────────────────────────────────────────────
+async function adminReportsSection(host) {
+  host.replaceChildren(
+    h(`
+    <div>
+      <div class="bt-seg" id="bt-rep-filter" style="margin-bottom:12px">
+        ${[['open', 'Open'], ['actioned', 'Actioned'], ['dismissed', 'Dismissed'], ['all', 'All']]
+          .map(
+            ([v, l]) =>
+              `<button type="button" data-rf="${v}" class="bt-seg-btn${
+                (state.repFilter || 'open') === v ? ' is-sel' : ''
+              }">${l}</button>`
+          )
+          .join('')}
+      </div>
+      <div id="bt-rep-list"><div class="empty">Loading…</div></div>
+    </div>
+  `)
+  );
+  const listEl = host.querySelector('#bt-rep-list');
+  const load = async () => {
+    let r;
+    try {
+      r = await guard(() => API.adminReports(state.repFilter || 'open'));
+    } catch {
+      return;
+    }
+    listEl.replaceChildren();
+    if (!r.reports.length) {
+      listEl.appendChild(h('<div class="empty">Nothing here.</div>'));
+      return;
+    }
+    r.reports.forEach((rep) => listEl.appendChild(reportCard(rep, load)));
+  };
+  on(host, '#bt-rep-filter [data-rf]', 'click', (e) => {
+    state.repFilter = e.currentTarget.dataset.rf;
+    host
+      .querySelectorAll('#bt-rep-filter [data-rf]')
+      .forEach((b) => b.classList.toggle('is-sel', b.dataset.rf === state.repFilter));
+    load();
+  });
+  load();
+}
+
+function reportCard(rep, reload) {
+  const t = rep.target || {};
+  const authorName = t.author ? ownerName(t.author) : null;
+  const card = h(`
+    <div class="bt-rep-card">
+      <div class="bt-rep-top">
+        <span class="bt-rep-cat">${esc(rep.category)}</span>
+        <span class="bt-rep-time">${esc(timeAgo(rep.created_at))}</span>
+      </div>
+      <div class="bt-rep-target">
+        <b>${esc(rep.target_type)}</b>${
+          t.exists ? ` — ${esc((t.preview || '').slice(0, 120))}` : ' — <i>already removed</i>'
+        }${authorName ? ` · by ${esc(authorName)}` : ''}
+      </div>
+      ${rep.detail ? `<div class="bt-rep-detail"></div>` : ''}
+      <div class="bt-rep-meta">reported by ${
+        rep.reporter ? esc(ownerName(rep.reporter)) : '<i>deleted user</i>'
+      }${
+        rep.status !== 'open'
+          ? ` · <b>${esc(rep.status)}</b>${
+              rep.resolved_by ? ' by ' + esc(ownerName(rep.resolved_by)) : ''
+            }${rep.resolution_note ? ' — ' + esc(rep.resolution_note) : ''}`
+          : ''
+      }</div>
+      <div class="bt-rep-actions"></div>
+    </div>
+  `);
+  if (rep.detail) card.querySelector('.bt-rep-detail').textContent = rep.detail;
+  const actions = card.querySelector('.bt-rep-actions');
+
+  const openTarget = () => {
+    if (rep.target_type === 'profile' && t.author) openProfile(t.author.handle);
+    else if (rep.target_type === 'listing') openListing(rep.target_id);
+    else if (rep.target_type === 'comment' && t.listing_id) openListing(t.listing_id);
+  };
+  if (t.exists) {
+    const view = h('<button class="btn-sm btn-sm-ghost">Open target</button>');
+    view.addEventListener('click', openTarget);
+    actions.appendChild(view);
+  }
+
+  if (rep.status === 'open') {
+    if (t.exists && (rep.target_type === 'listing' || rep.target_type === 'comment')) {
+      const rm = h('<button class="btn-sm btn-danger">Remove content</button>');
+      rm.addEventListener('click', async () => {
+        if (!(await btConfirm('Remove the reported content and mark this report actioned?', { danger: true, ok: 'Remove' })))
+          return;
+        const note = (await btPrompt('Resolution note (optional)', '')) || null;
+        try {
+          if (rep.target_type === 'listing') await API.deleteListing(rep.target_id);
+          else await API.deleteListingComment(t.listing_id, rep.target_id);
+          await API.resolveReport(rep.id, { status: 'actioned', note, removed: true });
+        } catch (ex) {
+          toast(ex.message || 'Could not remove');
+          return;
+        }
+        toast('Content removed');
+        reload();
+      });
+      actions.appendChild(rm);
+    }
+    if (authorName && t.author) {
+      const blk = h(
+        `<button class="btn-sm btn-sm-ghost">${t.board_blocked ? 'Unblock board' : 'Board block'} author</button>`
+      );
+      blk.addEventListener('click', () =>
+        sanctionFromReport(t.author.handle, t.board_blocked ? 'board_unblock' : 'board_block', rep.id, reload)
+      );
+      const dis = h(
+        `<button class="btn-sm btn-sm-ghost">${t.disabled ? 'Enable' : 'Disable'} author</button>`
+      );
+      dis.addEventListener('click', () =>
+        sanctionFromReport(t.author.handle, t.disabled ? 'enable' : 'disable', rep.id, reload)
+      );
+      actions.append(blk, dis);
+    }
+    const dismiss = h('<button class="btn-sm btn-sm-ghost">Dismiss</button>');
+    dismiss.addEventListener('click', async () => {
+      const note = (await btPrompt('Why dismiss? (optional)', '')) || null;
+      try {
+        await API.resolveReport(rep.id, { status: 'dismissed', note });
+      } catch (ex) {
+        toast(ex.message || 'Could not dismiss');
+        return;
+      }
+      toast('Dismissed');
+      reload();
+    });
+    actions.appendChild(dismiss);
+  }
+  return card;
+}
+
+async function sanctionFromReport(handle, action, reportId, reload) {
+  const verb = { board_block: 'Board block', board_unblock: 'Lift board block', disable: 'Disable', enable: 'Enable' }[action];
+  if (!(await btConfirm(`${verb} @${handle}?`, { danger: action === 'disable' || action === 'board_block' })))
+    return;
+  const note = (await btPrompt('Note (optional)', '')) || null;
+  try {
+    await API.sanctionUser(handle, { action, note, reportId });
+  } catch (ex) {
+    toast(ex.message || 'Could not apply');
+    return;
+  }
+  toast(`${verb} — done`);
+  reload();
+}
+
+// ── Admin: users ───────────────────────────────────────────────────────
+function adminUsersSection(host) {
+  host.replaceChildren(
+    h(`
+    <div>
+      <div class="sp-field">
+        <input class="sp-input" id="bt-au-q" autocomplete="off" placeholder="Look up by @handle" />
+      </div>
+      <div id="bt-au-detail"></div>
+    </div>
+  `)
+  );
+  const q = host.querySelector('#bt-au-q');
+  const detail = host.querySelector('#bt-au-detail');
+  const lookup = async () => {
+    const handle = q.value.trim().replace(/^@/, '');
+    if (handle.length < 2) {
+      detail.replaceChildren();
+      return;
+    }
+    let d;
+    try {
+      d = await guard(() => API.adminUser(handle));
+    } catch (ex) {
+      detail.replaceChildren(h(`<div class="empty">${esc(ex.message || 'Not found')}</div>`));
+      return;
+    }
+    detail.replaceChildren(adminUserCard(d, lookup));
+  };
+  let timer;
+  q.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(lookup, 300);
+  });
+}
+
+function adminUserCard(d, reload) {
+  const u = d.user;
+  const c = d.counts || {};
+  const card = h(`
+    <div class="bt-au-card">
+      <div class="bt-au-head">
+        ${avatarEl(u.display_name || u.name || u.handle, 'bt-avatar-lg')}
+        <div>
+          <div class="bt-au-name">${esc(u.display_name || '@' + u.handle)}${
+            u.is_admin ? ' <span class="bt-admin-tag">Admin</span>' : ''
+          }</div>
+          <div class="sp-row-sub">@${esc(u.handle)} · ${esc(u.email)} · ${esc(u.plan)} · joined ${esc(
+            fmtDate((u.created_at || '').slice(0, 10))
+          )}</div>
+          <div class="sp-row-sub">${c.listings || 0} listings · ${c.comments || 0} comments · ${
+            c.requests || 0
+          } requests · ${c.reports_filed || 0} reports filed</div>
+        </div>
+      </div>
+      <div class="bt-au-state">
+        Board: <b>${u.board_blocked_at ? 'blocked' : 'ok'}</b> ·
+        Account: <b>${u.disabled_at ? 'disabled' : 'active'}</b>
+      </div>
+      <div class="bt-au-actions"></div>
+      <div class="sp-label" style="padding-left:0;margin-top:10px">Moderation history</div>
+      <div class="bt-au-history"></div>
+    </div>
+  `);
+  const acts = card.querySelector('.bt-au-actions');
+  if (!u.is_admin) {
+    const mk = (action, label, danger) => {
+      const b = h(`<button class="btn-sm ${danger ? 'btn-danger' : 'btn-sm-ghost'}">${label}</button>`);
+      b.addEventListener('click', () => sanctionFromReport(u.handle, action, null, reload));
+      return b;
+    };
+    acts.append(
+      u.board_blocked_at ? mk('board_unblock', 'Lift board block') : mk('board_block', 'Board block', true),
+      u.disabled_at ? mk('enable', 'Re-enable account') : mk('disable', 'Disable account', true)
+    );
+  } else {
+    acts.appendChild(h('<div class="sp-row-sub">Admins can’t be sanctioned here.</div>'));
+  }
+
+  const hist = card.querySelector('.bt-au-history');
+  if (!d.history.length) hist.appendChild(h('<div class="empty-section">None.</div>'));
+  d.history.forEach((m) => {
+    const row = h(
+      `<div class="bt-au-hrow"><b>${esc(m.action)}</b> · ${esc(timeAgo(m.created_at))} · ${
+        m.admin ? esc(ownerName(m.admin)) : 'system'
+      }${m.note ? ' — <span></span>' : ''}</div>`
+    );
+    if (m.note) row.querySelector('span').textContent = m.note;
+    hist.appendChild(row);
+  });
+  return card;
+}
+
+// ── Admin: listings ────────────────────────────────────────────────────
+async function adminListingsSection(host) {
+  host.replaceChildren(h('<div class="empty">Loading…</div>'));
+  let r;
+  try {
+    r = await guard(() => API.adminListings());
+  } catch {
+    return;
+  }
+  host.replaceChildren();
+  if (!r.listings.length) {
+    host.appendChild(h('<div class="empty">No listings.</div>'));
+    return;
+  }
+  const reload = () => adminListingsSection(host);
+  r.listings.forEach((l) => {
+    const row = h(`
+      <div class="sp-row">
+        <div class="sp-row-left"><div>${esc(l.headline)}<div class="sp-row-sub">${esc(
+          l.status
+        )} · ${esc(ownerName(l.owner))} · ${l.comment_count} comments · ${
+          l.pending_requests
+        } pending</div></div></div>
+        <div class="bt-adm-actions">
+          <button class="btn-sm btn-sm-ghost" data-open>Open</button>
+          <button class="btn-sm btn-danger" data-del>Delete</button>
+        </div>
+      </div>
+    `);
+    row.querySelector('[data-open]').addEventListener('click', () => openListing(l.id));
+    row.querySelector('[data-del]').addEventListener('click', async () => {
+      if (!(await btConfirm(`Delete “${l.headline}”? Comments and requests go with it.`, { danger: true, ok: 'Delete' })))
+        return;
+      try {
+        await API.deleteListing(l.id);
+      } catch (ex) {
+        toast(ex.message || 'Could not delete');
+        return;
+      }
+      toast('Listing deleted');
+      reload();
+    });
+    host.appendChild(row);
+  });
+}
+
+// ── Admin: interest-tag tool ─────────────────────────────────────────────
+function adminTagsSection(app) {
+  app.replaceChildren(
+    h(`
+    <div>
+      <div class="sp-field">
+        <input class="sp-input" id="bt-adm-q" autocomplete="off" placeholder="Filter tags…" />
+      </div>
+      <div class="sp-row-sub" id="bt-adm-merge-state" style="padding:0 20px" hidden></div>
+      <div id="bt-adm-list"><div class="empty">Loading…</div></div>
+    </div>
+  `)
+  );
+  const el = app;
 
   const listEl = el.querySelector('#bt-adm-list');
   const qInput = el.querySelector('#bt-adm-q');
@@ -1984,6 +2331,11 @@ function listingCommentEl(c, listingId, rerender) {
     });
     actions.appendChild(del);
   }
+  if (!c.deleted && !c.is_mine) {
+    const rep = h('<button class="bt-linkbtn">Report</button>');
+    rep.addEventListener('click', () => openReportModal('comment', c.id));
+    actions.appendChild(rep);
+  }
 
   (c.replies || []).forEach((r) => el.appendChild(listingCommentEl(r, listingId, rerender)));
   return el;
@@ -2117,6 +2469,11 @@ async function renderListing(app) {
       act.appendChild(h('<div class="sp-row-sub">This listing isn’t taking requests.</div>'));
     }
   }
+  if (!d.is_owner) {
+    const rep = h('<button class="bt-linkbtn" style="margin:2px 20px 0">Report this listing</button>');
+    rep.addEventListener('click', () => openReportModal('listing', l.id));
+    act.appendChild(rep);
+  }
   body.appendChild(act);
 
   // pending requests (owner)
@@ -2192,6 +2549,83 @@ async function renderListing(app) {
     d.comments.forEach((c) => cList.appendChild(listingCommentEl(c, l.id, rerender)));
   }
   body.appendChild(cSec);
+}
+
+// ── Reporting ──────────────────────────────────────────────────────────
+// Renders a Turnstile widget into `box`. Returns () => token|''.
+function mountTurnstileWidget(box) {
+  let id = null;
+  let tries = 0;
+  const tick = () => {
+    if (window.turnstile) id = window.turnstile.render(box, { sitekey: TURNSTILE_SITE_KEY });
+    else if (tries++ < 60) setTimeout(tick, 200);
+  };
+  tick();
+  return () => (window.turnstile && id != null ? window.turnstile.getResponse(id) : '');
+}
+
+const REPORT_CATEGORIES = [
+  ['spam', 'Spam or advertising'],
+  ['harassment', 'Harassment or abuse'],
+  ['illegal', 'Illegal or infringing'],
+  ['other', 'Something else'],
+];
+
+function openReportModal(targetType, targetId, onDone) {
+  const needsTs = !!(state.me && state.me.board_new);
+  const overlay = h(`
+    <div class="modal-overlay open">
+      <div class="modal">
+        <div class="modal-header"><span class="modal-title">Report this ${esc(targetType)}</span>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
+        <div class="msg err" id="bt-rp-err" hidden></div>
+        <form id="bt-rp-form">
+          <label class="sp-label">Reason</label>
+          ${REPORT_CATEGORIES.map(
+            ([v, l], i) =>
+              `<label class="bt-radio"><input type="radio" name="category" value="${v}"${
+                i === 0 ? ' checked' : ''
+              }> ${l}</label>`
+          ).join('')}
+          <label class="sp-label">Details <span class="bt-count">optional</span></label>
+          <textarea class="sp-input bt-textarea" name="detail" rows="3" maxlength="1000"
+            placeholder="Anything that helps a moderator."></textarea>
+          ${needsTs ? '<div id="bt-rp-ts" style="margin:8px 0"></div>' : ''}
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button type="submit" class="btn-sm btn-sm-sage">Send report</button>
+            <button type="button" class="btn-sm btn-sm-ghost" data-cancel>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `);
+  const close = () => overlay.remove();
+  const err = overlay.querySelector('#bt-rp-err');
+  on(overlay, '.modal-close, [data-cancel]', 'click', close);
+  overlay.addEventListener('click', (e) => e.target === overlay && close());
+  const getToken = needsTs ? mountTurnstileWidget(overlay.querySelector('#bt-rp-ts')) : () => '';
+
+  on(overlay, '#bt-rp-form', 'submit', async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    err.hidden = true;
+    try {
+      await API.report({
+        targetType,
+        targetId,
+        category: f.get('category'),
+        detail: (f.get('detail') || '').trim() || null,
+        turnstileToken: getToken(),
+      });
+      close();
+      toast('Report sent — thank you');
+      onDone && onDone();
+    } catch (ex) {
+      err.textContent = ex.message || 'Could not send the report';
+      err.hidden = false;
+    }
+  });
+  document.body.appendChild(overlay);
 }
 
 // ── Notifications ───────────────────────────────────────────────────────
