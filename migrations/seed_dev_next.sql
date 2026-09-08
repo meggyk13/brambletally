@@ -13,10 +13,10 @@ DELETE FROM projects              WHERE id LIKE 'seed-%';
 
 -- ── Projects (owned by dev@test.local) ───────────────────────────────────
 INSERT INTO projects (id, owner_id, category, title, description, status, deadline, pickup_note) VALUES
-  ('seed-proj-caftan',  '2227b9a8-0946-4165-ad9f-16cf2510f5b7', 'Sewing',   'Ottoman caftan — winter weight', 'Lined wool caftan for Twelfth Night.', 'Active', '2026-10-15', 'Wool is prewashed and folded on the cutting table.'),
-  ('seed-proj-display', '2227b9a8-0946-4165-ad9f-16cf2510f5b7', 'Research', 'Kingdom A&S display board',       'Tri-fold board on Ottoman block printing.', 'Active', '2026-09-20', NULL),
-  ('seed-proj-feast',   '2227b9a8-0946-4165-ad9f-16cf2510f5b7', 'Events',   'Feast gear inventory',            NULL, 'Active', NULL, NULL),
-  ('seed-proj-trim',    '2227b9a8-0946-4165-ad9f-16cf2510f5b7', 'Sewing',   'Card-woven trim — green dress',   'Silk card weaving to edge the neckline.', 'Active', NULL, NULL);
+  ('seed-proj-caftan',  '2227b9a8-0946-4165-ad9f-16cf2510f5b7', 'Making',     'Ottoman caftan — winter weight', 'Lined wool caftan for Twelfth Night.', 'Active', '2026-10-15', 'Wool is prewashed and folded on the cutting table.'),
+  ('seed-proj-display', '2227b9a8-0946-4165-ad9f-16cf2510f5b7', 'Research',   'Block-printing display board',    'Tri-fold board on Ottoman block printing.', 'Active', '2026-09-20', NULL),
+  ('seed-proj-feast',   '2227b9a8-0946-4165-ad9f-16cf2510f5b7', 'Event prep', 'Feast gear inventory',            NULL, 'Active', NULL, NULL),
+  ('seed-proj-trim',    '2227b9a8-0946-4165-ad9f-16cf2510f5b7', 'Making',     'Card-woven trim — green dress',   'Silk card weaving to edge the neckline.', 'Active', NULL, NULL);
 
 INSERT INTO project_collaborators (project_id, user_id, role) VALUES
   ('seed-proj-caftan',  '2227b9a8-0946-4165-ad9f-16cf2510f5b7', 'owner'),

@@ -2,7 +2,7 @@ import { json, error, readJson } from '../lib/http.js';
 import { uuid } from '../lib/id.js';
 import { isNonEmptyString } from '../lib/validate.js';
 
-const DEFAULTS = ['A&S', 'Research', 'Office', 'Event prep', 'Household'];
+const DEFAULTS = ['Making', 'Research', 'Event prep', 'Household', 'Admin'];
 
 // GET /api/categories — the signed-in user's category pick list. Lazy-seeds a
 // starter set the first time.

@@ -1,12 +1,19 @@
 # Brambletally — Build Plan
 
-Rebranded, self-hosted version of "noodlr" (a craft-project tracker) for
-Rayhana's Repositorium's Tools section, restructured around GTD (Getting
-Things Done) and extended to cover A&S projects, personal research, and
-Kingdom Chatelaine office work, with login and shared/collaborative projects.
+Rebranded, self-hosted version of "noodlr" (a craft-project tracker),
+restructured around a capture → break-down → focus → weekly-review loop, with
+magic-link login and shared/collaborative projects.
 
-Repo: github.com/meggyk13/rayhanas-repositorium
-Site: Astro, static output, deployed on Cloudflare Pages.
+**Audience (revised 2026-09-08):** any maker with long projects — sewing and
+costuming, personal research, event prep, household work, admin. The app grew
+out of SCA use (A&S, Kingdom-office work) and keeps a hedgerow/medieval visual
+identity by choice, but the product is no longer SCA-specific and the copy,
+categories, and landing page shouldn't assume that vocabulary. See section A of
+the personal-utility batch and `design.md` "Direction".
+
+Repo: github.com/meggyk13/rayhanas-repositorium (now its own repo,
+`meggyk13/brambletally`, deployed at brambletally.com)
+Site: Astro, static output, one Cloudflare Worker with static assets.
 
 ## Stack decisions
 
@@ -44,18 +51,22 @@ fully replaced.)
   $10/year plan, scaffolded with social Phase 1 (`isSupporter()` helper,
   badge, inert Settings section, admin manual-grant); billing deferred until
   there are users who might pay. Gates: project photo count, uploaded vs
-  initials avatar, immediate vs digest email, active board-listing count,
-  profile badge — never the core project/step/collaboration features. Adding
+  initials avatar, active board-listing count, profile badge — never the core
+  project/step/collaboration features. (Email frequency was on this list;
+  dropped 2026-09-08 — everyone picks Right away / Weekly digest / Never, and
+  gating a setting that mostly reduces our own send cost made no sense.) Adding
   payment later is additive — no schema rework.
 - Not needed for cost: Cloudflare Workers + D1 free tier covers this site for
   a long time; the $5/month Workers Paid plan is the escape hatch.
 
-**Add (GTD structure):**
+**Add (capture / break-down / review structure):**
 - Project **category** (revised 2026-09-06 — was a fixed Office/Research/A&S
   `project_type`): a per-user managed pick list (`categories` table),
-  starter set A&S / Research / Office / Event prep / Household, add-your-own
-  inline, optional per project (`projects.category` denormalized name).
-  Filterable on the home screen.
+  add-your-own inline, optional per project (`projects.category` denormalized
+  name). Filterable on the home screen. **Starter set revised 2026-09-08**
+  (section A of the personal-utility batch) to
+  `Making / Research / Event prep / Household / Admin` — the old
+  `A&S / Research / Office / Event prep / Household` seed read as SCA jargon.
 - Status set: Active, Waiting For, Someday, Paused, Done (add "Waiting For"
   to noodlr's existing set)
 - ~~Step-level `context` tag~~ — dropped 2026-09-06, didn't fit the work.
@@ -105,8 +116,9 @@ insert/update both in the same transaction).
    it. No separate "remember me".
 3. **Viewers + journal:** viewers CAN read the journal/timeline; editors
    and up can post.
-4. **Office-type projects:** no restriction. "Office" is a personal filter
-   tag anyone can put on their own project.
+4. **Office-type projects:** no restriction — categories are just personal
+   filter tags anyone can put on their own project. (The default `Office`
+   category was renamed `Admin` on 2026-09-08; the point stands.)
 5. **Config sanity-check:** done. Astro output is `static` (no adapter).
    The Pages project is Git-connected (build `npm run build`), so
    `/functions` auto-deploys and D1 is bound in the dashboard. The existing
@@ -623,3 +635,349 @@ is the "links back to the app" payoff.
    regenerate.
 3. Frontend — Plan-focus-time control, project + home surfacing, Settings →
    Calendar, `?focus=` handling on load.
+
+## Planned: personal-utility batch + project export + category rework (spec'd 2026-09-08)
+
+Comes out of the "comparable apps" gap review in the 2026-09-08 session. Six
+additions (A–G) in one batch. None of it is social — this is the personal and
+small-team side of the app catching up. Ordered so the no-schema piece can land
+first.
+
+Reference framing: Todoist / Things (reminders), Trello / Notion (duplicate,
+archive), Asana (step assignee), any project tool (a printable). Stash /
+materials inventory was **declined** — revisit only if users ask.
+
+### A. Category rework — de-SCA the starter set
+
+Decided 2026-09-08: the app is no longer SCA-specific, so `A&S` and `Office`
+(Kingdom-office work) in the seeded starter set read as jargon.
+
+- **New seed:** `worker/api/categories/index.js` `DEFAULTS` →
+  `['Making', 'Research', 'Event prep', 'Household', 'Admin']`.
+  `Making` replaces `A&S`; `Admin` replaces `Office`.
+- **No migration.** Confirmed no real users yet, so nothing to rename. Only the
+  lazy-seed for brand-new users changes. Anyone can still add `A&S` etc. as
+  their own category — the pick list is user-managed and unchanged.
+- **Landing page** `src/pages/index.astro` (~L200–212): rewrite the `#who`
+  intro and the `.kinds` list to drop "Arts &amp; Sciences" and "Kingdom
+  office and Chatelaine". New kinds list mirrors the seed:
+  Making · Research · Event prep · Household · Admin. Keep the repo editorial
+  standard (short declarative sentences, no methodology jargon).
+- **Dev seed** `migrations/seed_dev_next.sql`: update the sample `category`
+  values and the `Kingdom A&S display board` sample title to match the new set
+  (low stakes — it's fixture data).
+- `src/pages/legal/privacy.astro:59` just lists "categories" generically — no
+  change.
+
+No schema, no API shape change. Ship this as its own commit first.
+
+### B. Per-user timezone
+
+Due dates and the Sunday digest are effectively `America/Los_Angeles` today
+with nothing to change it. The reminder cron in **D** needs a real per-user
+"today" to be useful.
+
+- **Schema** (migration `0013`, folded into `schema.sql`):
+  `ALTER TABLE users ADD COLUMN timezone TEXT;` — IANA name
+  (`America/Los_Angeles`), nullable. `NULL` → treat as `America/Los_Angeles`
+  (today's implicit default); a `DEFAULT_TZ` constant in
+  `worker/api/lib/constants.js`.
+- `/api/auth/me` returns `timezone` (raw column value, may be null).
+- **Endpoint:** `PATCH /api/settings/timezone` `{ timezone }` — new module
+  `worker/api/settings/timezone.js`, registered in `worker/routes.js`.
+  Validate against `Intl.supportedValuesOf('timeZone')` when available on the
+  Worker runtime, else a hardcoded allowlist in `constants.js`; 400 on an
+  unknown zone. Writes `users.timezone`.
+- **Frontend:** a control in Settings → Account (below display name). A
+  `<select>` of common zones + a **Detect** button that fills it from
+  `Intl.DateTimeFormat().resolvedOptions().timeZone`. Saves live, toast on
+  success. `API.setTimezone(tz)`.
+- **Uses now:** the reminder cron (**D**). **Not** rescheduling the weekly
+  digest per user — still one Sunday run; note as later. Date *display* is
+  already browser-local, so no render change. The `.ics` feed already emits
+  UTC — unaffected.
+
+### C. Duplicate a project
+
+Crafters remake the same garment; researchers reuse the same methodology
+checklist.
+
+- **Endpoint:** `POST /api/projects/:id/duplicate` — caller must be a
+  collaborator on the source at **viewer+** (you can copy something shared with
+  you into a project you own).
+- **New project:** `owner_id` = caller, `title` = `"<title> (copy)"`,
+  `status` = `Active`, `deadline` = `NULL`, `created_at` = now. `category`:
+  copy the source string as-is **and** `INSERT OR IGNORE` a `categories` row
+  for the caller with that name so the picker shows it.
+- **Copies:** `project_steps` (incl. sub-steps — build an old→new id map, remap
+  `parent_step_id`), `project_supplies`, `project_links`. **Resets:** every
+  step `completed`/`completed_at` → `0`/`NULL`; every supply `acquired` → `0`.
+- **Does not copy:** journal, collaborators, board listing, work sessions.
+- One `DB.batch`: insert the project, the `role='owner'` collaborator row (the
+  plan.md owner/collaborator-in-lockstep rule), then all child rows. Returns
+  `{ id }`.
+- **Frontend:** "Duplicate" in the project detail overflow menu →
+  `btConfirm` → `API.duplicateProject(id)` → navigate to the new project.
+
+### D. Due-date reminders (personal)
+
+"Step due today / tomorrow" reaches you in-app and by email, reusing the
+`notifications` + email plumbing built for the board.
+
+**Email-frequency default changes with this batch (decided 2026-09-08).**
+`DEFAULT_NOTIF_PREFS.mode` flips `'immediate'` → `'weekly'` in
+`worker/api/lib/notif.js`. Out of the box a user now gets **in-app
+notifications only, plus the one Sunday digest** — no immediate email. The
+three modes are unchanged (`immediate` | `weekly` | `off`); the Settings
+control is reframed as a *frequency* choice ("How often should we email you?" —
+**Right away · Weekly digest · Never**, default **Weekly digest**). Conservative
+"for now" while email volume against Resend's free tier (~100/day) is unproven;
+revisit once there's real usage. Also mirrored in `social-plan.md` →
+Notifications. Every notification **type** still defaults on — `mode` is what
+decides whether/when it emails.
+
+- **New notification type** `step_due`. Add to `NOTIF_TYPES` in
+  `worker/api/lib/notif.js` (+ `DEFAULT_NOTIF_PREFS.types.step_due: true`,
+  `sanitizeNotifPrefs`). `notifCopy('step_due', …)` in `worker/api/lib/notify.js`:
+  subject `Due <today|tomorrow>: <step title>`, line
+  `"<step title>" in <project title> is due <today|tomorrow>.`
+- **Recipients:** the step's **assignee** when set (see **G**); otherwise the
+  project **owner and editors** (dedup; viewers can't complete steps). Most
+  projects are solo, so this is normally one person.
+- **Which steps:** leaf steps only, `completed = 0`, project not archived and
+  `status IN ('Active','Waiting For')`, `due_date` equal to the recipient's
+  local **today or tomorrow** (computed from `users.timezone`, `DEFAULT_TZ`
+  fallback).
+- **Dedup:** store `subject_type='step'`, `subject_id=<step id>`,
+  `preview=<due_date>`. Before inserting, skip if a `step_due` row already
+  exists for that `(user_id, subject_id, preview)` — so a step re-reminds only
+  if its due date *changes*.
+- **Delivery:** honours `mode` exactly like every other type — no special
+  immediate bypass. The daily cron **always writes the in-app row** (subject to
+  `types.step_due !== false` and the `disabled_at` guard; block checks are moot,
+  self-scoped). Email then follows `mode`: `immediate` → sent now by the cron
+  via `notify()`; `weekly` (the default) → picked up by Sunday's digest;
+  `off` → in-app only. A day-before reminder that reaches a default user by
+  email only on Sunday is weak — the timely signal for them is the in-app bell.
+  A per-type "always email now" override for time-sensitive types is a **Later**
+  item.
+- **New lib** `worker/api/lib/reminders.js` — `runDueReminders(env)`. It writes
+  rows through `notify()` so the immediate-mode email path is reused.
+- **Cron:** add `"0 12 * * *"` (12:00 UTC daily) to `wrangler.jsonc`
+  `triggers.crons` (keep the Sunday entry). In `worker/index.js` `scheduled()`,
+  branch on `event.cron`: `"0 15 * * 0"` → `runWeeklyDigest`; `"0 12 * * *"` →
+  `runDueReminders`. Both under `ctx.waitUntil` with a `.catch`.
+- **Settings:** the Notifications section's per-type toggle list gains
+  `step_due` ("Reminders for steps due soon"); update the helper text to
+  describe the new default (digest only).
+
+### E. Project export — printable + time summary
+
+- **Endpoint:** `GET /api/projects/:id/print` — returns a standalone **HTML
+  document** (not JSON), screen + `@media print` CSS inline, so the user does
+  Ctrl/Cmd-P → Save as PDF. No server-side PDF library. Viewer+ access.
+- **Sections:**
+  - Header — title, category, status, deadline, owner display name,
+    "Exported <date>".
+  - Description / project notes (`projects.pickup_note`).
+  - **Summary stats** — `X of Y steps done` (leaf-only) + percent; estimated
+    time left (`SUM(estimate_minutes)` over open leaf steps, `fmtDuration`);
+    total estimated time (all leaf steps); steps completed with a
+    `completed_at` and the earliest→latest span; count + total hours of
+    *upcoming* planned focus sessions for the caller.
+  - Steps — nested list, `☐` / `☑` glyphs, due date + estimate + notes per
+    step.
+  - Supplies — table (name, source, cost, `☐`/`☑` acquired) + cost total.
+  - Links — title (or hostname) + URL.
+  - Journal — **excluded by default**; a `?journal=1` link on the page itself
+    ("Include journal entries") reloads with it. No modal.
+- Escape every field on the way out (same discipline as `notify.js` /
+  `digest.js` — a shared `escapeHtml`).
+- **Frontend:** "Print / PDF" in the project overflow menu → opens
+  `/api/projects/:id/print` in a new tab.
+
+### Schema — one migration
+
+`migrations/0013_personal_utility.sql` (fold all three columns into `schema.sql`):
+
+```sql
+ALTER TABLE users        ADD COLUMN timezone    TEXT;   -- IANA name; NULL = DEFAULT_TZ
+ALTER TABLE projects     ADD COLUMN archived_at TEXT;   -- ISO datetime; NULL = active
+ALTER TABLE project_steps ADD COLUMN assignee_id TEXT
+  REFERENCES users(id) ON DELETE SET NULL;             -- NULL = unassigned (see G)
+```
+
+`archived_at` is orthogonal to `projects.status` (see **F**).
+
+### F. Archive vs. delete a project
+
+Kept in the same migration as **B** because it's one small column and the same
+list-endpoint edits.
+
+- **Schema:** `projects.archived_at` (above). Orthogonal to `status` — an
+  archived project keeps whatever status it had; "Done" stays a workflow
+  state, "archived" means shelved out of view.
+- **Read:** `GET /api/projects` excludes `archived_at IS NOT NULL`;
+  `?archived=1` returns **only** archived. Home status counts, Quick tasks,
+  Next, and Review all exclude archived (add the clause wherever
+  `worker/api/projects/index.js` / `review.js` scope the owner's/collaborator's
+  projects).
+- **Write:** `PATCH /api/projects/:id` accepts `{ archived: true|false }` →
+  sets/clears `archived_at`. **Owner only** (editors don't shelve someone
+  else's project). Archiving also sets any `open` board listing on the project
+  to `closed` in the same batch.
+- **Frontend:** "Archive" / "Unarchive" in the project overflow menu; an
+  "Archived" entry in the Home status-filter row → a `renderArchived` list
+  (reuses the card grid) with a per-card Unarchive. Archived projects are still
+  openable and editable — just out of the default views.
+
+### G. Assign a step to a person
+
+A lightweight Asana "assignee" — in a multi-person project, a step can be
+handed to one collaborator. Single assignee only; no workload view, no
+per-person capacity, no reassignment history.
+
+- **Schema:** `project_steps.assignee_id` (in migration `0013` above).
+  `REFERENCES users(id) ON DELETE SET NULL` covers account deletion. `NULL` =
+  unassigned. Any step row, leaf or container.
+- **Who can assign:** editor+ on the project (same gate as editing a step).
+  Assignable to **any** current collaborator — owner, editor, or viewer —
+  validated against `project_collaborators`; 400 if the target isn't a member.
+  (Assigning a viewer is allowed as a signal; you'd usually then bump them to
+  editor through the existing collaborators UI.)
+- **Collaborator removal cleanup:** `DELETE /api/projects/:id/collaborators`
+  also runs `UPDATE project_steps SET assignee_id = NULL WHERE project_id = ?
+  AND assignee_id = ?` in the same batch (`worker/api/projects/id/collaborators.js`).
+- **API:**
+  - `PATCH /api/projects/:id/steps/:stepId` — add `assignee_id` to the `pick`
+    whitelist (`stepId.js:13`). Accept a member id or `null`; 400 otherwise.
+    The `bash` endpoint is unchanged — new sub-steps start unassigned.
+  - `GET /api/tasks?scope=mine` — new module `worker/api/tasks.js` (+
+    `worker/routes.js`): open **leaf** steps where `assignee_id` = caller,
+    across every project the caller collaborates on, not archived, project
+    `status IN ('Active','Waiting For')`. Each row carries project title,
+    `due_date`, `estimate_minutes`, `parent_step_id` (for the breadcrumb).
+    Sorted `due_date` (nulls last) then `estimate_minutes`.
+- **Surfacing:**
+  - `stepRow` — an assignee chip (initials via `avatarEl`); an editor sees a
+    faint "+ assign" affordance when it's unset. No new query: `id.js` already
+    returns the step rows with `assignee_id`, and the project detail already
+    loads `collaborators` — resolve the name client-side against that list.
+  - Project detail — an "Everyone · Me · <name>…" filter chip row above the
+    step list, shown only when the project has more than one collaborator.
+  - Home — a **My tasks** mode beside `Projects | Quick tasks` (`state.homeMode`),
+    rendering `GET /api/tasks?scope=mine`. This is the cross-project "what's on
+    my plate" view — the main payoff of assignment.
+  - Quick tasks / Next / Review rows — show the assignee chip when set.
+- **Interaction with D (reminders):** a step with an `assignee_id` reminds
+  **the assignee only**. Unassigned falls back to owner + editors (D's
+  default). One branch in `runDueReminders`.
+- **Interaction with E (print):** show the assignee name on each step line.
+- **Notification:** new type `step_assigned` — "`<actor>` assigned you
+  ‘`<step>`’ in `<project>`". Add to `NOTIF_TYPES` (+
+  `DEFAULT_NOTIF_PREFS.types.step_assigned: true`). Fired from the PATCH when
+  `assignee_id` changes to someone other than the actor; reuses `notify()`,
+  so it honours `mode` — with the 2026-09-08 default (`weekly`) the assignee
+  learns of it in-app immediately and by email in Sunday's digest unless they
+  chose "Right away". Skipped when you assign yourself.
+
+### Build order
+
+1. **A — category rework.** No schema. `DEFAULTS`, landing copy, dev seed.
+   One commit.
+2. **Migration `0013`** (`users.timezone`, `projects.archived_at`,
+   `project_steps.assignee_id`) + `schema.sql` + `DEFAULT_TZ` / zone allowlist
+   in `constants.js`.
+3. **B — timezone.** `me` payload, `PATCH /api/settings/timezone`, Settings
+   control + Detect button.
+4. **F — archive.** List-endpoint filters, `PATCH` toggle, Archived view,
+   overflow-menu actions.
+5. **C — duplicate.** `POST /api/projects/:id/duplicate`, overflow-menu action.
+6. **G — assignee.** `assignee_id` in the step PATCH + membership check,
+   collaborator-removal cleanup, `GET /api/tasks?scope=mine`, the step chip +
+   project filter + Home "My tasks" mode, `step_assigned` notification.
+7. **D — reminders.** Flip `DEFAULT_NOTIF_PREFS.mode` → `'weekly'` and reframe
+   the Settings mode control as a frequency choice (do this part first — it's
+   independent of the cron). Then `reminders.js`, `step_due` type + copy +
+   prefs, the daily cron + `event.cron` branch, per-type toggle. Assignee-aware
+   recipient selection (needs G).
+8. **E — printable.** `GET /api/projects/:id/print`, overflow-menu link,
+   per-step assignee.
+
+**Prod migration after merge:**
+`npx wrangler d1 execute brambletally --remote --file=./migrations/0013_personal_utility.sql`
+
+### H. Inline editing (frontend only, no schema, no API change)
+
+Today every edit is a `.modal-overlay` (bottom sheet on phones, centred dialog
+wider — `public/app.css:1440`). Only `quickAddRow`, `appearanceControls`, and
+search suggest are inline. Convert the **frequent single-field** edits to
+inline; keep the sheet for create flows and multi-field edits.
+
+Not one commit — each surface below is independent and can land on its own.
+
+#### Two shared helpers (build first)
+
+- **`inlineEdit(displayEl, { value, multiline, validate, onSave })`** — swaps
+  the display node for an `<input>`/`<textarea>` sized to match, selects the
+  text, commits on Enter (single-line) or blur, cancels on Esc. Empty/invalid
+  on blur reverts, never deletes. Optimistic: update the row, call
+  `guard(onSave)`, roll back the text on reject. One CSS class pair
+  (`.bt-inline` / `.bt-inline.editing`) under a `:global()` wrapper (Astro
+  scoping — see the working-style note in `plan.md`).
+- **`popover(anchorEl, contentEl, { align })`** — a small anchored panel with
+  outside-click / Esc to dismiss. Generalise the mechanic already in
+  `openNotifPanel` (`app.js:2944`). Used for enumerated fields (status,
+  assignee, estimate, due-date chips).
+
+#### Convert to inline
+
+| Surface | Interaction |
+| --- | --- |
+| **Step title** | Tap the title → `inlineEdit` in place. The rest of `openStepForm` (notes, estimate, delete) moves behind a `⋯` control on the row. |
+| **Step due date** | Tap the "due …" sub-line bit → `popover` with the existing `bt-date-chips` + a native `<input type=date>`. Writes `due_date` directly. |
+| **Step assignee (G)** | Tap the assignee chip / "+ assign" → `popover` list of the project's collaborators + "Unassign". This *is* G's assignment UI — build G's chip inline from the start rather than as a modal. (Not to be confused with `openAssignStep`, the inbox→project flow.) |
+| **Step estimate** | Tap the "~15m" bit → `popover` with the 0–7 stops (reuse `STEP_ESTIMATE_LABELS`). |
+| **Project title** | Tap the header title → `inlineEdit`. |
+| **Project status** | A `<select>` styled inline in the header (or a `popover`), `PATCH` on change — no form. |
+| **Project category** | Inline `<select>` in the header, same as status; keeps the "＋ New category…" option → falls back to `btPrompt`, not the full sheet. |
+| **Project description / notes** | Inline `<textarea>` on the detail view that saves on blur. *(Phone caveat: a bottom-anchored textarea can sit under the keyboard — if it's bad in testing, leave these two in the sheet.)* |
+| **Journal entry edit** | Tap an entry → `inlineEdit` multiline. |
+| **Supply `acquired`** | Already a checkbox — confirm it's a direct toggle, not a form open. |
+
+#### Keep as a sheet / dialog
+
+New project (`openProjectForm` create mode — many fields + category creation),
+`openBashForm` (multi-line textarea), `openPlanForm` (date + time + duration),
+`openSupplyForm` edit (name / source / cost / url — multi-field),
+`openListingForm` / `openRequestModal` / `openReportModal` (low frequency),
+`openManageCategories`. `openStepForm` stays for the "⋯" path (notes +
+estimate + delete in one place) but is no longer the primary tap target.
+
+#### Watch for
+
+- Keep one obvious affordance per row that still opens the full editor (the
+  `⋯`), so inline edits don't strand the less-common fields.
+- `rerender()` after every inline commit so derived bits (container roll-ups,
+  breadcrumb, sub-line) refresh.
+- Don't regress the checkbox tap target — `.checkbox` keeps its own
+  `stopPropagation` handler; inline edit binds on `.check-title` only.
+- All new classes need `:global()` wrappers in the Astro-scoped stylesheet.
+
+### Later (not this batch)
+
+- **Per-type "always email now" override** — a way for a user on the
+  `weekly` default to still get immediate mail for time-sensitive types
+  (`step_due`, `step_assigned`) without switching everything to `immediate`.
+  Deferred with the 2026-09-08 conservative-default decision.
+- **Daily digest** as a fourth frequency, piggybacking the reminder cron —
+  a middle ground between `immediate` and `weekly`.
+- Per-user digest scheduling (send the weekly digest in each user's local
+  Sunday morning, not one global run) — needs `users.timezone` from **B**.
+- Reminder lead time as a user preference (same-day only vs. 1 / 3 days out).
+- Recurring steps (already on the step "Later" list) would pair well with
+  reminders.
+- Human-readable export as a real server-side PDF once the app is on Workers
+  Paid — the print-to-PDF path covers it until then.
+- Revisit the email-frequency **default** (`weekly` → maybe `immediate` for
+  some types) once there's real usage data against Resend's daily cap.
