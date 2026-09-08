@@ -24,6 +24,15 @@ CREATE TABLE users (
 );
 CREATE UNIQUE INDEX idx_users_handle ON users(handle) WHERE handle IS NOT NULL;
 
+-- 1:1 with users; split out so the hot auth SELECT in session.js stays lean.
+CREATE TABLE user_profiles (
+  user_id     TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  bio         TEXT,                       -- <= 500, escaped on render
+  pronouns    TEXT,                       -- <= 40, escaped on render
+  notif_prefs TEXT,                       -- JSON: { mode: 'immediate'|'weekly'|'off', types: {...} }
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE sessions (
   id            TEXT PRIMARY KEY,        -- random token, stored as httpOnly cookie
   user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

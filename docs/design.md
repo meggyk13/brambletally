@@ -287,24 +287,20 @@ block around line 268):
 
 ## Settings — Appearance section
 
-**Built 2026-09-07** as `openAppearance()` in `public/app.js` (styles
-`.bt-appr-*` / `.bt-seg*` / `.bt-swatch*` in `public/app.css`).
+The Appearance controls live in the **Settings screen** as of the social
+Phase 1b-i PR (#10). `openAppearance()` (the standalone modal) is gone;
+`appearanceControls()` returns the Mode segmented control + palette swatches as
+a DOM node that `renderSettings()` slots in. Styles unchanged
+(`.bt-appr-*` / `.bt-seg*` / `.bt-swatch*`).
 
-- **Mode** — a three-way segmented control: Light / Dark / System.
-- **Theme** — three swatch cards (Bramble / Hearth / Fen). Each shows the
-  palette's light `--bg` with its `--accent` and `--accent-2` as dots, the
-  name, and a one-line note. Swatch colours are mirrored from this doc in a
-  `PALETTE_CARDS` const — a nested element can't read `:root[data-theme]`
-  tokens.
-- Both live-apply on tap (`lsSet` + `applyTheme()`); no Save button. The modal
-  survives the `render()` that a mode change triggers (it's mounted on
-  `document.body`). Closes on ×, backdrop, or Esc.
+- **Mode** — Light / Dark / System segmented control.
+- **Theme** — three swatch cards (Bramble / Hearth / Fen), colours mirrored
+  from this doc in `PALETTE_CARDS` (a nested element can't read
+  `:root[data-theme]` tokens).
+- Live-apply on tap (`lsSet` + `applyTheme()`), no Save button.
 
-**Deviation from the original plan:** there is no Settings shell yet (it lands
-in social Phase 1), so the header button **opens this picker** rather than
-blind-toggling light/dark. The quick light/dark flip is one tap deep, inside
-the picker's Mode control. When the Settings shell lands, move this block into
-it and decide whether the header reverts to a blind toggle.
+The header `#bt-theme` button is now a **blind light/dark flip**
+(`toggleTheme`); a **gear button** opens Settings, where the full picker lives.
 
 ## Wordmark, mark, favicon
 
