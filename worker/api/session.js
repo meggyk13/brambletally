@@ -27,7 +27,7 @@ export async function loadSession(context) {
     `SELECT s.expires_at AS expires_at,
             u.id, u.email, u.name, u.avatar_url, u.plan,
             u.handle, u.display_name, u.is_admin, u.disabled_at, u.board_blocked_at,
-            u.tos_accepted_at, u.tos_version
+            u.tos_accepted_at, u.tos_version, u.timezone
        FROM sessions s
        JOIN users u ON u.id = s.user_id
       WHERE s.id = ? AND s.expires_at > datetime('now')`
@@ -50,6 +50,7 @@ export async function loadSession(context) {
     board_blocked_at: row.board_blocked_at,
     tos_accepted_at: row.tos_accepted_at,
     tos_version: row.tos_version,
+    timezone: row.timezone,
   };
   context.data.sessionId = sid;
 

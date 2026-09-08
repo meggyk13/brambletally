@@ -65,6 +65,7 @@ import * as settingsNotifPrefs from './api/settings/notif-prefs.js';
 import * as settingsExport from './api/settings/export.js';
 import * as settingsEmail from './api/settings/email.js';
 import * as settingsCalendarToken from './api/settings/calendar-token.js';
+import * as settingsTimezone from './api/settings/timezone.js';
 import * as legalAccept from './api/legal/accept.js';
 import * as account from './api/account.js';
 
@@ -136,6 +137,7 @@ export const routes = [
   ['/api/settings/export', settingsExport],
   ['/api/settings/email', settingsEmail],
   ['/api/settings/calendar-token', settingsCalendarToken],
+  ['/api/settings/timezone', settingsTimezone],
   ['/api/legal/accept', legalAccept],
   ['/api/account', account],
 ];

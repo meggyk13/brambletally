@@ -225,6 +225,7 @@ const API = {
   saveNotifPrefs: (prefs) => api('/api/settings/notif-prefs', { method: 'PATCH', body: prefs }),
   changeEmail: (email) => api('/api/settings/email', { method: 'POST', body: { email } }),
   acceptTos: () => api('/api/legal/accept', { method: 'POST' }),
+  setTimezone: (timezone) => api('/api/settings/timezone', { method: 'PATCH', body: { timezone } }),
   deleteAccount: () => api('/api/account', { method: 'DELETE' }),
 
   listInbox: () => api('/api/inbox'),
@@ -817,6 +818,14 @@ function renderSettings(app) {
               <button class="btn-sm btn-sm-sage" id="bt-set-dname-save">Save</button>
             </div>
           </div>
+          <div class="sp-field">
+            <div class="sp-field-label">Time zone</div>
+            <div style="display:flex;gap:8px">
+              <select class="sp-select" id="bt-set-tz"></select>
+              <button type="button" class="btn-sm btn-sm-ghost" id="bt-set-tz-detect">Detect</button>
+            </div>
+            <div class="sp-row-sub" style="padding:6px 0 0">Used for due-date reminders and daily summaries. Defaults to US&nbsp;Pacific.</div>
+          </div>
         </div>
 
         <div class="sp-section">
@@ -933,6 +942,46 @@ function renderSettings(app) {
     await guard(() => API.updateProfile({ display_name: v || null }));
     state.me.user.display_name = v || null;
     toast('Display name saved');
+  });
+
+  // Time zone — a native <select> of IANA zones, plus a Detect button.
+  const tzSel = el.querySelector('#bt-set-tz');
+  const tzList =
+    typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+  const cur = u.timezone || '';
+  tzSel.innerHTML =
+    '<option value="">Default (US Pacific)</option>' +
+    (cur && !tzList.includes(cur) ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : '') +
+    tzList
+      .map(
+        (z) =>
+          `<option value="${esc(z)}"${z === cur ? ' selected' : ''}>${esc(z.replace(/_/g, ' '))}</option>`
+      )
+      .join('');
+  on(el, '#bt-set-tz', 'change', async () => {
+    const v = tzSel.value || null;
+    try {
+      await guard(() => API.setTimezone(v));
+      state.me.user.timezone = v;
+      toast('Time zone saved');
+    } catch {
+      /* toast already shown */
+    }
+  });
+  on(el, '#bt-set-tz-detect', 'click', () => {
+    let z;
+    try {
+      z = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      z = null;
+    }
+    if (!z) return toast("Couldn't detect your time zone");
+    if (![...tzSel.options].some((o) => o.value === z)) {
+      tzSel.add(new Option(z.replace(/_/g, ' '), z));
+    }
+    if (tzSel.value === z) return toast(`Already set to ${z.replace(/_/g, ' ')}`);
+    tzSel.value = z;
+    tzSel.dispatchEvent(new Event('change'));
   });
   on(el, '#bt-notif-mode [data-nmode]', 'click', (e) => {
     prefs.mode = e.currentTarget.dataset.nmode;
