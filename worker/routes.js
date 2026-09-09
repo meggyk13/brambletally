@@ -23,6 +23,7 @@ import * as transfer from './api/projects/id/transfer.js';
 import * as projectSessions from './api/projects/id/sessions.js';
 import * as projectSession from './api/projects/id/sessions/sessionId.js';
 import * as duplicate from './api/projects/id/duplicate.js';
+import * as projectPrint from './api/projects/id/print.js';
 import * as sessionsList from './api/sessions.js';
 import * as sessionDetail from './api/sessions/id.js';
 import * as calendarFeed from './api/calendar/token.js';
@@ -93,6 +94,7 @@ export const routes = [
   ['/api/projects/:id/sessions', projectSessions],
   ['/api/projects/:id/sessions/:sessionId', projectSession],
   ['/api/projects/:id/duplicate', duplicate],
+  ['/api/projects/:id/print', projectPrint],
 
   ['/api/sessions', sessionsList],
   ['/api/sessions/:id', sessionDetail],

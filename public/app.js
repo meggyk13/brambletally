@@ -4190,6 +4190,7 @@ function renderProject(app) {
       <div class="detail-body">
         <div class="detail-topbar">
           <button class="detail-back" id="bt-back">← Back</button>
+          <button class="detail-back" id="bt-printproj">Print</button>
           <button class="detail-back" id="bt-dupproj">Duplicate</button>
           ${canEdit ? '<button class="detail-back" id="bt-editproj">Edit</button>' : ''}
         </div>
@@ -4249,6 +4250,7 @@ function renderProject(app) {
   );
   if (canEdit) on(view, '#bt-editproj', 'click', () => openProjectForm(p));
   view.querySelector('#bt-sessions-slot').appendChild(sessionsBlock(b));
+  on(view, '#bt-printproj', 'click', () => window.open('/api/projects/' + p.id + '/print', '_blank'));
   on(view, '#bt-dupproj', 'click', async () => {
     const ok = await btConfirm(
       `Duplicate “${p.title}”? Its steps, supplies and links copy into a new project you own — the timeline and collaborators don't come along.`,
