@@ -1615,7 +1615,13 @@ textarea{resize:vertical;min-height:60px}
 }
 #bt-app .step-bash:hover, #bt-app .step-more:hover { opacity: 1; }
 #bt-app .step-more { font-size: 20px; color: var(--text); }
-#bt-app .check-title.bt-editable, #bt-app .detail-title.bt-editable { cursor: text; }
+#bt-app .check-title.bt-editable, #bt-app .detail-title.bt-editable,
+#bt-app .detail-desc.bt-editable { cursor: text; }
+#bt-app .detail-desc {
+  color: var(--text-muted); font-size: 16px; line-height: 1.55; margin-bottom: 14px;
+  white-space: pre-wrap;
+}
+#bt-app .detail-desc.is-empty { color: var(--text-faint); font-style: italic; }
 
 /* Step assignee chip + picker (G — multi-person projects) */
 #bt-app .step-assignee {

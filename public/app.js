@@ -399,10 +399,12 @@ async function guard(fn) {
 
 // ── Inline edit ────────────────────────────────────────────────────────────
 // Swap a display node for a field sized to sit in its place. Enter (single
-// line) or blur commits; Esc cancels. Empty, unchanged or invalid reverts —
-// this never deletes. Optimistic: the display updates right away and rolls
-// back if onSave rejects. `onSave` is responsible for any rerender().
-function inlineEdit(displayEl, { value, multiline = false, validate, onSave } = {}) {
+// line) or blur commits; Esc cancels. Unchanged or invalid reverts.
+// Optimistic: the display updates right away and rolls back if onSave
+// rejects. `onSave` is responsible for any rerender(). Without `placeholder`
+// an empty value reverts (the field is not clearable); with one, an empty
+// value commits and the node shows the placeholder with an `is-empty` class.
+function inlineEdit(displayEl, { value, multiline = false, validate, onSave, placeholder } = {}) {
   if (displayEl.dataset.editing === '1') return;
   const orig = value != null ? String(value) : displayEl.textContent;
   const field = h(
@@ -420,30 +422,35 @@ function inlineEdit(displayEl, { value, multiline = false, validate, onSave } = 
   field.focus();
   field.select();
 
+  const paint = (text) => {
+    displayEl.textContent = text || placeholder || '';
+    if (placeholder !== undefined) displayEl.classList.toggle('is-empty', !text);
+  };
   let settled = false;
   const restore = (text) => {
     if (settled) return;
     settled = true;
-    displayEl.textContent = text;
+    paint(text);
     delete displayEl.dataset.editing;
     field.replaceWith(displayEl);
   };
-  const cancel = () => restore(orig);
   const commit = async () => {
     if (settled) return;
     const next = field.value.trim();
-    if (!next || next === orig.trim() || (validate && !validate(next))) return cancel();
+    const unchanged = next === orig.trim();
+    const blocked = (!next && placeholder === undefined) || (validate && next && !validate(next));
+    if (unchanged || blocked) return restore(orig);
     restore(next); // optimistic
     try {
       await guard(() => onSave(next));
     } catch {
-      displayEl.textContent = orig; // roll back
+      paint(orig); // roll back
     }
   };
   field.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       e.preventDefault();
-      cancel();
+      restore(orig);
     } else if (e.key === 'Enter' && !multiline) {
       e.preventDefault();
       commit();
@@ -4358,7 +4365,13 @@ function renderProject(app) {
                 : ''
           }
         </div>
-        ${p.description ? `<p style="color:var(--text-muted);font-size:16px;line-height:1.55;margin-bottom:14px">${esc(p.description)}</p>` : ''}
+        ${
+          canEdit || p.description
+            ? `<p class="detail-desc${canEdit ? ' bt-editable' : ''}${
+                p.description ? '' : ' is-empty'
+              }">${p.description ? esc(p.description) : 'Add a description'}</p>`
+            : ''
+        }
         <div class="pickup-box" id="bt-pickup-box"></div>
         ${
           leaves.length
@@ -4401,6 +4414,18 @@ function renderProject(app) {
         onSave: async (title) => {
           await API.updateProject(p.id, { title });
           p.title = title;
+        },
+      })
+    );
+  if (canEdit)
+    on(view, '.detail-desc', 'click', (e) =>
+      inlineEdit(e.currentTarget, {
+        value: p.description || '',
+        multiline: true,
+        placeholder: 'Add a description',
+        onSave: async (description) => {
+          await API.updateProject(p.id, { description: description || null });
+          p.description = description || null;
         },
       })
     );
