@@ -105,5 +105,13 @@ export async function onRequestDelete(context) {
     .bind(id, body.userId)
     .run();
   if (!res.meta.changes) return error(404, 'Collaborator not found');
+
+  // Drop any step assignments the removed person held on this project.
+  await context.env.DB.prepare(
+    'UPDATE project_steps SET assignee_id = NULL WHERE project_id = ? AND assignee_id = ?'
+  )
+    .bind(id, body.userId)
+    .run();
+
   return json({ ok: true });
 }

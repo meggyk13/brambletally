@@ -8,7 +8,9 @@ import { routes } from './routes.js';
 import { loadSession } from './api/session.js';
 import { error } from './api/lib/http.js';
 import { runWeeklyDigest } from './api/lib/digest.js';
+import { runDueReminders } from './api/lib/reminders.js';
 import { needsTos } from './api/lib/legal.js';
+import { DIGEST_CRON, REMINDERS_CRON } from './api/lib/constants.js';
 
 // Reachable while a sanction / acceptance gate is in force: sign-in state, a
 // way out, and the data-subject routes (export, delete) which must never be
@@ -128,14 +130,26 @@ export default {
     return res;
   },
 
-  // Cron Trigger. wrangler.jsonc schedules "0 15 * * 0" — Sunday 15:00 UTC,
-  // roughly 08:00 America/Los_Angeles (drifts one hour across the DST boundary;
-  // Cloudflare cron has no timezone support).
+  // Cron Triggers — the strings below come from constants.js and must match
+  // wrangler.jsonc `triggers.crons` exactly. Dispatch is by explicit match on
+  // each; an unrecognized cron is logged and does nothing, so a string drift
+  // makes one job stop rather than silently running the wrong job.
+  // (Cloudflare cron has no timezone support, hence the DST drift on the weekly.)
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(
-      runWeeklyDigest(env).catch((e) =>
-        console.error('[brambletally] weekly digest failed', e)
-      )
-    );
+    if (event.cron === REMINDERS_CRON) {
+      ctx.waitUntil(
+        runDueReminders(env, ctx).catch((e) =>
+          console.error('[brambletally] due reminders failed', e)
+        )
+      );
+    } else if (event.cron === DIGEST_CRON) {
+      ctx.waitUntil(
+        runWeeklyDigest(env).catch((e) =>
+          console.error('[brambletally] weekly digest failed', e)
+        )
+      );
+    } else {
+      console.error('[brambletally] scheduled(): unrecognized cron', event.cron);
+    }
   },
 };

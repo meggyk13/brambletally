@@ -9,16 +9,23 @@ export const NOTIF_TYPES = [
   'contributor_decided',
   'board_comment',
   'board_reply',
+  'step_assigned',
+  'step_due',
 ];
 
+// `mode` default is 'weekly' (2026-09-08): a new account gets in-app
+// notifications plus the one Sunday digest and no immediate email until it
+// opts in. Conservative while volume against Resend's free cap is unproven.
 export const DEFAULT_NOTIF_PREFS = {
-  mode: 'immediate',
+  mode: 'weekly',
   types: {
     follow: true,
     contributor_request: true,
     contributor_decided: true,
     board_comment: true,
     board_reply: true,
+    step_assigned: true,
+    step_due: true,
   },
 };
 

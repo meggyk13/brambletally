@@ -100,11 +100,13 @@ const API = {
   requestLink: (email, turnstileToken) =>
     api('/api/auth/request-link', { method: 'POST', body: { email, turnstileToken } }),
 
-  listProjects: () => api('/api/projects'),
+  listProjects: (opts = {}) => api('/api/projects' + (opts.archived ? '?archived=1' : '')),
   createProject: (b) => api('/api/projects', { method: 'POST', body: b }),
   getProject: (id) => api('/api/projects/' + id),
   updateProject: (id, b) => api('/api/projects/' + id, { method: 'PATCH', body: b }),
   deleteProject: (id) => api('/api/projects/' + id, { method: 'DELETE' }),
+  duplicateProject: (id) => api('/api/projects/' + id + '/duplicate', { method: 'POST' }),
+  getTasks: () => api('/api/tasks?scope=mine'),
 
   addStep: (pid, b) => api(`/api/projects/${pid}/steps`, { method: 'POST', body: b }),
   updateStep: (pid, sid, b) =>
@@ -225,6 +227,7 @@ const API = {
   saveNotifPrefs: (prefs) => api('/api/settings/notif-prefs', { method: 'PATCH', body: prefs }),
   changeEmail: (email) => api('/api/settings/email', { method: 'POST', body: { email } }),
   acceptTos: () => api('/api/legal/accept', { method: 'POST' }),
+  setTimezone: (timezone) => api('/api/settings/timezone', { method: 'PATCH', body: { timezone } }),
   deleteAccount: () => api('/api/account', { method: 'DELETE' }),
 
   listInbox: () => api('/api/inbox'),
@@ -526,12 +529,13 @@ const state = {
   categories: [], // [{id, name, sort_order}]
   filterStatus: 'Active',
   filterCategory: 'all', // 'all' | 'none' | a category name
-  homeMode: 'projects', // 'projects' | 'quick'
+  homeMode: 'projects', // 'projects' | 'quick' | 'mine'
   quickCap: 30, // minutes ceiling for the Quick tasks list; Infinity = all
   boardMode: 'listings', // 'listings' | 'activity'
   feedFilter: 'all', // 'all' | 'following'
   project: null, // full bundle when view === 'project'
   detailTab: 'steps',
+  stepFilterAssignee: 'all', // 'all' | 'me' | a collaborator user_id (project detail, multi-person)
   doneThisSession: 0,
 };
 
@@ -769,13 +773,15 @@ const NOTIF_TYPE_LABELS = [
   ['contributor_decided', 'Your request is accepted or declined'],
   ['board_comment', 'Comment on your board listing'],
   ['board_reply', 'Reply to your comment'],
+  ['step_assigned', 'A step is assigned to you'],
+  ['step_due', 'Reminders for steps due soon'],
 ];
 
 function renderSettings(app) {
   app.replaceChildren();
   const me = state.me;
   const u = me.user;
-  me.notif_prefs = me.notif_prefs || { mode: 'immediate', types: {} };
+  me.notif_prefs = me.notif_prefs || { mode: 'weekly', types: {} };
   me.notif_prefs.types = me.notif_prefs.types || {};
   const prefs = me.notif_prefs;
   const saveNotif = () => guard(() => API.saveNotifPrefs(prefs));
@@ -817,14 +823,22 @@ function renderSettings(app) {
               <button class="btn-sm btn-sm-sage" id="bt-set-dname-save">Save</button>
             </div>
           </div>
+          <div class="sp-field">
+            <div class="sp-field-label">Time zone</div>
+            <div style="display:flex;gap:8px">
+              <select class="sp-select" id="bt-set-tz"></select>
+              <button type="button" class="btn-sm btn-sm-ghost" id="bt-set-tz-detect">Detect</button>
+            </div>
+            <div class="sp-row-sub" style="padding:6px 0 0">Used for due-date reminders and daily summaries. Defaults to US&nbsp;Pacific.</div>
+          </div>
         </div>
 
         <div class="sp-section">
           <div class="sp-label">Notifications</div>
           <div class="sp-field">
-            <div class="sp-field-label">When something happens</div>
+            <div class="sp-field-label">How often should we email you?</div>
             <div class="bt-seg" id="bt-notif-mode">
-              ${[['immediate', 'Right away'], ['weekly', 'Weekly digest'], ['off', 'Off']]
+              ${[['immediate', 'Right away'], ['weekly', 'Weekly digest'], ['off', 'Never']]
                 .map(
                   ([v, l]) =>
                     `<button type="button" data-nmode="${v}" class="bt-seg-btn${
@@ -842,7 +856,7 @@ function renderSettings(app) {
                 role="switch" aria-checked="${!!prefs.types[k]}" aria-label="${l}"></button>
             </div>`
           ).join('')}
-          <div class="sp-row-sub" style="padding:8px 20px 0">In-app notifications always show. “Right away” also emails immediately; “Weekly digest” sends one summary each Sunday.</div>
+          <div class="sp-row-sub" style="padding:8px 20px 0">In-app notifications always show. “Weekly digest” (the default) sends one summary each Sunday; “Right away” emails as things happen; “Never” turns email off. The toggles choose what counts as a notification at all.</div>
         </div>
 
         <div class="sp-section">
@@ -933,6 +947,46 @@ function renderSettings(app) {
     await guard(() => API.updateProfile({ display_name: v || null }));
     state.me.user.display_name = v || null;
     toast('Display name saved');
+  });
+
+  // Time zone — a native <select> of IANA zones, plus a Detect button.
+  const tzSel = el.querySelector('#bt-set-tz');
+  const tzList =
+    typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+  const cur = u.timezone || '';
+  tzSel.innerHTML =
+    '<option value="">Default (US Pacific)</option>' +
+    (cur && !tzList.includes(cur) ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : '') +
+    tzList
+      .map(
+        (z) =>
+          `<option value="${esc(z)}"${z === cur ? ' selected' : ''}>${esc(z.replace(/_/g, ' '))}</option>`
+      )
+      .join('');
+  on(el, '#bt-set-tz', 'change', async () => {
+    const v = tzSel.value || null;
+    try {
+      await guard(() => API.setTimezone(v));
+      state.me.user.timezone = v;
+      toast('Time zone saved');
+    } catch {
+      /* toast already shown */
+    }
+  });
+  on(el, '#bt-set-tz-detect', 'click', () => {
+    let z;
+    try {
+      z = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      z = null;
+    }
+    if (!z) return toast("Couldn't detect your time zone");
+    if (![...tzSel.options].some((o) => o.value === z)) {
+      tzSel.add(new Option(z.replace(/_/g, ' '), z));
+    }
+    if (tzSel.value === z) return toast(`Already set to ${z.replace(/_/g, ' ')}`);
+    tzSel.value = z;
+    tzSel.dispatchEvent(new Event('change'));
   });
   on(el, '#bt-notif-mode [data-nmode]', 'click', (e) => {
     prefs.mode = e.currentTarget.dataset.nmode;
@@ -1107,6 +1161,56 @@ function initials(name) {
 }
 const avatarEl = (nameForInitials, extra = '') =>
   `<span class="bt-avatar ${extra}">${esc(initials(nameForInitials))}</span>`;
+
+// Resolve a user id to a display name from a project bundle's collaborator list.
+function collabName(b, userId) {
+  const c = (b.collaborators || []).find((x) => x.user_id === userId);
+  if (!c) return null;
+  return c.name || (c.email ? c.email.split('@')[0] : '@?');
+}
+
+// A small floating menu of the project's collaborators, anchored under `anchor`.
+// Picking one assigns the step; "Unassign" clears it.
+function openAssigneeMenu(anchor, b, s, rerender) {
+  document.querySelector('.bt-assignee-menu')?.remove();
+  const menu = h('<div class="bt-assignee-menu"></div>');
+  const pick = async (uid) => {
+    menu.remove();
+    document.removeEventListener('click', onDoc, true);
+    try {
+      await guard(() => API.updateStep(b.project.id, s.id, { assignee_id: uid }));
+    } catch {
+      return;
+    }
+    rerender();
+  };
+  (b.collaborators || []).forEach((c) => {
+    const name = c.name || (c.email ? c.email.split('@')[0] : '@?');
+    const item = h(
+      `<button class="bt-assignee-item${s.assignee_id === c.user_id ? ' is-sel' : ''}">${avatarEl(
+        name
+      )}<span>${esc(name)}</span></button>`
+    );
+    item.addEventListener('click', () => pick(c.user_id));
+    menu.appendChild(item);
+  });
+  if (s.assignee_id) {
+    const un = h('<button class="bt-assignee-item bt-assignee-clear">Unassign</button>');
+    un.addEventListener('click', () => pick(null));
+    menu.appendChild(un);
+  }
+  const r = anchor.getBoundingClientRect();
+  menu.style.top = window.scrollY + r.bottom + 4 + 'px';
+  menu.style.left = Math.max(8, window.scrollX + r.right - 190) + 'px';
+  document.body.appendChild(menu);
+  const onDoc = (e) => {
+    if (!menu.contains(e.target) && e.target !== anchor) {
+      menu.remove();
+      document.removeEventListener('click', onDoc, true);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', onDoc, true), 0);
+}
 
 function openProfile(handle) {
   if (!handle) return;
@@ -2931,6 +3035,10 @@ function notifLine(n) {
       return `${who} commented on your listing${p}`;
     case 'board_reply':
       return `${who} replied to your comment${p}`;
+    case 'step_assigned':
+      return `${who} assigned you a step${p}`;
+    case 'step_due':
+      return `Due soon${p}`;
     default:
       return 'New activity';
   }
@@ -2938,6 +3046,13 @@ function notifLine(n) {
 function notifNav(n) {
   if (n.type === 'follow' && n.actor) return () => openProfile(n.actor.handle);
   if (n.subject_type === 'listing' && n.subject_id) return () => openListing(n.subject_id);
+  if (n.subject_type === 'step') {
+    return () => {
+      state.view = 'home';
+      state.homeMode = 'mine';
+      renderApp();
+    };
+  }
   return null;
 }
 
@@ -3196,10 +3311,59 @@ function renderApp() {
   const main = h(`<div class="project-list${state.view === 'home' ? ' is-home' : ''}"></div>`);
   app.appendChild(main);
   if (state.view === 'home') renderHome(main);
+  else if (state.view === 'archived') renderArchived(main);
   else if (state.view === 'next') renderNext(main);
   else if (state.view === 'inbox') renderInbox(main);
   else if (state.view === 'review') renderReview(main);
   else if (state.view === 'board') renderBoard(main);
+}
+
+// ── Archived projects ─────────────────────────────────────────────────────
+async function renderArchived(main) {
+  main.replaceChildren(h('<div class="empty">Loading…</div>'));
+  let projects;
+  try {
+    ({ projects } = await guard(() => API.listProjects({ archived: true })));
+  } catch {
+    return;
+  }
+
+  const wrap = h('<div></div>');
+  const bar = h(
+    `<div class="detail-topbar"><button class="detail-back" id="bt-arch-back">← Back</button></div>`
+  );
+  on(bar, '#bt-arch-back', 'click', () => {
+    state.view = 'home';
+    renderApp();
+  });
+  wrap.appendChild(bar);
+  wrap.appendChild(h('<h1 class="detail-title">Archived</h1>'));
+
+  if (!projects.length) {
+    wrap.appendChild(h('<div class="empty">No archived projects.</div>'));
+  } else {
+    const grid = h('<div class="cards-grid"></div>');
+    projects.forEach((p) => {
+      const card = projectCard(p);
+      const un = h(
+        '<button class="btn-sm btn-sm-ghost" style="margin-top:8px">Unarchive</button>'
+      );
+      un.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+          await guard(() => API.updateProject(p.id, { archived: false }));
+        } catch {
+          return;
+        }
+        toast('Unarchived');
+        renderArchived(main);
+      });
+      card.appendChild(un);
+      grid.appendChild(card);
+    });
+    wrap.appendChild(grid);
+  }
+  main.replaceChildren(wrap);
 }
 
 // ── Home / project list ────────────────────────────────────────────────────
@@ -3284,8 +3448,9 @@ async function renderHome(main) {
 
   const modes = h(`
     <div class="bt-home-modes">
-      <button class="bt-home-mode${state.homeMode !== 'quick' ? ' active' : ''}" data-mode="projects">Projects</button>
+      <button class="bt-home-mode${state.homeMode === 'projects' ? ' active' : ''}" data-mode="projects">Projects</button>
       <button class="bt-home-mode${state.homeMode === 'quick' ? ' active' : ''}" data-mode="quick">Quick tasks</button>
+      <button class="bt-home-mode${state.homeMode === 'mine' ? ' active' : ''}" data-mode="mine">My tasks</button>
     </div>
   `);
   on(modes, '.bt-home-mode', 'click', (e) => {
@@ -3296,6 +3461,11 @@ async function renderHome(main) {
 
   if (state.homeMode === 'quick') {
     renderQuickTasks(wrap, review);
+    main.replaceChildren(wrap);
+    return;
+  }
+  if (state.homeMode === 'mine') {
+    await renderMyTasks(wrap);
     main.replaceChildren(wrap);
     return;
   }
@@ -3313,6 +3483,14 @@ async function renderHome(main) {
     });
     statusTabs.appendChild(b);
   });
+  const archTab = h(
+    `<button class="tab" style="--tab-color:var(--text-muted)">Archived</button>`
+  );
+  archTab.addEventListener('click', () => {
+    state.view = 'archived';
+    renderApp();
+  });
+  statusTabs.appendChild(archTab);
   wrap.appendChild(statusTabs);
 
   const catFilters = [['all', 'All']];
@@ -3448,6 +3626,56 @@ function renderQuickTasks(wrap, review) {
   wrap.appendChild(list);
 }
 
+// Home "My tasks" — open leaf steps assigned to me across every project.
+async function renderMyTasks(wrap) {
+  let tasks;
+  try {
+    ({ tasks } = await guard(() => API.getTasks()));
+  } catch {
+    return;
+  }
+  if (!tasks.length) {
+    wrap.appendChild(
+      h('<div class="empty">Nothing is assigned to you. Steps you\'re given on shared projects show up here.</div>')
+    );
+    return;
+  }
+  const list = h('<div class="next-wrap"></div>');
+  tasks.forEach((t) => {
+    const tail = [t.due_date ? 'due ' + fmtDate(t.due_date) : '', t.estimate_minutes ? '~' + fmtDuration(t.estimate_minutes) : '']
+      .filter(Boolean)
+      .join(' · ');
+    const row = h(`
+      <div class="next-row" data-step="${t.id}">
+        <button class="checkbox" aria-label="Mark done"></button>
+        <div class="next-row-main">
+          <div class="next-row-title">${crumb(t.title)}</div>
+          <div class="next-row-sub">${esc(t.project_title)}${tail ? ' · ' + esc(tail) : ''}</div>
+        </div>
+      </div>
+    `);
+    row.querySelector('.next-row-main').addEventListener('click', () => openProject(t.project_id));
+    row.querySelector('.checkbox').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      row.classList.add('done');
+      try {
+        await API.updateStep(t.project_id, t.id, { completed: true });
+      } catch {
+        row.classList.remove('done');
+        toast('Could not update');
+        return;
+      }
+      state.doneThisSession++;
+      setTimeout(() => {
+        row.remove();
+        if (!list.querySelector('.next-row')) renderApp();
+      }, 320);
+    });
+    list.appendChild(row);
+  });
+  wrap.appendChild(list);
+}
+
 function projectCard(p) {
   const total = p.step_count || 0;
   const done = p.step_done || 0;
@@ -3475,8 +3703,15 @@ function projectCard(p) {
     </div>
   `);
   const open = () => openProject(p.id);
-  card.addEventListener('click', open);
+  card.addEventListener('click', (e) => {
+    // Let a nested control (e.g. the Unarchive button on the Archived view)
+    // handle its own activation instead of opening the project.
+    if (e.target.closest('button, a, input, select, textarea, label')) return;
+    open();
+  });
   card.addEventListener('keydown', (e) => {
+    // Only the card itself Enter/Space-activates — not a focused child button.
+    if (e.target !== card) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       open();
@@ -3531,7 +3766,12 @@ async function openProjectForm(existing, opts = {}) {
           </div>
           ${
             existing && existing.role === 'owner'
-              ? '<button type="button" class="btn-sm btn-danger" data-delete style="margin-top:18px">Delete project</button>'
+              ? `<div style="display:flex;gap:8px;margin-top:18px">
+            <button type="button" class="btn-sm btn-sm-ghost" data-archive>${
+              existing.archived_at ? 'Unarchive' : 'Archive'
+            }</button>
+            <button type="button" class="btn-sm btn-danger" data-delete>Delete project</button>
+          </div>`
               : ''
           }
         </form>
@@ -3554,6 +3794,29 @@ async function openProjectForm(existing, opts = {}) {
     state.view = 'home';
     state.project = null;
     renderApp();
+  });
+  on(overlay, '[data-archive]', 'click', async () => {
+    const archiving = !existing.archived_at;
+    if (archiving) {
+      const ok = await btConfirm(
+        `Archive “${existing.title}”? It leaves your project lists and any board listing is closed. You can bring it back any time.`,
+        { ok: 'Archive' }
+      );
+      if (!ok) return;
+    }
+    try {
+      await guard(() => API.updateProject(existing.id, { archived: archiving }));
+    } catch {
+      return;
+    }
+    close();
+    if (archiving) {
+      state.view = 'home';
+      state.project = null;
+      renderApp();
+    } else {
+      openProject(existing.id);
+    }
   });
   on(overlay, '.modal-close, [data-cancel]', 'click', close);
   overlay.addEventListener('click', (e) => {
@@ -3945,6 +4208,8 @@ function renderProject(app) {
       <div class="detail-body">
         <div class="detail-topbar">
           <button class="detail-back" id="bt-back">← Back</button>
+          <button class="detail-back" id="bt-printproj">Print</button>
+          <button class="detail-back" id="bt-dupproj">Duplicate</button>
           ${canEdit ? '<button class="detail-back" id="bt-editproj">Edit</button>' : ''}
         </div>
         <h1 class="detail-title">${esc(p.title)}</h1>
@@ -4003,6 +4268,22 @@ function renderProject(app) {
   );
   if (canEdit) on(view, '#bt-editproj', 'click', () => openProjectForm(p));
   view.querySelector('#bt-sessions-slot').appendChild(sessionsBlock(b));
+  on(view, '#bt-printproj', 'click', () => window.open('/api/projects/' + p.id + '/print', '_blank'));
+  on(view, '#bt-dupproj', 'click', async () => {
+    const ok = await btConfirm(
+      `Duplicate “${p.title}”? Its steps, supplies and links copy into a new project you own — the timeline and collaborators don't come along.`,
+      { ok: 'Duplicate' }
+    );
+    if (!ok) return;
+    let res;
+    try {
+      res = await guard(() => API.duplicateProject(p.id));
+    } catch {
+      return;
+    }
+    toast('Project duplicated');
+    openProject(res.id);
+  });
   renderPickup(view.querySelector('#bt-pickup-box'), canEdit);
   on(view, '[data-tab]', 'click', (e) => {
     state.detailTab = e.currentTarget.dataset.tab;
@@ -4103,8 +4384,26 @@ function stepsPanel(b, canEdit) {
   const wrap = h('<div class="detail-panel"></div>');
   const rerender = refreshDetail;
   const tree = stepTree(b.steps);
-  const open = tree.top.filter((s) => !s.completed);
+  let open = tree.top.filter((s) => !s.completed);
   const done = tree.top.filter((s) => s.completed);
+
+  const multiPerson = (b.collaborators || []).length > 1;
+  if (multiPerson) {
+    // Drop a stale filter that points at someone no longer on this project
+    // (switched projects, or the collaborator was removed) so it can't silently
+    // empty the list with no active chip to explain why.
+    const af0 = state.stepFilterAssignee;
+    if (af0 && af0 !== 'all' && af0 !== 'me' && !b.collaborators.some((c) => c.user_id === af0)) {
+      state.stepFilterAssignee = 'all';
+    }
+    const af = state.stepFilterAssignee || 'all';
+    const wanted = af === 'me' ? state.me.user.id : af;
+    if (af !== 'all') {
+      const hit = (st) => st.assignee_id === wanted;
+      open = open.filter((s) => hit(s) || tree.kidsOf(s.id).some(hit));
+    }
+    wrap.appendChild(assigneeFilterRow(b));
+  }
 
   wrap.appendChild(
     sectionHeader('Steps', open.length, canEdit ? () => openStepForm(b, null, rerender) : null)
@@ -4115,6 +4414,8 @@ function stepsPanel(b, canEdit) {
     listEl.appendChild(
       h(`<div class="empty-section">${canEdit ? 'No steps yet — add the first one.' : 'No steps yet.'}</div>`)
     );
+  } else if (!open.length && multiPerson && state.stepFilterAssignee !== 'all') {
+    listEl.appendChild(h('<div class="empty-section">No open steps for that person.</div>'));
   }
   open.forEach((s) => listEl.appendChild(stepBlock(b, s, tree, canEdit, rerender)));
   wrap.appendChild(listEl);
@@ -4133,6 +4434,30 @@ function stepsPanel(b, canEdit) {
     wrap.appendChild(doneList);
   }
   return wrap;
+}
+
+// "Everyone · Me · <name>…" — narrows the step list by assignee. Shown only on
+// projects with more than one collaborator.
+function assigneeFilterRow(b) {
+  const cur = state.stepFilterAssignee || 'all';
+  const opts = [
+    ['all', 'Everyone'],
+    ['me', 'Me'],
+    ...(b.collaborators || [])
+      .filter((c) => c.user_id !== state.me.user.id)
+      .map((c) => [c.user_id, c.name || (c.email ? c.email.split('@')[0] : '@?')]),
+  ];
+  const rowEl = h('<div class="tabs bt-assignee-filter" style="margin-bottom:10px"></div>');
+  opts.forEach(([v, label]) => {
+    const bn = h(`<button class="tab${cur === v ? ' active' : ''}">${esc(label)}</button>`);
+    bn.addEventListener('click', () => {
+      state.stepFilterAssignee = v;
+      const panel = document.getElementById('bt-panel');
+      if (panel) renderPanel(panel);
+    });
+    rowEl.appendChild(bn);
+  });
+  return rowEl;
 }
 
 // A top-level step plus, if it's a container, its sub-steps indented beneath.
@@ -4163,6 +4488,18 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
 
   const boxDisabled = !canEdit || isContainer;
   const showBash = canEdit && !isChild;
+  const multiPerson = (b.collaborators || []).length > 1;
+  const assigneeNm = s.assignee_id ? collabName(b, s.assignee_id) : null;
+  const showAssignee = multiPerson || !!s.assignee_id;
+  const assigneeHtml = !showAssignee
+    ? ''
+    : assigneeNm
+      ? `<button class="step-assignee" title="Assigned to ${esc(assigneeNm)}" aria-label="Assigned to ${esc(
+          assigneeNm
+        )}">${avatarEl(assigneeNm)}</button>`
+      : canEdit
+        ? `<button class="step-assignee step-assignee-empty" title="Assign" aria-label="Assign this step">+</button>`
+        : '';
   const row = h(`
     <div class="check-row${s.completed ? ' checked' : ''}${isChild ? ' is-child' : ''}${
       isContainer ? ' is-container' : ''
@@ -4174,6 +4511,7 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
         <div class="check-title">${esc(s.title)}</div>
         ${bits.length ? `<div class="check-sub">${bits.join(' · ')}</div>` : ''}
       </div>
+      ${assigneeHtml}
       ${
         showBash
           ? `<button class="step-bash" title="${
@@ -4192,6 +4530,10 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
       });
     }
     on(row, '.check-content', 'click', () => openStepForm(b, s, rerender, { isContainer }));
+    on(row, '.step-assignee', 'click', (e) => {
+      e.stopPropagation();
+      openAssigneeMenu(e.currentTarget, b, s, rerender);
+    });
     if (showBash) {
       on(row, '.step-bash', 'click', (e) => {
         e.stopPropagation();

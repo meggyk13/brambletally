@@ -13,10 +13,14 @@ later work.
 
 A **tally** is a medieval accounting tool — a notched stick for tracking debts
 and stores. "Brambletally" reads as *a keeping-book kept in the hedgerow*. The
-app is a **workshop ledger for makers** — craft, research, A&S, event work.
+app is a **workshop ledger for makers** — sewing and costuming, research, event
+prep, household work, admin. (It grew out of SCA use and still speaks to it,
+but the product is no longer SCA-specific — see `plan.md` "Audience". The
+vocabulary in the UI stays plain; the *look* below is the part that leans
+old-world, and that's a deliberate skin, not an audience filter.)
 
-Aesthetic: cottagecore / fantasy / LARP / SCA. Visual language is woodcut and
-linocut, botanical marginalia, iron-gall ink on parchment, guild inventory
+Aesthetic: cottagecore / fantasy / folk-medieval. Visual language is woodcut
+and linocut, botanical marginalia, iron-gall ink on parchment, guild inventory
 rolls. Muted and earthy. Never bright, never "SaaS dashboard". Calm motion.
 
 What changes from today:

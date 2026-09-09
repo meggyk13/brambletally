@@ -22,10 +22,13 @@ import * as collaborators from './api/projects/id/collaborators.js';
 import * as transfer from './api/projects/id/transfer.js';
 import * as projectSessions from './api/projects/id/sessions.js';
 import * as projectSession from './api/projects/id/sessions/sessionId.js';
+import * as duplicate from './api/projects/id/duplicate.js';
+import * as projectPrint from './api/projects/id/print.js';
 import * as sessionsList from './api/sessions.js';
 import * as sessionDetail from './api/sessions/id.js';
 import * as calendarFeed from './api/calendar/token.js';
 import * as review from './api/review.js';
+import * as tasks from './api/tasks.js';
 import * as search from './api/search.js';
 import * as categories from './api/categories/index.js';
 import * as category from './api/categories/categoryId.js';
@@ -65,6 +68,7 @@ import * as settingsNotifPrefs from './api/settings/notif-prefs.js';
 import * as settingsExport from './api/settings/export.js';
 import * as settingsEmail from './api/settings/email.js';
 import * as settingsCalendarToken from './api/settings/calendar-token.js';
+import * as settingsTimezone from './api/settings/timezone.js';
 import * as legalAccept from './api/legal/accept.js';
 import * as account from './api/account.js';
 
@@ -89,11 +93,14 @@ export const routes = [
   ['/api/projects/:id/transfer', transfer],
   ['/api/projects/:id/sessions', projectSessions],
   ['/api/projects/:id/sessions/:sessionId', projectSession],
+  ['/api/projects/:id/duplicate', duplicate],
+  ['/api/projects/:id/print', projectPrint],
 
   ['/api/sessions', sessionsList],
   ['/api/sessions/:id', sessionDetail],
   ['/api/calendar/:token', calendarFeed],
   ['/api/review', review],
+  ['/api/tasks', tasks],
   ['/api/search', search],
   ['/api/categories', categories],
   ['/api/categories/:categoryId', category],
@@ -136,6 +143,7 @@ export const routes = [
   ['/api/settings/export', settingsExport],
   ['/api/settings/email', settingsEmail],
   ['/api/settings/calendar-token', settingsCalendarToken],
+  ['/api/settings/timezone', settingsTimezone],
   ['/api/legal/accept', legalAccept],
   ['/api/account', account],
 ];

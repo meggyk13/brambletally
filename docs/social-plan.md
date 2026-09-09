@@ -164,9 +164,16 @@ perks that cost money (R2 storage, Resend volume) are what the tier offsets.
 | Projects / steps / supplies / journal / links / collaboration | unlimited | unlimited |
 | Project photos (Phase 4) | 10 / project | 30 / project |
 | Avatar (Phase 4) | initials | uploaded image |
-| Email notifications (Phase 3) | weekly digest | immediate |
+| Email notification frequency | any of Right away / Weekly digest / Never — **default Weekly digest** | same (see note) |
 | Active board listings (Phase 3) | 1 | 3 |
 | Profile badge + accent colour | — | yes |
+
+**Note (2026-09-08):** email frequency is no longer a Supporter gate. Every
+user picks Right away / Weekly digest / Never; the default is Weekly digest.
+The earlier plan (free = digest only, immediate = Supporter perk) is dropped —
+gating a checkbox that mostly *reduces* our Resend cost made little sense. If a
+paid perk is wanted here later, a **daily digest** tier or **per-type
+immediate overrides** are better candidates.
 
 ### Deferred until there are users
 
@@ -705,20 +712,27 @@ shared project and everyone's access with it.
   request decided (to requester), comment on your listing (to owner), reply to
   your comment (to parent author). Skip if actor is blocked by recipient or
   recipient's `notif_prefs` disables that type.
-- **Immediate mode:** send the email in `ctx.waitUntil()` right after the
+- Email frequency is one `mode` value, surfaced in Settings as a **frequency**
+  choice: "How often should we email you?" — **Right away** (`immediate`) ·
+  **Weekly digest** (`weekly`) · **Never** (`off`).
+- **`immediate`:** send the email in `ctx.waitUntil()` right after the
   insert, using the existing Resend helper (generalize `sendMagicLink` into a
   `sendEmail(env, {to, subject, text, html})` in `worker/api/lib/email.js`).
   Stamp `emailed_at`.
-- **Weekly-digest mode:** a Cron Trigger (add to `wrangler.jsonc`) fires
+- **`weekly`:** a Cron Trigger (add to `wrangler.jsonc`) fires
   **Sunday 08:00 PT**, site-wide. Cloudflare cron is UTC-only with no DST: use
   `0 15 * * 0` and accept a one-hour drift across the DST boundary (08:00 PDT /
   07:00 PST), or nudge the entry twice a year. It groups each user's rows with
   `emailed_at IS NULL` (and `mode='weekly'`), sends one summary email, stamps
   `emailed_at`. Up to a week of activity per mail: group by type, cap the
   detail lines, link to the app for the rest.
-- `notif_prefs` default: `{ mode: 'immediate', types: { follow: true,
-  contributor_request: true, contributor_decided: true, board_comment: true,
-  board_reply: true } }`. `mode` is one of `immediate` | `weekly` | `off`.
+- **`notif_prefs` default (revised 2026-09-08):**
+  `{ mode: 'weekly', types: { …all true } }`. Was `mode: 'immediate'`; flipped
+  to `weekly` so a new account gets **in-app notifications plus the one Sunday
+  digest and no immediate mail** until they opt in — conservative while volume
+  against Resend's ~100/day free cap is unproven. The personal-utility batch
+  (`plan.md` → D) makes this change and adds the `step_due` / `step_assigned`
+  types to the list. Revisit the default once there's usage data.
 - In-app: unread count from `notifications` in the app header; a dropdown list.
   Independent of `mode` — turning email off doesn't stop in-app notifications.
 
