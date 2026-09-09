@@ -773,13 +773,15 @@ const NOTIF_TYPE_LABELS = [
   ['contributor_decided', 'Your request is accepted or declined'],
   ['board_comment', 'Comment on your board listing'],
   ['board_reply', 'Reply to your comment'],
+  ['step_assigned', 'A step is assigned to you'],
+  ['step_due', 'Reminders for steps due soon'],
 ];
 
 function renderSettings(app) {
   app.replaceChildren();
   const me = state.me;
   const u = me.user;
-  me.notif_prefs = me.notif_prefs || { mode: 'immediate', types: {} };
+  me.notif_prefs = me.notif_prefs || { mode: 'weekly', types: {} };
   me.notif_prefs.types = me.notif_prefs.types || {};
   const prefs = me.notif_prefs;
   const saveNotif = () => guard(() => API.saveNotifPrefs(prefs));
@@ -834,9 +836,9 @@ function renderSettings(app) {
         <div class="sp-section">
           <div class="sp-label">Notifications</div>
           <div class="sp-field">
-            <div class="sp-field-label">When something happens</div>
+            <div class="sp-field-label">How often should we email you?</div>
             <div class="bt-seg" id="bt-notif-mode">
-              ${[['immediate', 'Right away'], ['weekly', 'Weekly digest'], ['off', 'Off']]
+              ${[['immediate', 'Right away'], ['weekly', 'Weekly digest'], ['off', 'Never']]
                 .map(
                   ([v, l]) =>
                     `<button type="button" data-nmode="${v}" class="bt-seg-btn${
@@ -854,7 +856,7 @@ function renderSettings(app) {
                 role="switch" aria-checked="${!!prefs.types[k]}" aria-label="${l}"></button>
             </div>`
           ).join('')}
-          <div class="sp-row-sub" style="padding:8px 20px 0">In-app notifications always show. “Right away” also emails immediately; “Weekly digest” sends one summary each Sunday.</div>
+          <div class="sp-row-sub" style="padding:8px 20px 0">In-app notifications always show. “Weekly digest” (the default) sends one summary each Sunday; “Right away” emails as things happen; “Never” turns email off. The toggles choose what counts as a notification at all.</div>
         </div>
 
         <div class="sp-section">

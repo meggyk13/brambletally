@@ -38,6 +38,11 @@ export function notifCopy(type, actorName, preview) {
         subject: `${actorName} assigned you a step`,
         line: `${actorName} assigned you a step${q}.`,
       };
+    case 'step_due':
+      return {
+        subject: preview ? `Due soon: ${preview}` : 'A step is due soon',
+        line: preview ? `“${preview}” is due soon.` : 'You have a step due soon.',
+      };
     default:
       return { subject: 'New activity on Brambletally', line: 'You have new activity.' };
   }

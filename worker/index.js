@@ -8,6 +8,7 @@ import { routes } from './routes.js';
 import { loadSession } from './api/session.js';
 import { error } from './api/lib/http.js';
 import { runWeeklyDigest } from './api/lib/digest.js';
+import { runDueReminders } from './api/lib/reminders.js';
 import { needsTos } from './api/lib/legal.js';
 
 // Reachable while a sanction / acceptance gate is in force: sign-in state, a
@@ -128,14 +129,23 @@ export default {
     return res;
   },
 
-  // Cron Trigger. wrangler.jsonc schedules "0 15 * * 0" — Sunday 15:00 UTC,
-  // roughly 08:00 America/Los_Angeles (drifts one hour across the DST boundary;
-  // Cloudflare cron has no timezone support).
+  // Cron Triggers (wrangler.jsonc):
+  //   "0 15 * * 0" — Sunday 15:00 UTC ≈ 08:00 America/Los_Angeles — weekly digest
+  //   "0 12 * * *" — daily 12:00 UTC — due-date reminders
+  // Cloudflare cron has no timezone support, hence the DST drift on the weekly.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(
-      runWeeklyDigest(env).catch((e) =>
-        console.error('[brambletally] weekly digest failed', e)
-      )
-    );
+    if (event.cron === '0 12 * * *') {
+      ctx.waitUntil(
+        runDueReminders(env, ctx).catch((e) =>
+          console.error('[brambletally] due reminders failed', e)
+        )
+      );
+    } else {
+      ctx.waitUntil(
+        runWeeklyDigest(env).catch((e) =>
+          console.error('[brambletally] weekly digest failed', e)
+        )
+      );
+    }
   },
 };

@@ -11,10 +11,11 @@
     "directory": "./dist",
     "binding": "ASSETS"
   },
-  // Sunday 15:00 UTC ≈ 08:00 America/Los_Angeles — the weekly notification
-  // digest (worker/api/lib/digest.js via the scheduled() handler).
+  // "0 15 * * 0": Sunday 15:00 UTC ≈ 08:00 America/Los_Angeles — weekly digest.
+  // "0 12 * * *": daily 12:00 UTC — due-date reminders.
+  // Both dispatched from the scheduled() handler in worker/index.js.
   "triggers": {
-    "crons": ["0 15 * * 0"]
+    "crons": ["0 15 * * 0", "0 12 * * *"]
   },
   "d1_databases": [
     {
