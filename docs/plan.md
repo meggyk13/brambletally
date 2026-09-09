@@ -643,8 +643,12 @@ after PR #18 merged, 2026-09-08.** Eight feature commits: A category rework,
 migration `0013`, B timezone, F archive, C duplicate, G assignee, D reminders +
 email-default flip, E printable export. Each backend path unit-tested against
 `node:sqlite`; B/C/F/G/E browser-verified against `wrangler dev` (incl. after
-the rebase). **Not built:** H (inline editing) — its own follow-on, surfaces
-land independently. **Still open:** run
+the rebase). **H (inline editing) built on `h-inline-editing`, off `main`
+post-#19, 2026-09-08** — seven frontend commits: the `inlineEdit` / `popover`
+helpers, then step title, step due-date, step estimate, project title,
+project status + category, project description. Journal-entry edit was
+**dropped** from H (it would need a new journal PATCH route, and H is
+frontend-only); revisit separately. **Still open:** run
 `migrations/0013_personal_utility.sql` against prod D1 after merge; E's
 `work_sessions`-based "upcoming focus sessions" summary stat is still a TODO
 (the table now exists post-#18).
@@ -920,6 +924,14 @@ per-person capacity, no reassignment history.
 
 ### H. Inline editing (frontend only, no schema, no API change)
 
+**Built on `h-inline-editing` (off `main` post-#19), 2026-09-08.** Helpers plus
+six surfaces below. `inlineEdit` gained a `placeholder` option (a field with a
+placeholder is clearable; without one an empty value reverts). The chip cluster
+was factored into a `dueChips()` helper shared by the popover and
+`openStepForm`. Step assignee was already inline (shipped with G,
+`openAssigneeMenu`). Journal-entry edit was **dropped** — no journal PATCH
+route and H is frontend-only. Supply `acquired` was already a direct toggle.
+
 Today every edit is a `.modal-overlay` (bottom sheet on phones, centred dialog
 wider — `public/app.css:1440`). Only `quickAddRow`, `appearanceControls`, and
 search suggest are inline. Convert the **frequent single-field** edits to
@@ -953,8 +965,8 @@ Not one commit — each surface below is independent and can land on its own.
 | **Project status** | A `<select>` styled inline in the header (or a `popover`), `PATCH` on change — no form. |
 | **Project category** | Inline `<select>` in the header, same as status; keeps the "＋ New category…" option → falls back to `btPrompt`, not the full sheet. |
 | **Project description / notes** | Inline `<textarea>` on the detail view that saves on blur. *(Phone caveat: a bottom-anchored textarea can sit under the keyboard — if it's bad in testing, leave these two in the sheet.)* |
-| **Journal entry edit** | Tap an entry → `inlineEdit` multiline. |
-| **Supply `acquired`** | Already a checkbox — confirm it's a direct toggle, not a form open. |
+| ~~**Journal entry edit**~~ | Dropped — needs a journal PATCH route; H is frontend-only. Revisit separately. |
+| **Supply `acquired`** | Already a direct checkbox toggle (`suppliesPanel`). No change. |
 
 #### Keep as a sheet / dialog
 
