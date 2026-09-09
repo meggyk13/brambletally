@@ -8,6 +8,20 @@ import { routes } from './routes.js';
 import { loadSession } from './api/session.js';
 import { error } from './api/lib/http.js';
 import { runWeeklyDigest } from './api/lib/digest.js';
+import { needsTos } from './api/lib/legal.js';
+
+// Reachable while a sanction / acceptance gate is in force: sign-in state, a
+// way out, and the data-subject routes (export, delete) which must never be
+// walled off.
+const DISABLED_OK = new Set([
+  '/api/auth/me',
+  '/api/auth/logout',
+  '/api/auth/email-change',
+  '/api/settings/export',
+  '/api/account',
+]);
+// The above, plus the accept endpoint itself.
+const TOS_OK = new Set([...DISABLED_OK, '/api/legal/accept']);
 
 // decodeURIComponent throws on a malformed %-escape; a bad path segment should
 // just fail to match (-> 404), never crash the request.
@@ -76,17 +90,26 @@ export default {
       console.error('[brambletally] session load failed', e);
     }
 
-    // Hard sanction: a by-hand D1 edit to users.disabled_at 403s every route
-    // except the two the client needs to show the "suspended" screen and leave.
-    // Data-subject routes (export, delete) get added to the allowlist when they
-    // ship in Phase 1b.
+    // Hard sanction: users.disabled_at 403s every route except the ones the
+    // client needs to show the "suspended" screen, leave, and exercise
+    // data-subject rights (export, delete).
     if (
       context.data.user &&
       context.data.user.disabled_at &&
-      url.pathname !== '/api/auth/me' &&
-      url.pathname !== '/api/auth/logout'
+      !DISABLED_OK.has(url.pathname)
     ) {
       return error(403, 'This account is suspended');
+    }
+
+    // Acceptance gate: a signed-in user who hasn't accepted the current Terms
+    // is held to the same small allowlist until they do. The client renders the
+    // acceptance screen off the needs_tos flag on /api/auth/me.
+    if (
+      context.data.user &&
+      needsTos(context.data.user) &&
+      !TOS_OK.has(url.pathname)
+    ) {
+      return error(403, 'Accept the current Terms to continue', { needs_tos: true });
     }
 
     let res;

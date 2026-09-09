@@ -127,6 +127,17 @@ const API = {
   addJournal: (pid, text) =>
     api(`/api/projects/${pid}/journal`, { method: 'POST', body: { text } }),
 
+  projectSessions: (pid) => api(`/api/projects/${pid}/sessions`),
+  addSession: (pid, b) => api(`/api/projects/${pid}/sessions`, { method: 'POST', body: b }),
+  updateSession: (pid, sid, b) =>
+    api(`/api/projects/${pid}/sessions/${sid}`, { method: 'PATCH', body: b }),
+  deleteSession: (pid, sid) =>
+    api(`/api/projects/${pid}/sessions/${sid}`, { method: 'DELETE' }),
+  mySessions: () => api('/api/sessions'),
+  getSession: (sid) => api('/api/sessions/' + encodeURIComponent(sid)),
+  getCalendarToken: () => api('/api/settings/calendar-token'),
+  regenCalendarToken: () => api('/api/settings/calendar-token', { method: 'POST' }),
+
   collaborators: (pid) => api(`/api/projects/${pid}/collaborators`),
   addCollaborator: (pid, body) =>
     api(`/api/projects/${pid}/collaborators`, { method: 'POST', body }),
@@ -152,6 +163,12 @@ const API = {
     api('/api/notifications/read', { method: 'POST', body: ids ? { ids } : {} }),
 
   board: (cursor) => api('/api/board' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  feed: (filter, cursor) =>
+    api(
+      '/api/feed?filter=' +
+        (filter === 'following' ? 'following' : 'all') +
+        (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')
+    ),
   listing: (id) => api('/api/board/' + encodeURIComponent(id)),
   createListing: (body) => api('/api/board', { method: 'POST', body }),
   updateListing: (id, body) =>
@@ -206,6 +223,8 @@ const API = {
   sanctionUser: (handle, body) =>
     api('/api/admin/users/' + encodeURIComponent(handle) + '/sanction', { method: 'POST', body }),
   saveNotifPrefs: (prefs) => api('/api/settings/notif-prefs', { method: 'PATCH', body: prefs }),
+  changeEmail: (email) => api('/api/settings/email', { method: 'POST', body: { email } }),
+  acceptTos: () => api('/api/legal/accept', { method: 'POST' }),
   deleteAccount: () => api('/api/account', { method: 'DELETE' }),
 
   listInbox: () => api('/api/inbox'),
@@ -509,6 +528,8 @@ const state = {
   filterCategory: 'all', // 'all' | 'none' | a category name
   homeMode: 'projects', // 'projects' | 'quick'
   quickCap: 30, // minutes ceiling for the Quick tasks list; Infinity = all
+  boardMode: 'listings', // 'listings' | 'activity'
+  feedFilter: 'all', // 'all' | 'following'
   project: null, // full bundle when view === 'project'
   detailTab: 'steps',
   doneThisSession: 0,
@@ -522,6 +543,12 @@ async function loadCategories() {
   }
 }
 
+const EMAIL_RESULT_MSG = {
+  changed: 'Your email address has been updated.',
+  invalid: 'That email-change link has expired or was already used.',
+  taken: 'That address was taken before you confirmed it. Nothing changed.',
+};
+
 async function boot() {
   applyTheme();
   try {
@@ -533,11 +560,47 @@ async function boot() {
     state.user = null;
   }
   render();
+
+  const params = new URLSearchParams(location.search);
+  const emailResult = params.get('email');
+  if (emailResult && EMAIL_RESULT_MSG[emailResult]) {
+    toast(EMAIL_RESULT_MSG[emailResult]);
+    params.delete('email');
+  }
+
+  // Deep link from a calendar event: open the project and, if it's about now,
+  // drop straight into the focus screen preset to that step.
+  const focusId = params.get('focus');
+  if (focusId) {
+    params.delete('focus');
+    if (state.user) {
+      try {
+        const { session } = await API.getSession(focusId);
+        await openProject(session.project_id);
+        if (state.project && sessionIsSoon(session)) {
+          openFocusSession(state.project, {
+            stepId: session.step_id,
+            planSessionId: session.status === 'planned' ? session.id : null,
+          });
+        }
+      } catch {
+        toast('That planned focus time is no longer available.');
+      }
+    }
+  }
+
+  const qs = params.toString();
+  if (location.search.slice(1) !== qs) {
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+  }
 }
 
 function render() {
   if (!state.user) return renderAuth();
   if (state.user.disabled_at) return renderSuspended();
+  // Terms first: the handle-set endpoint (and everything else) is behind the
+  // acceptance gate, so a new user must clear this before picking a handle.
+  if (state.me && state.me.needs_tos) return renderTos();
   if (state.me && state.me.needs_handle) return renderHandlePrompt();
   renderApp();
 }
@@ -612,6 +675,72 @@ function renderHandlePrompt() {
   input.focus();
 }
 
+function renderTos() {
+  const returning = !!(state.me && state.me.user && state.me.user.tos_accepted_at);
+  const el = h(`
+    <div class="bt-auth">
+      <div class="wordmark">brambletally<span>.</span></div>
+      <div class="tagline">a keeping-book for makers</div>
+      <h1>${returning ? 'Updated terms' : 'Before you start'}</h1>
+      <p class="sub">${
+        returning
+          ? 'The Terms and Acceptable Use policy have changed. Have a look and accept them to keep going.'
+          : 'Brambletally has a short set of rules — mostly "be decent on the board." Please read and accept them.'
+      }</p>
+      <div class="msg err" id="bt-tos-err" hidden></div>
+      <p class="bt-tos-links">
+        <a href="/legal/terms" target="_blank" rel="noopener">Terms of Use</a>
+        <span aria-hidden="true">·</span>
+        <a href="/legal/acceptable-use" target="_blank" rel="noopener">Acceptable Use</a>
+      </p>
+      <label class="bt-tos-check">
+        <input type="checkbox" id="bt-tos-agree" />
+        <span>I've read and agree to the Terms of Use and the Acceptable Use policy.</span>
+      </label>
+      <button class="btn-primary" id="bt-tos-submit" disabled>Accept and continue</button>
+      <a class="back" id="bt-tos-signout" href="#">Sign out</a>
+    </div>
+  `);
+  const agree = el.querySelector('#bt-tos-agree');
+  const submit = el.querySelector('#bt-tos-submit');
+  const err = el.querySelector('#bt-tos-err');
+  agree.addEventListener('change', () => {
+    submit.disabled = !agree.checked;
+    err.hidden = true;
+  });
+  submit.addEventListener('click', async () => {
+    if (!agree.checked) return;
+    submit.disabled = true;
+    submit.textContent = 'Saving…';
+    try {
+      const r = await API.acceptTos();
+      if (state.me) {
+        state.me.needs_tos = false;
+        if (state.me.user) {
+          state.me.user.tos_accepted_at = new Date().toISOString();
+          state.me.user.tos_version = r.tos_version;
+        }
+      }
+      render();
+    } catch (ex) {
+      err.textContent = ex.message || 'Could not save that just now.';
+      err.hidden = false;
+      submit.disabled = false;
+      submit.textContent = 'Accept and continue';
+    }
+  });
+  el.querySelector('#bt-tos-signout').addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+      await API.logout();
+    } catch {
+      /* ignore */
+    }
+    location.href = APP_PATH;
+  });
+  root().replaceChildren(el);
+}
+
 function renderSuspended() {
   const el = h(`
     <div class="bt-auth">
@@ -664,7 +793,10 @@ function renderSettings(app) {
 
         <div class="sp-section">
           <div class="sp-label">Account</div>
-          <div class="sp-row"><div class="sp-row-left"><div>Email<div class="sp-row-sub">${esc(u.email)}</div></div></div></div>
+          <div class="sp-row">
+            <div class="sp-row-left"><div>Email<div class="sp-row-sub">${esc(u.email)}</div></div></div>
+            <button class="btn-sm btn-sm-ghost" id="bt-set-email">Change</button>
+          </div>
           <div class="sp-row">
             <div class="sp-row-left"><div>Handle<div class="sp-row-sub">@${esc(u.handle || '')}</div></div></div>
             <button class="btn-sm btn-sm-ghost" id="bt-set-handle">Change</button>
@@ -726,6 +858,18 @@ function renderSettings(app) {
         </div>
 
         <div class="sp-section">
+          <div class="sp-label">Calendar</div>
+          <div class="sp-row-sub" style="padding:0 20px 10px">Subscribe a calendar app to your planned focus time. Add the link in Google Calendar on the web (Other calendars → From URL), or open it on iOS to subscribe.</div>
+          <div class="sp-field">
+            <div style="display:flex;gap:8px">
+              <input class="sp-input" id="bt-cal-url" readonly placeholder="Loading…" style="font-size:13px" />
+              <button class="btn-sm btn-sm-sage" id="bt-cal-copy">Copy</button>
+            </div>
+            <button class="btn-sm btn-sm-ghost" id="bt-cal-regen" style="margin-top:8px">Regenerate link</button>
+          </div>
+        </div>
+
+        <div class="sp-section">
           <div class="sp-label">Plan</div>
           <div class="sp-row"><div class="sp-row-left"><div>${
             me.supporter ? 'Supporter' : 'Free'
@@ -757,6 +901,20 @@ function renderSettings(app) {
     render();
   });
   on(el, '#bt-set-handle', 'click', openHandleChange);
+  on(el, '#bt-set-email', 'click', async () => {
+    const next = await btPrompt('New email address', '');
+    if (!next) return;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(next)) {
+      toast('Enter a valid email address');
+      return;
+    }
+    try {
+      await API.changeEmail(next);
+      toast(`Check ${next} for a link to confirm the change.`);
+    } catch (ex) {
+      toast(ex.message || 'Could not start the email change');
+    }
+  });
   on(el, '#bt-set-profile', 'click', () => {
     state.viewBeforeProfile = 'settings';
     state.view = 'profile-edit';
@@ -790,6 +948,38 @@ function renderSettings(app) {
     e.currentTarget.setAttribute('aria-checked', String(next));
     prefs.types[k] = next;
     saveNotif();
+  });
+  const calUrl = el.querySelector('#bt-cal-url');
+  API.getCalendarToken()
+    .then((r) => {
+      calUrl.value = r.url;
+    })
+    .catch(() => {
+      calUrl.placeholder = 'Could not load the calendar link.';
+    });
+  on(el, '#bt-cal-copy', 'click', async () => {
+    if (!calUrl.value) return;
+    try {
+      await navigator.clipboard.writeText(calUrl.value);
+      toast('Calendar link copied');
+    } catch {
+      calUrl.select();
+      toast('Select and copy the link');
+    }
+  });
+  on(el, '#bt-cal-regen', 'click', async () => {
+    const ok = await btConfirm(
+      'Regenerate the calendar link? Any calendar already subscribed to the old link stops updating.',
+      { ok: 'Regenerate' }
+    );
+    if (!ok) return;
+    try {
+      const r = await API.regenCalendarToken();
+      calUrl.value = r.url;
+      toast('New calendar link ready');
+    } catch (ex) {
+      toast(ex.message || 'Could not regenerate the link');
+    }
   });
   on(el, '#bt-export', 'click', async () => {
     try {
@@ -2122,7 +2312,26 @@ function listingCard(l) {
   return card;
 }
 
-async function renderBoard(main) {
+function renderBoard(main) {
+  main.replaceChildren();
+  const modeBar = h(`
+    <div class="bt-home-modes">
+      <button class="bt-home-mode${state.boardMode !== 'activity' ? ' active' : ''}" data-bmode="listings">Listings</button>
+      <button class="bt-home-mode${state.boardMode === 'activity' ? ' active' : ''}" data-bmode="activity">Activity</button>
+    </div>
+  `);
+  const body = h('<div class="bt-board-body"></div>');
+  on(modeBar, '[data-bmode]', 'click', (e) => {
+    state.boardMode = e.currentTarget.dataset.bmode;
+    renderBoard(main);
+  });
+  main.appendChild(modeBar);
+  main.appendChild(body);
+  if (state.boardMode === 'activity') renderBoardActivity(body);
+  else renderBoardListings(body);
+}
+
+async function renderBoardListings(main) {
   main.replaceChildren(h('<div class="empty">Loading…</div>'));
   let cursor = null;
   let first = true;
@@ -2159,6 +2368,85 @@ async function renderBoard(main) {
       main.appendChild(b);
     }
   };
+
+  loadMore(null);
+}
+
+const FEED_VERB = { listing: 'listed a project', comment: 'commented on a listing' };
+
+function feedEventEl(ev) {
+  const who = ownerName(ev.actor);
+  const el = h(`
+    <button class="bt-feed-row${ev.from_followed ? ' is-followed' : ''}">
+      <div class="bt-feed-head">
+        ${avatarEl(who)}
+        <span class="bt-feed-who">${esc(who)}${
+          ev.actor && ev.actor.supporter ? ' <span class="bt-supporter">Supporter</span>' : ''
+        }</span>
+        ${ev.from_followed ? '<span class="bt-feed-tag">you follow</span>' : ''}
+        <span class="bt-feed-time">${esc(timeAgo(ev.created_at))}</span>
+      </div>
+      <div class="bt-feed-line">${esc(FEED_VERB[ev.kind] || 'posted')} · <b>${esc(ev.project_title)}</b></div>
+      ${ev.preview ? '<div class="bt-feed-preview"></div>' : ''}
+    </button>
+  `);
+  if (ev.preview) el.querySelector('.bt-feed-preview').textContent = ev.preview;
+  el.addEventListener('click', () => openListing(ev.listing_id));
+  return el;
+}
+
+async function renderBoardActivity(main) {
+  main.replaceChildren();
+  const filterBar = h(`
+    <div class="bt-feed-filter">
+      <button class="bt-quick-cap${state.feedFilter !== 'following' ? ' active' : ''}" data-ffilter="all">All activity</button>
+      <button class="bt-quick-cap${state.feedFilter === 'following' ? ' active' : ''}" data-ffilter="following">Following</button>
+    </div>
+  `);
+  const list = h('<div class="bt-feed-list"><div class="empty">Loading…</div></div>');
+  main.appendChild(filterBar);
+  main.appendChild(list);
+
+  let cursor = null;
+  let first = true;
+
+  const loadMore = async (btn) => {
+    let r;
+    try {
+      r = await guard(() => API.feed(state.feedFilter, cursor));
+    } catch {
+      if (first) list.replaceChildren(h('<div class="empty">Could not load activity.</div>'));
+      return;
+    }
+    if (first) {
+      list.replaceChildren();
+      first = false;
+    }
+    if (btn) btn.remove();
+    (r.events || []).forEach((ev) => list.appendChild(feedEventEl(ev)));
+    if (!list.children.length) {
+      list.appendChild(
+        h(
+          `<div class="empty">${
+            state.feedFilter === 'following'
+              ? 'No recent activity from people you follow.'
+              : 'No board activity yet.'
+          }</div>`
+        )
+      );
+    }
+    cursor = r.next_cursor;
+    if (cursor) {
+      const b = h('<button class="btn-sm btn-sm-ghost bt-loadmore">Load more</button>');
+      b.addEventListener('click', () => loadMore(b));
+      main.appendChild(b);
+    }
+  };
+
+  on(filterBar, '[data-ffilter]', 'click', (e) => {
+    state.feedFilter = e.currentTarget.dataset.ffilter;
+    renderBoardActivity(main);
+  });
 
   loadMore(null);
 }
@@ -2917,12 +3205,13 @@ function renderApp() {
 // ── Home / project list ────────────────────────────────────────────────────
 async function renderHome(main) {
   main.replaceChildren(h('<div class="empty">Loading…</div>'));
-  let projects, review;
+  let projects, review, sessionData;
   try {
-    [{ projects }, , review] = await Promise.all([
+    [{ projects }, , review, sessionData] = await Promise.all([
       guard(() => API.listProjects()),
       loadCategories(),
       API.review().catch(() => ({ active: [], waiting: [] })),
+      API.mySessions().catch(() => ({ sessions: [] })),
     ]);
   } catch {
     return;
@@ -2967,6 +3256,30 @@ async function renderHome(main) {
       band.appendChild(row);
     });
     wrap.appendChild(band);
+  }
+
+  const nextFocus = (sessionData.sessions || []).find((s) => s.status === 'planned');
+  if (nextFocus) {
+    const soon = sessionIsSoon(nextFocus);
+    const line = h(`
+      <button class="bt-nextfocus${soon ? ' is-soon' : ''}">
+        <span class="bt-nextfocus-label">${soon ? 'Focus time now' : 'Next focus'}</span>
+        <span class="bt-nextfocus-body">${esc(nextFocus.project_title)} · ${esc(
+          fmtSessionWhen(nextFocus.starts_at, nextFocus.ends_at)
+        )}</span>
+        <span class="bt-nextfocus-go">${soon ? 'Start now' : 'Open'}</span>
+      </button>
+    `);
+    line.addEventListener('click', async () => {
+      await openProject(nextFocus.project_id);
+      if (soon && state.project) {
+        openFocusSession(state.project, {
+          stepId: nextFocus.step_id,
+          planSessionId: nextFocus.id,
+        });
+      }
+    });
+    wrap.appendChild(line);
   }
 
   const modes = h(`
@@ -3661,6 +3974,7 @@ function renderProject(app) {
             : ''
         }
         <button class="focus-detail-btn" id="bt-focus">${icon('candle')} Start a focus session</button>
+        <div id="bt-sessions-slot"></div>
         <div class="detail-tabs">
           ${['steps', 'supplies', 'links', 'timeline']
             .map(
@@ -3688,6 +4002,7 @@ function renderProject(app) {
     openListingForm(p.id, null, (id) => openListing(id))
   );
   if (canEdit) on(view, '#bt-editproj', 'click', () => openProjectForm(p));
+  view.querySelector('#bt-sessions-slot').appendChild(sessionsBlock(b));
   renderPickup(view.querySelector('#bt-pickup-box'), canEdit);
   on(view, '[data-tab]', 'click', (e) => {
     state.detailTab = e.currentTarget.dataset.tab;
@@ -4807,6 +5122,232 @@ async function renderReview(main) {
   main.replaceChildren(wrap);
 }
 
+// ── Planned focus time (work sessions) ────────────────────────────────────
+const SESSION_DURATIONS = [
+  [15, '15 min'],
+  [30, '30 min'],
+  [60, '1 hour'],
+  [120, '2 hours'],
+  [240, '4 hours'],
+];
+
+// Stored datetimes are "YYYY-MM-DD HH:MM:SS" UTC — parseTs() handles that.
+function fmtSessionWhen(startsAt, endsAt) {
+  const s = parseTs(startsAt);
+  const e = parseTs(endsAt);
+  const day = s.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const t = (d) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return `${day} · ${t(s)}–${t(e)}`;
+}
+
+const sessionIsSoon = (sess) => {
+  const now = Date.now();
+  const s = parseTs(sess.starts_at).getTime();
+  const e = parseTs(sess.ends_at).getTime();
+  return sess.status === 'planned' && now >= s - 30 * 60000 && now <= e + 60 * 60000;
+};
+
+// date "YYYY-MM-DD" + time "HH:MM" (both local) -> ISO string for the API.
+function localToIso(dateStr, timeStr) {
+  const [y, mo, da] = dateStr.split('-').map(Number);
+  const [hh, mi] = timeStr.split(':').map(Number);
+  return new Date(y, mo - 1, da, hh, mi, 0, 0).toISOString();
+}
+
+function nextHourHHMM() {
+  const d = new Date();
+  d.setMinutes(0, 0, 0);
+  d.setHours(d.getHours() + 1);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// bundle: the project detail bundle. existing: a session for edit, or null.
+function openPlanForm(bundle, existing, onDone) {
+  const s = existing || {};
+  const open = bundle.steps.filter(
+    (x) => !x.completed && !bundle.steps.some((o) => o.parent_step_id === x.id)
+  );
+  const startD = s.starts_at ? parseTs(s.starts_at) : null;
+  const dateVal = startD
+    ? `${startD.getFullYear()}-${String(startD.getMonth() + 1).padStart(2, '0')}-${String(startD.getDate()).padStart(2, '0')}`
+    : isoInDays(0);
+  const timeVal = startD
+    ? `${String(startD.getHours()).padStart(2, '0')}:${String(startD.getMinutes()).padStart(2, '0')}`
+    : nextHourHHMM();
+  const curDur = existing
+    ? Math.round((parseTs(s.ends_at).getTime() - parseTs(s.starts_at).getTime()) / 60000)
+    : 60;
+
+  const overlay = h(`
+    <div class="modal-overlay open">
+      <div class="modal">
+        <div class="modal-header"><span class="modal-title">${existing ? 'Edit focus time' : 'Plan focus time'}</span>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
+        <form id="bt-plan">
+          <label class="sp-label">Day</label>
+          <div class="bt-date-chips">
+            <button type="button" class="bt-chip" data-days="0">Today</button>
+            <button type="button" class="bt-chip" data-days="1">Tomorrow</button>
+            <button type="button" class="bt-chip" data-weekend>This weekend</button>
+            <button type="button" class="bt-chip" data-days="7">Next week</button>
+          </div>
+          <input class="sp-input" type="date" name="date" required value="${esc(dateVal)}" />
+          <label class="sp-label">Start</label>
+          <input class="sp-input" type="time" name="time" required value="${esc(timeVal)}" />
+          <label class="sp-label">How long?</label>
+          <div class="bt-dur-chips" id="bt-plan-dur">
+            ${SESSION_DURATIONS.map(
+              ([m, label]) =>
+                `<button type="button" class="bt-chip${m === curDur ? ' is-sel' : ''}" data-dur="${m}">${label}</button>`
+            ).join('')}
+          </div>
+          ${
+            open.length
+              ? `<label class="sp-label">Step (optional)</label>
+          <select class="sp-input" name="stepId">
+            <option value="">Whole project</option>
+            ${open
+              .map(
+                (x) =>
+                  `<option value="${esc(x.id)}"${x.id === s.step_id ? ' selected' : ''}>${esc(x.title)}</option>`
+              )
+              .join('')}
+          </select>`
+              : ''
+          }
+          <label class="sp-label">Note (optional)</label>
+          <textarea class="sp-input" name="note" rows="2" maxlength="500">${esc(s.note || '')}</textarea>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button type="submit" class="btn-sm btn-sm-sage">${existing ? 'Save' : 'Add to plan'}</button>
+            ${existing ? '<button type="button" class="btn-sm btn-sm-ghost" data-del>Delete</button>' : ''}
+            <button type="button" class="btn-sm btn-sm-ghost" data-cancel>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `);
+  const close = () => overlay.remove();
+  const dateInput = overlay.querySelector('input[name=date]');
+  let dur = curDur;
+  on(overlay, '.bt-chip[data-days]', 'click', (e) => {
+    dateInput.value = isoInDays(Number(e.currentTarget.dataset.days));
+  });
+  on(overlay, '.bt-chip[data-weekend]', 'click', () => {
+    dateInput.value = isoWeekend();
+  });
+  on(overlay, '#bt-plan-dur [data-dur]', 'click', (e) => {
+    dur = Number(e.currentTarget.dataset.dur);
+    overlay
+      .querySelectorAll('#bt-plan-dur [data-dur]')
+      .forEach((b) => b.classList.toggle('is-sel', Number(b.dataset.dur) === dur));
+  });
+  on(overlay, '.modal-close, [data-cancel]', 'click', close);
+  overlay.addEventListener('click', (e) => e.target === overlay && close());
+  on(overlay, '[data-del]', 'click', async () => {
+    if (!(await btConfirm('Delete this planned focus time?', { danger: true, ok: 'Delete' }))) return;
+    await guard(() => API.deleteSession(bundle.project.id, existing.id));
+    close();
+    onDone && onDone();
+  });
+  on(overlay, '#bt-plan', 'submit', async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    if (!f.get('date') || !f.get('time')) return;
+    const startsAt = localToIso(f.get('date'), f.get('time'));
+    const endsAt = new Date(new Date(startsAt).getTime() + dur * 60000).toISOString();
+    const body = {
+      startsAt,
+      endsAt,
+      stepId: f.get('stepId') || null,
+      note: (f.get('note') || '').trim() || null,
+    };
+    try {
+      if (existing) await API.updateSession(bundle.project.id, existing.id, body);
+      else await API.addSession(bundle.project.id, body);
+      close();
+      onDone && onDone();
+    } catch (ex) {
+      toast(ex.message || 'Could not save that focus time');
+    }
+  });
+  document.body.appendChild(overlay);
+}
+
+// The "Upcoming focus time" block on the project detail view. Owns its own
+// refresh so a plan edit doesn't need a full detail re-render.
+function sessionsBlock(bundle) {
+  const canEdit = bundle.project.role === 'owner' || bundle.project.role === 'editor';
+  const wrap = h('<div class="bt-sessions"></div>');
+
+  const paint = () => {
+    wrap.replaceChildren();
+    const head = h('<div class="bt-sessions-head"><span>Upcoming focus time</span></div>');
+    if (canEdit) {
+      const add = h('<button class="bt-linkbtn" id="bt-plan-add">+ Plan focus time</button>');
+      add.addEventListener('click', () =>
+        openPlanForm(bundle, null, refresh)
+      );
+      head.appendChild(add);
+    }
+    wrap.appendChild(head);
+
+    const list = (bundle.sessions || []).filter((s) => s.status !== 'skipped');
+    if (!list.length) {
+      wrap.appendChild(
+        h('<div class="bt-sessions-empty">Nothing scheduled. Plan a block of time to work on this.</div>')
+      );
+      return;
+    }
+    list.forEach((sess) => wrap.appendChild(sessionRow(sess, bundle, refresh)));
+  };
+
+  const refresh = async () => {
+    try {
+      const r = await API.projectSessions(bundle.project.id);
+      bundle.sessions = r.sessions || [];
+    } catch {
+      /* keep what we have */
+    }
+    paint();
+  };
+
+  paint();
+  return wrap;
+}
+
+function sessionRow(sess, bundle, refresh) {
+  const row = h(`
+    <div class="bt-session-row${sess.status === 'done' ? ' is-done' : ''}">
+      <div class="bt-session-main">
+        <div class="bt-session-when">${esc(fmtSessionWhen(sess.starts_at, sess.ends_at))}${
+          sess.status === 'done' ? ' · done' : ''
+        }</div>
+        <div class="bt-session-sub">${
+          sess.step_title ? esc(sess.step_title) : 'Whole project'
+        }${sess.is_mine ? '' : ' · ' + esc(sess.planner.display_name || sess.planner.name || '@' + sess.planner.handle)}${
+          sess.note ? ' · ' + esc(sess.note) : ''
+        }</div>
+      </div>
+      <div class="bt-session-actions"></div>
+    </div>
+  `);
+  const actions = row.querySelector('.bt-session-actions');
+
+  if (sess.status === 'planned') {
+    const start = h('<button class="btn-sm btn-sm-sage">Start now</button>');
+    start.addEventListener('click', () =>
+      openFocusSession(bundle, { stepId: sess.step_id, planSessionId: sess.id })
+    );
+    actions.appendChild(start);
+  }
+  if (sess.is_mine) {
+    const edit = h('<button class="bt-linkbtn">Edit</button>');
+    edit.addEventListener('click', () => openPlanForm(bundle, sess, refresh));
+    actions.appendChild(edit);
+  }
+  return row;
+}
+
 // ── Focus session ─────────────────────────────────────────────────────────
 const DURATIONS = [10, 25, 45, 60];
 const RING = 326.7; // 2πr for r=52
@@ -4818,12 +5359,21 @@ function mmss(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-function openFocusSession(bundle) {
+function openFocusSession(bundle, opts = {}) {
   // Leaf steps only — a container isn't something you "work on" directly.
   const open = bundle.steps.filter(
     (s) => !s.completed && !bundle.steps.some((o) => o.parent_step_id === s.id)
   );
-  const sess = { projectId: bundle.project.id, projectTitle: bundle.project.title, stepId: null, minutes: 25 };
+  const presetStep = opts.stepId && open.some((s) => s.id === opts.stepId) ? opts.stepId : null;
+  const sess = {
+    projectId: bundle.project.id,
+    projectTitle: bundle.project.title,
+    stepId: presetStep,
+    minutes: 25,
+    // A planned work_session this focus run is fulfilling — offered "mark done"
+    // on the finish screen.
+    planSessionId: opts.planSessionId || null,
+  };
 
   const screen = h('<div id="focus-screen" class="open"></div>');
   const close = () => {
@@ -4851,7 +5401,7 @@ function openFocusSession(bundle) {
                 ? open
                     .map(
                       (s) =>
-                        `<div class="focus-check-row" data-step="${s.id}">
+                        `<div class="focus-check-row${s.id === sess.stepId ? ' checked' : ''}" data-step="${s.id}">
                           <span class="focus-check-box"><span class="focus-check-icon">${icon('check', 16)}</span></span>
                           <span class="focus-check-label">${esc(s.title)}</span>
                         </div>`
@@ -4960,6 +5510,7 @@ function openFocusSession(bundle) {
           <textarea id="fs-note" rows="2" placeholder="Optional — adds a timeline note" style="width:100%;padding:12px 14px;border-radius:9px;border:1px solid var(--border-strong);background:var(--input);color:var(--text);font:inherit;font-size:16px;resize:vertical;margin-bottom:12px"></textarea>
           <div class="focus-finish-actions">
             ${step ? `<button class="btn-sm btn-sm-sage" id="fs-markdone">Mark “${esc(step.title)}” done</button>` : ''}
+            ${sess.planSessionId ? '<button class="btn-sm btn-sm-sage" id="fs-plandone">Mark planned focus done</button>' : ''}
             <button class="btn-sm btn-sm-amethyst" id="fs-again">Another session</button>
             <button class="btn-sm btn-sm-ghost" id="fs-close">Done</button>
           </div>
@@ -4992,6 +5543,19 @@ function openFocusSession(bundle) {
         await saveNote();
         try {
           await API.updateStep(sess.projectId, step.id, { completed: true });
+        } catch {
+          /* toast shown */
+        }
+        close();
+        if (state.view === 'project') refreshDetail();
+      });
+    }
+    if (sess.planSessionId) {
+      on(screen, '#fs-plandone', 'click', async (e) => {
+        e.currentTarget.disabled = true;
+        await saveNote();
+        try {
+          await API.updateSession(sess.projectId, sess.planSessionId, { status: 'done' });
         } catch {
           /* toast shown */
         }

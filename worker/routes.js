@@ -5,6 +5,7 @@
 
 import * as authRequestLink from './api/auth/request-link.js';
 import * as authCallback from './api/auth/callback.js';
+import * as authEmailChange from './api/auth/email-change.js';
 import * as authLogout from './api/auth/logout.js';
 import * as authMe from './api/auth/me.js';
 import * as projects from './api/projects/index.js';
@@ -19,6 +20,11 @@ import * as link from './api/projects/id/links/linkId.js';
 import * as journal from './api/projects/id/journal.js';
 import * as collaborators from './api/projects/id/collaborators.js';
 import * as transfer from './api/projects/id/transfer.js';
+import * as projectSessions from './api/projects/id/sessions.js';
+import * as projectSession from './api/projects/id/sessions/sessionId.js';
+import * as sessionsList from './api/sessions.js';
+import * as sessionDetail from './api/sessions/id.js';
+import * as calendarFeed from './api/calendar/token.js';
 import * as review from './api/review.js';
 import * as search from './api/search.js';
 import * as categories from './api/categories/index.js';
@@ -35,6 +41,7 @@ import * as interests from './api/interests/index.js';
 import * as interest from './api/interests/slug.js';
 import * as follows from './api/follows/index.js';
 import * as follow from './api/follows/handle.js';
+import * as feed from './api/feed/index.js';
 import * as blocks from './api/blocks/index.js';
 import * as block from './api/blocks/handle.js';
 import * as notifications from './api/notifications/index.js';
@@ -56,11 +63,15 @@ import * as adminUser from './api/admin/users/handle.js';
 import * as adminUserSanction from './api/admin/users/handle/sanction.js';
 import * as settingsNotifPrefs from './api/settings/notif-prefs.js';
 import * as settingsExport from './api/settings/export.js';
+import * as settingsEmail from './api/settings/email.js';
+import * as settingsCalendarToken from './api/settings/calendar-token.js';
+import * as legalAccept from './api/legal/accept.js';
 import * as account from './api/account.js';
 
 export const routes = [
   ['/api/auth/request-link', authRequestLink],
   ['/api/auth/callback', authCallback],
+  ['/api/auth/email-change', authEmailChange],
   ['/api/auth/logout', authLogout],
   ['/api/auth/me', authMe],
 
@@ -76,7 +87,12 @@ export const routes = [
   ['/api/projects/:id/journal', journal],
   ['/api/projects/:id/collaborators', collaborators],
   ['/api/projects/:id/transfer', transfer],
+  ['/api/projects/:id/sessions', projectSessions],
+  ['/api/projects/:id/sessions/:sessionId', projectSession],
 
+  ['/api/sessions', sessionsList],
+  ['/api/sessions/:id', sessionDetail],
+  ['/api/calendar/:token', calendarFeed],
   ['/api/review', review],
   ['/api/search', search],
   ['/api/categories', categories],
@@ -95,6 +111,7 @@ export const routes = [
   ['/api/interests/:slug', interest],
   ['/api/follows', follows],
   ['/api/follows/:handle', follow],
+  ['/api/feed', feed],
   ['/api/blocks', blocks],
   ['/api/blocks/:handle', block],
   ['/api/notifications', notifications],
@@ -117,5 +134,8 @@ export const routes = [
   ['/api/admin/users/:handle/sanction', adminUserSanction],
   ['/api/settings/notif-prefs', settingsNotifPrefs],
   ['/api/settings/export', settingsExport],
+  ['/api/settings/email', settingsEmail],
+  ['/api/settings/calendar-token', settingsCalendarToken],
+  ['/api/legal/accept', legalAccept],
   ['/api/account', account],
 ];
