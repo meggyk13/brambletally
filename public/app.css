@@ -1680,13 +1680,19 @@ textarea{resize:vertical;min-height:60px}
 
 /* Step form — due-date chips + time-needed slider */
 .modal-overlay .bt-date-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 20px 4px; }
-.modal-overlay .bt-chip {
+.bt-popover .bt-date-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.modal-overlay .bt-chip, .bt-popover .bt-chip {
   background: var(--elevated); color: var(--text-sub); border: 1px solid transparent;
   border-radius: 99px; padding: 5px 11px; font: inherit; font-size:14px; font-weight: 600;
   cursor: pointer;
 }
-.modal-overlay .bt-chip:hover { border-color: var(--border-strong); }
-.modal-overlay .bt-chip-clear { color: var(--text-muted); }
+.modal-overlay .bt-chip:hover, .bt-popover .bt-chip:hover { border-color: var(--border-strong); }
+.modal-overlay .bt-chip-clear, .bt-popover .bt-chip-clear { color: var(--text-muted); }
+.bt-popover .bt-due input[type=date] {
+  width: 100%; box-sizing: border-box; padding: 6px 8px; font: inherit;
+  border: 1px solid var(--border); border-radius: 7px; background: var(--card); color: var(--text);
+}
+#bt-app .check-sub .bt-sub-hit { cursor: pointer; text-decoration-line: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
 .modal-overlay .bt-est { display: flex; align-items: center; gap: 12px; margin: 2px 20px 4px; }
 .modal-overlay .bt-est-slider { flex: 1; accent-color: var(--accent); }
 .modal-overlay .bt-est-label {

@@ -4569,11 +4569,16 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
     ? kids.reduce((n, k) => n + (k.estimate_minutes || 0), 0)
     : s.estimate_minutes || 0;
 
+  const hitDue = canEdit && !isContainer;
   const bits = [];
-  if (s.due_date) bits.push('due ' + esc(fmtDate(s.due_date)));
-  if (isContainer) bits.push(`${kids.filter((k) => k.completed).length}/${kids.length} done`);
-  if (shownEst) bits.push((isContainer ? '≈ ' : '~') + esc(fmtDuration(shownEst)));
-  if (!isContainer && s.notes) bits.push(esc(s.notes));
+  if (s.due_date)
+    bits.push(
+      `<span class="bt-sub-due${hitDue ? ' bt-sub-hit' : ''}">due ${esc(fmtDate(s.due_date))}</span>`
+    );
+  if (isContainer)
+    bits.push(`<span>${kids.filter((k) => k.completed).length}/${kids.length} done</span>`);
+  if (shownEst) bits.push(`<span>${(isContainer ? '≈ ' : '~') + esc(fmtDuration(shownEst))}</span>`);
+  if (!isContainer && s.notes) bits.push(`<span>${esc(s.notes)}</span>`);
 
   const boxDisabled = !canEdit || isContainer;
   const showBash = canEdit && !isChild;
@@ -4641,6 +4646,25 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
         e.stopPropagation();
         openStepForm(b, s, rerender, { isContainer });
       });
+      on(row, '.bt-sub-due', 'click', (e) => {
+        e.stopPropagation();
+        const pop = popover(
+          e.currentTarget,
+          dueChips({
+            value: s.due_date,
+            onChange: async (v) => {
+              pop.close();
+              try {
+                await guard(() => API.updateStep(b.project.id, s.id, { due_date: v }));
+              } catch {
+                return;
+              }
+              rerender();
+            },
+          }),
+          { align: 'left' }
+        );
+      });
     } else {
       on(row, '.check-content', 'click', () => openStepForm(b, s, rerender, { isContainer }));
     }
@@ -4705,6 +4729,35 @@ function isoWeekend() {
   return d.toISOString().slice(0, 10);
 }
 
+// A "due date" control: quick chips + a native date input. `onChange(iso|null)`
+// fires on every pick. Pass `name` to make the date input a form field (the
+// step sheet reads it on submit); omit it for standalone use (the popover).
+function dueChips({ value = '', name, onChange } = {}) {
+  const wrap = h(`
+    <div class="bt-due">
+      <div class="bt-date-chips">
+        <button type="button" class="bt-chip" data-days="0">Today</button>
+        <button type="button" class="bt-chip" data-days="1">Tomorrow</button>
+        <button type="button" class="bt-chip" data-weekend>This weekend</button>
+        <button type="button" class="bt-chip" data-days="7">Next week</button>
+        <button type="button" class="bt-chip bt-chip-clear" data-clear>Clear</button>
+      </div>
+      <input class="sp-input" type="date" value="${esc(value || '')}" />
+    </div>
+  `);
+  const dateInput = wrap.querySelector('input[type=date]');
+  if (name) dateInput.name = name;
+  const set = (v) => {
+    dateInput.value = v;
+    if (onChange) onChange(v || null);
+  };
+  on(wrap, '.bt-chip[data-days]', 'click', (e) => set(isoInDays(Number(e.currentTarget.dataset.days))));
+  on(wrap, '.bt-chip[data-weekend]', 'click', () => set(isoWeekend()));
+  on(wrap, '.bt-chip[data-clear]', 'click', () => set(''));
+  dateInput.addEventListener('change', () => onChange && onChange(dateInput.value || null));
+  return wrap;
+}
+
 function openStepForm(b, existing, done, opts = {}) {
   const s = existing || {};
   const isContainer = !!opts.isContainer;
@@ -4718,14 +4771,7 @@ function openStepForm(b, existing, done, opts = {}) {
           <label class="sp-label">Step</label>
           <input class="sp-input" name="title" required value="${esc(s.title || '')}" />
           <label class="sp-label">Due date</label>
-          <div class="bt-date-chips">
-            <button type="button" class="bt-chip" data-days="0">Today</button>
-            <button type="button" class="bt-chip" data-days="1">Tomorrow</button>
-            <button type="button" class="bt-chip" data-weekend>This weekend</button>
-            <button type="button" class="bt-chip" data-days="7">Next week</button>
-            <button type="button" class="bt-chip bt-chip-clear" data-clear>Clear</button>
-          </div>
-          <input class="sp-input" type="date" name="due_date" value="${esc(s.due_date || '')}" />
+          <div id="bt-due-slot"></div>
           <label class="sp-label">Notes</label>
           <textarea class="sp-input" name="notes" rows="2">${esc(s.notes || '')}</textarea>
           ${
@@ -4747,16 +4793,9 @@ function openStepForm(b, existing, done, opts = {}) {
     </div>
   `);
   const close = () => overlay.remove();
-  const dateInput = overlay.querySelector('input[name=due_date]');
-  on(overlay, '.bt-chip[data-days]', 'click', (e) => {
-    dateInput.value = isoInDays(Number(e.currentTarget.dataset.days));
-  });
-  on(overlay, '.bt-chip[data-weekend]', 'click', () => {
-    dateInput.value = isoWeekend();
-  });
-  on(overlay, '.bt-chip[data-clear]', 'click', () => {
-    dateInput.value = '';
-  });
+  overlay
+    .querySelector('#bt-due-slot')
+    .replaceWith(dueChips({ value: s.due_date, name: 'due_date' }));
 
   const slider = overlay.querySelector('.bt-est-slider');
   if (slider) {
