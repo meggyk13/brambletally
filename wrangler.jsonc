@@ -13,7 +13,9 @@
   },
   // "0 15 * * 0": Sunday 15:00 UTC ≈ 08:00 America/Los_Angeles — weekly digest.
   // "0 12 * * *": daily 12:00 UTC — due-date reminders.
-  // Both dispatched from the scheduled() handler in worker/index.js.
+  // scheduled() in worker/index.js dispatches by exact string match; keep these
+  // byte-for-byte in sync with DIGEST_CRON / REMINDERS_CRON in
+  // worker/api/lib/constants.js.
   "triggers": {
     "crons": ["0 15 * * 0", "0 12 * * *"]
   },

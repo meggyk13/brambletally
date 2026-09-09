@@ -23,3 +23,11 @@ export const TOS_VERSION = '2026-09-07';
 // Used to compute "today / tomorrow" for due-date reminders and to render
 // server-side dates. Matches the app's historical implicit default.
 export const DEFAULT_TZ = 'America/Los_Angeles';
+
+// Cron trigger strings. These MUST stay byte-for-byte identical to the entries
+// in wrangler.jsonc `triggers.crons` — scheduled() in worker/index.js dispatches
+// by exact string match. If they drift, that job silently stops running (which
+// is why the handler logs an unrecognized cron rather than falling through to a
+// default job).
+export const DIGEST_CRON = '0 15 * * 0'; // Sunday 15:00 UTC ≈ 08:00 America/Los_Angeles
+export const REMINDERS_CRON = '0 12 * * *'; // daily 12:00 UTC

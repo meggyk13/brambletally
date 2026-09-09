@@ -3035,6 +3035,10 @@ function notifLine(n) {
       return `${who} commented on your listing${p}`;
     case 'board_reply':
       return `${who} replied to your comment${p}`;
+    case 'step_assigned':
+      return `${who} assigned you a step${p}`;
+    case 'step_due':
+      return `Due soon${p}`;
     default:
       return 'New activity';
   }
@@ -3042,6 +3046,13 @@ function notifLine(n) {
 function notifNav(n) {
   if (n.type === 'follow' && n.actor) return () => openProfile(n.actor.handle);
   if (n.subject_type === 'listing' && n.subject_id) return () => openListing(n.subject_id);
+  if (n.subject_type === 'step') {
+    return () => {
+      state.view = 'home';
+      state.homeMode = 'mine';
+      renderApp();
+    };
+  }
   return null;
 }
 
