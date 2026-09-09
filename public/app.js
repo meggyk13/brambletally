@@ -397,6 +397,95 @@ async function guard(fn) {
   }
 }
 
+// ── Inline edit ────────────────────────────────────────────────────────────
+// Swap a display node for a field sized to sit in its place. Enter (single
+// line) or blur commits; Esc cancels. Empty, unchanged or invalid reverts —
+// this never deletes. Optimistic: the display updates right away and rolls
+// back if onSave rejects. `onSave` is responsible for any rerender().
+function inlineEdit(displayEl, { value, multiline = false, validate, onSave } = {}) {
+  if (displayEl.dataset.editing === '1') return;
+  const orig = value != null ? String(value) : displayEl.textContent;
+  const field = h(
+    multiline
+      ? '<textarea class="bt-inline editing" rows="2"></textarea>'
+      : '<input class="bt-inline editing" type="text" />'
+  );
+  field.value = orig;
+  displayEl.dataset.editing = '1';
+  displayEl.replaceWith(field);
+  field.focus();
+  field.select();
+
+  let settled = false;
+  const restore = (text) => {
+    if (settled) return;
+    settled = true;
+    displayEl.textContent = text;
+    delete displayEl.dataset.editing;
+    field.replaceWith(displayEl);
+  };
+  const cancel = () => restore(orig);
+  const commit = async () => {
+    if (settled) return;
+    const next = field.value.trim();
+    if (!next || next === orig.trim() || (validate && !validate(next))) return cancel();
+    restore(next); // optimistic
+    try {
+      await guard(() => onSave(next));
+    } catch {
+      displayEl.textContent = orig; // roll back
+    }
+  };
+  field.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      cancel();
+    } else if (e.key === 'Enter' && !multiline) {
+      e.preventDefault();
+      commit();
+    }
+  });
+  field.addEventListener('blur', commit);
+}
+
+// ── Popover ────────────────────────────────────────────────────────────────
+// A small panel anchored under `anchorEl`. Outside-tap or Esc dismiss.
+// Returns { close }. Only one is open at a time.
+function popover(anchorEl, contentEl, { align = 'right' } = {}) {
+  document.querySelector('.bt-popover')?.remove();
+  const pop = h('<div class="bt-popover"></div>');
+  pop.appendChild(contentEl);
+  document.body.appendChild(pop);
+
+  const r = anchorEl.getBoundingClientRect();
+  pop.style.top = window.scrollY + r.bottom + 4 + 'px';
+  const w = pop.offsetWidth;
+  const vw = document.documentElement.clientWidth;
+  let left = align === 'left' ? window.scrollX + r.left : window.scrollX + r.right - w;
+  left = Math.max(8, Math.min(left, window.scrollX + vw - w - 8));
+  pop.style.left = left + 'px';
+
+  const close = () => {
+    pop.remove();
+    document.removeEventListener('mousedown', onDoc, true);
+    document.removeEventListener('keydown', onKey, true);
+  };
+  const onDoc = (e) => {
+    if (!pop.contains(e.target) && e.target !== anchorEl && !anchorEl.contains(e.target)) close();
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    }
+  };
+  setTimeout(() => {
+    document.addEventListener('mousedown', onDoc, true);
+    document.addEventListener('keydown', onKey, true);
+  }, 0);
+  return { close };
+}
+
 // ── Theme ──────────────────────────────────────────────────────────────────
 // Two choices: bt-mode (light | dark | system) and bt-palette (bramble | hearth
 // | fen). They resolve to data-theme="<palette>-<mode>". The full palette picker

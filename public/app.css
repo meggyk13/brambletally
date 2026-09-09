@@ -1641,6 +1641,29 @@ textarea{resize:vertical;min-height:60px}
 .bt-assignee-item .bt-avatar { width: 22px; height: 22px; font-size: 10px; }
 .bt-assignee-clear { color: var(--text-muted); }
 
+/* Inline editing (H) — a field that sits in place of its display node */
+#bt-app .bt-inline {
+  font: inherit; color: var(--text); width: 100%; box-sizing: border-box;
+  padding: 1px 4px; margin: -2px 0; border: 1px solid var(--accent);
+  border-radius: 6px; background: var(--card); line-height: inherit;
+}
+#bt-app textarea.bt-inline { resize: vertical; line-height: 1.5; min-height: 3em; }
+#bt-app .bt-inline:focus { outline: none; box-shadow: 0 0 0 2px var(--accent)33; }
+
+/* Anchored popover — shared by the inline due-date / estimate pickers (H) */
+.bt-popover {
+  position: absolute; z-index: 60; min-width: 180px; max-width: min(320px, 92vw);
+  padding: 6px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow);
+}
+.bt-popover-item {
+  display: flex; align-items: center; width: 100%; text-align: left;
+  padding: 7px 9px; border: none; background: none; border-radius: 7px;
+  cursor: pointer; font: inherit; color: var(--text);
+}
+.bt-popover-item:hover { background: var(--elevated); }
+.bt-popover-item.is-sel { color: var(--accent); font-weight: 600; }
+
 /* Sub-step breadcrumb in the cross-project lists (search / Next / Review / Due) */
 #bt-app .bt-crumb { color: var(--text-muted); font-weight: 400; }
 
