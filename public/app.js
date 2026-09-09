@@ -4577,6 +4577,9 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
 
   const boxDisabled = !canEdit || isContainer;
   const showBash = canEdit && !isChild;
+  // Leaf steps: tap the title to rename inline; the "⋯" opens the full editor
+  // (notes / estimate / delete). Containers keep the tap-to-open-sheet path.
+  const inlineTitle = canEdit && !isContainer;
   const multiPerson = (b.collaborators || []).length > 1;
   const assigneeNm = s.assignee_id ? collabName(b, s.assignee_id) : null;
   const showAssignee = multiPerson || !!s.assignee_id;
@@ -4596,8 +4599,8 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
       <button class="checkbox" ${s.completed ? 'aria-checked="true"' : ''} ${
         boxDisabled ? 'disabled' : ''
       }>${s.completed ? icon('check', 18) : ''}</button>
-      <div class="check-content${canEdit ? ' tappable' : ''}">
-        <div class="check-title">${esc(s.title)}</div>
+      <div class="check-content${canEdit && !inlineTitle ? ' tappable' : ''}">
+        <div class="check-title${inlineTitle ? ' bt-editable' : ''}">${esc(s.title)}</div>
         ${bits.length ? `<div class="check-sub">${bits.join(' · ')}</div>` : ''}
       </div>
       ${assigneeHtml}
@@ -4606,6 +4609,11 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
           ? `<button class="step-bash" title="${
               isContainer ? 'Add sub-steps' : 'Break into steps'
             }" aria-label="Break into steps">${icon('steps', 18)}</button>`
+          : ''
+      }
+      ${
+        inlineTitle
+          ? `<button class="step-more" title="More" aria-label="Step options">⋯</button>`
           : ''
       }
     </div>
@@ -4618,7 +4626,24 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
         rerender();
       });
     }
-    on(row, '.check-content', 'click', () => openStepForm(b, s, rerender, { isContainer }));
+    if (inlineTitle) {
+      on(row, '.check-title', 'click', (e) => {
+        e.stopPropagation();
+        inlineEdit(e.currentTarget, {
+          value: s.title,
+          onSave: async (title) => {
+            await API.updateStep(b.project.id, s.id, { title });
+            rerender();
+          },
+        });
+      });
+      on(row, '.step-more', 'click', (e) => {
+        e.stopPropagation();
+        openStepForm(b, s, rerender, { isContainer });
+      });
+    } else {
+      on(row, '.check-content', 'click', () => openStepForm(b, s, rerender, { isContainer }));
+    }
     on(row, '.step-assignee', 'click', (e) => {
       e.stopPropagation();
       openAssigneeMenu(e.currentTarget, b, s, rerender);

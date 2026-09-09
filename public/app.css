@@ -1609,11 +1609,13 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .check-row.is-container.checked > .checkbox {
   background: var(--accent); border-style: solid; opacity: 1;
 }
-#bt-app .step-bash {
+#bt-app .step-bash, #bt-app .step-more {
   background: none; border: none; cursor: pointer; font-size:16px; line-height: 1;
   padding: 2px 4px; margin-left: 4px; align-self: center; flex-shrink: 0; opacity: .4;
 }
-#bt-app .step-bash:hover { opacity: 1; }
+#bt-app .step-bash:hover, #bt-app .step-more:hover { opacity: 1; }
+#bt-app .step-more { font-size: 20px; color: var(--text); }
+#bt-app .check-title.bt-editable { cursor: text; }
 
 /* Step assignee chip + picker (G — multi-person projects) */
 #bt-app .step-assignee {
