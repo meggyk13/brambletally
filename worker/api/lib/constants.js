@@ -29,5 +29,7 @@ export const DEFAULT_TZ = 'America/Los_Angeles';
 // by exact string match. If they drift, that job silently stops running (which
 // is why the handler logs an unrecognized cron rather than falling through to a
 // default job).
-export const DIGEST_CRON = '0 15 * * 0'; // Sunday 15:00 UTC ≈ 08:00 America/Los_Angeles
+// NOTE: Cloudflare's cron day-of-week is 1-7 with 1 = Sunday (not the Unix
+// 0-6 / 0 = Sunday). `0` is rejected as an invalid cron string, so Sunday is 1.
+export const DIGEST_CRON = '0 15 * * 1'; // Sunday 15:00 UTC ≈ 08:00 America/Los_Angeles
 export const REMINDERS_CRON = '0 12 * * *'; // daily 12:00 UTC
