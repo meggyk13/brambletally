@@ -397,6 +397,106 @@ async function guard(fn) {
   }
 }
 
+// ── Inline edit ────────────────────────────────────────────────────────────
+// Swap a display node for a field sized to sit in its place. Enter (single
+// line) or blur commits; Esc cancels. Unchanged or invalid reverts.
+// Optimistic: the display updates right away and rolls back if onSave
+// rejects. `onSave` is responsible for any rerender(). Without `placeholder`
+// an empty value reverts (the field is not clearable); with one, an empty
+// value commits and the node shows the placeholder with an `is-empty` class.
+function inlineEdit(displayEl, { value, multiline = false, validate, onSave, placeholder } = {}) {
+  if (displayEl.dataset.editing === '1') return;
+  const orig = value != null ? String(value) : displayEl.textContent;
+  const field = h(
+    multiline
+      ? '<textarea class="bt-inline editing" rows="2"></textarea>'
+      : '<input class="bt-inline editing" type="text" />'
+  );
+  field.value = orig;
+  const cs = getComputedStyle(displayEl);
+  ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'color'].forEach(
+    (k) => (field.style[k] = cs[k])
+  );
+  displayEl.dataset.editing = '1';
+  displayEl.replaceWith(field);
+  field.focus();
+  field.select();
+
+  const paint = (text) => {
+    displayEl.textContent = text || placeholder || '';
+    if (placeholder !== undefined) displayEl.classList.toggle('is-empty', !text);
+  };
+  let settled = false;
+  const restore = (text) => {
+    if (settled) return;
+    settled = true;
+    paint(text);
+    delete displayEl.dataset.editing;
+    field.replaceWith(displayEl);
+  };
+  const commit = async () => {
+    if (settled) return;
+    const next = field.value.trim();
+    const unchanged = next === orig.trim();
+    const blocked = (!next && placeholder === undefined) || (validate && next && !validate(next));
+    if (unchanged || blocked) return restore(orig);
+    restore(next); // optimistic
+    try {
+      await guard(() => onSave(next));
+    } catch {
+      paint(orig); // roll back
+    }
+  };
+  field.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      restore(orig);
+    } else if (e.key === 'Enter' && !multiline) {
+      e.preventDefault();
+      commit();
+    }
+  });
+  field.addEventListener('blur', commit);
+}
+
+// ── Popover ────────────────────────────────────────────────────────────────
+// A small panel anchored under `anchorEl`. Outside-tap or Esc dismiss.
+// Returns { close }. Only one is open at a time.
+function popover(anchorEl, contentEl, { align = 'right' } = {}) {
+  document.querySelector('.bt-popover')?.remove();
+  const pop = h('<div class="bt-popover"></div>');
+  pop.appendChild(contentEl);
+  document.body.appendChild(pop);
+
+  const r = anchorEl.getBoundingClientRect();
+  pop.style.top = window.scrollY + r.bottom + 4 + 'px';
+  const w = pop.offsetWidth;
+  const vw = document.documentElement.clientWidth;
+  let left = align === 'left' ? window.scrollX + r.left : window.scrollX + r.right - w;
+  left = Math.max(8, Math.min(left, window.scrollX + vw - w - 8));
+  pop.style.left = left + 'px';
+
+  const close = () => {
+    pop.remove();
+    document.removeEventListener('mousedown', onDoc, true);
+    document.removeEventListener('keydown', onKey, true);
+  };
+  const onDoc = (e) => {
+    if (!pop.contains(e.target) && e.target !== anchorEl && !anchorEl.contains(e.target)) close();
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    }
+  };
+  setTimeout(() => {
+    document.addEventListener('mousedown', onDoc, true);
+    document.addEventListener('keydown', onKey, true);
+  }, 0);
+  return { close };
+}
+
 // ── Theme ──────────────────────────────────────────────────────────────────
 // Two choices: bt-mode (light | dark | system) and bt-palette (bramble | hearth
 // | fen). They resolve to data-theme="<palette>-<mode>". The full palette picker
@@ -4197,6 +4297,12 @@ function renderProject(app) {
   }
   const p = b.project;
   const canEdit = p.role === 'owner' || p.role === 'editor';
+  // Deep-linking straight to a project can land here before Home has loaded the
+  // category list; fetch it once so the inline category picker is populated.
+  if (canEdit && !state.categories.length && !state._catsLoaded) {
+    state._catsLoaded = true;
+    loadCategories().then(() => state.view === 'project' && renderApp());
+  }
   // Progress counts leaf steps only — a container's state is derived from them.
   const leaves = b.steps.filter((s) => !b.steps.some((o) => o.parent_step_id === s.id));
   const done = leaves.filter((s) => s.completed).length;
@@ -4212,10 +4318,38 @@ function renderProject(app) {
           <button class="detail-back" id="bt-dupproj">Duplicate</button>
           ${canEdit ? '<button class="detail-back" id="bt-editproj">Edit</button>' : ''}
         </div>
-        <h1 class="detail-title">${esc(p.title)}</h1>
+        <h1 class="detail-title${canEdit ? ' bt-editable' : ''}">${esc(p.title)}</h1>
         <div class="detail-meta">
-          <span class="status-pill" style="--tab-color:${STATUS_COLOR[p.status]}">${esc(p.status)}</span>
-          ${p.category ? `<span>${esc(p.category)}</span>` : ''}
+          ${
+            canEdit
+              ? `<select class="bt-meta-select bt-status-select" style="--tab-color:${
+                  STATUS_COLOR[p.status]
+                }" aria-label="Status">${STATUSES.map(
+                  (s) => `<option ${p.status === s ? 'selected' : ''}>${esc(s)}</option>`
+                ).join('')}</select>`
+              : `<span class="status-pill" style="--tab-color:${STATUS_COLOR[p.status]}">${esc(
+                  p.status
+                )}</span>`
+          }
+          ${
+            canEdit
+              ? `<select class="bt-meta-select bt-cat-select" aria-label="Category">
+                  <option value=""${!p.category ? ' selected' : ''}>+ category</option>
+                  ${(p.category && !state.categories.some((c) => c.name === p.category)
+                    ? [{ name: p.category }]
+                    : []
+                  )
+                    .concat(state.categories)
+                    .map(
+                      (c) => `<option ${p.category === c.name ? 'selected' : ''}>${esc(c.name)}</option>`
+                    )
+                    .join('')}
+                  <option value="__new">＋ New category…</option>
+                </select>`
+              : p.category
+                ? `<span>${esc(p.category)}</span>`
+                : ''
+          }
           ${p.deadline ? `<span>due ${esc(fmtDate(p.deadline))}</span>` : ''}
           <button class="meta-people" id="bt-people">${icon('people', 16)} ${b.collaborators.length}${
             p.role !== 'owner' ? ` &middot; ${esc(p.role)}` : ''
@@ -4231,7 +4365,13 @@ function renderProject(app) {
                 : ''
           }
         </div>
-        ${p.description ? `<p style="color:var(--text-muted);font-size:16px;line-height:1.55;margin-bottom:14px">${esc(p.description)}</p>` : ''}
+        ${
+          canEdit || p.description
+            ? `<p class="detail-desc${canEdit ? ' bt-editable' : ''}${
+                p.description ? '' : ' is-empty'
+              }">${p.description ? esc(p.description) : 'Add a description'}</p>`
+            : ''
+        }
         <div class="pickup-box" id="bt-pickup-box"></div>
         ${
           leaves.length
@@ -4267,6 +4407,69 @@ function renderProject(app) {
     openListingForm(p.id, null, (id) => openListing(id))
   );
   if (canEdit) on(view, '#bt-editproj', 'click', () => openProjectForm(p));
+  // Persist a project-field edit, then refetch the bundle and repaint.
+  // refreshDetail() rebuilds only the panel, so after a step edit swaps
+  // state.project these header handlers close over a stale bundle — always
+  // re-read state.project on the way out rather than mutating the closed-over
+  // one.
+  // Caller supplies the error handling (inlineEdit wraps onSave in guard; the
+  // <select> handlers guard explicitly).
+  const saveProjectField = async (patch) => {
+    await API.updateProject(p.id, patch);
+    try {
+      state.project = await API.getProject(p.id);
+    } catch {
+      /* keep the bundle we have */
+    }
+    renderApp();
+  };
+  if (canEdit)
+    on(view, '.detail-title', 'click', (e) =>
+      inlineEdit(e.currentTarget, {
+        value: p.title,
+        onSave: (title) => saveProjectField({ title }),
+      })
+    );
+  if (canEdit)
+    on(view, '.detail-desc', 'click', (e) =>
+      inlineEdit(e.currentTarget, {
+        value: p.description || '',
+        multiline: true,
+        placeholder: 'Add a description',
+        onSave: (description) => saveProjectField({ description: description || null }),
+      })
+    );
+  if (canEdit) {
+    on(view, '.bt-status-select', 'change', async (e) => {
+      try {
+        await guard(() => saveProjectField({ status: e.currentTarget.value }));
+      } catch {
+        e.currentTarget.value = state.project.project.status;
+      }
+    });
+    on(view, '.bt-cat-select', 'change', async (e) => {
+      const sel = e.currentTarget;
+      const revert = () => (sel.value = state.project.project.category || '');
+      let category;
+      if (sel.value === '__new') {
+        const name = await btPrompt('New category');
+        if (!name) return revert();
+        try {
+          category = (await guard(() => API.createCategory(name))).category.name;
+          await loadCategories(); // so the new one is an option everywhere
+        } catch {
+          return revert();
+        }
+      } else {
+        category = sel.value || null;
+      }
+      try {
+        await guard(() => saveProjectField({ category }));
+      } catch {
+        revert();
+      }
+    });
+  }
   view.querySelector('#bt-sessions-slot').appendChild(sessionsBlock(b));
   on(view, '#bt-printproj', 'click', () => window.open('/api/projects/' + p.id + '/print', '_blank'));
   on(view, '#bt-dupproj', 'click', async () => {
@@ -4480,14 +4683,27 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
     ? kids.reduce((n, k) => n + (k.estimate_minutes || 0), 0)
     : s.estimate_minutes || 0;
 
+  const hitDue = canEdit && !isContainer;
   const bits = [];
-  if (s.due_date) bits.push('due ' + esc(fmtDate(s.due_date)));
-  if (isContainer) bits.push(`${kids.filter((k) => k.completed).length}/${kids.length} done`);
-  if (shownEst) bits.push((isContainer ? '≈ ' : '~') + esc(fmtDuration(shownEst)));
-  if (!isContainer && s.notes) bits.push(esc(s.notes));
+  if (s.due_date)
+    bits.push(
+      `<span class="bt-sub-due${hitDue ? ' bt-sub-hit' : ''}">due ${esc(fmtDate(s.due_date))}</span>`
+    );
+  if (isContainer)
+    bits.push(`<span>${kids.filter((k) => k.completed).length}/${kids.length} done</span>`);
+  if (shownEst) {
+    const estTxt = (isContainer ? '≈ ' : '~') + esc(fmtDuration(shownEst));
+    bits.push(
+      hitDue ? `<span class="bt-sub-est bt-sub-hit">${estTxt}</span>` : `<span>${estTxt}</span>`
+    );
+  }
+  if (!isContainer && s.notes) bits.push(`<span>${esc(s.notes)}</span>`);
 
   const boxDisabled = !canEdit || isContainer;
   const showBash = canEdit && !isChild;
+  // Leaf steps: tap the title to rename inline; the "⋯" opens the full editor
+  // (notes / estimate / delete). Containers keep the tap-to-open-sheet path.
+  const inlineTitle = canEdit && !isContainer;
   const multiPerson = (b.collaborators || []).length > 1;
   const assigneeNm = s.assignee_id ? collabName(b, s.assignee_id) : null;
   const showAssignee = multiPerson || !!s.assignee_id;
@@ -4507,8 +4723,8 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
       <button class="checkbox" ${s.completed ? 'aria-checked="true"' : ''} ${
         boxDisabled ? 'disabled' : ''
       }>${s.completed ? icon('check', 18) : ''}</button>
-      <div class="check-content${canEdit ? ' tappable' : ''}">
-        <div class="check-title">${esc(s.title)}</div>
+      <div class="check-content${canEdit && !inlineTitle ? ' tappable' : ''}">
+        <div class="check-title${inlineTitle ? ' bt-editable' : ''}">${esc(s.title)}</div>
         ${bits.length ? `<div class="check-sub">${bits.join(' · ')}</div>` : ''}
       </div>
       ${assigneeHtml}
@@ -4517,6 +4733,11 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
           ? `<button class="step-bash" title="${
               isContainer ? 'Add sub-steps' : 'Break into steps'
             }" aria-label="Break into steps">${icon('steps', 18)}</button>`
+          : ''
+      }
+      ${
+        inlineTitle
+          ? `<button class="step-more" title="More" aria-label="Step options">⋯</button>`
           : ''
       }
     </div>
@@ -4529,7 +4750,65 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
         rerender();
       });
     }
-    on(row, '.check-content', 'click', () => openStepForm(b, s, rerender, { isContainer }));
+    if (inlineTitle) {
+      on(row, '.check-title', 'click', (e) => {
+        e.stopPropagation();
+        inlineEdit(e.currentTarget, {
+          value: s.title,
+          onSave: async (title) => {
+            await API.updateStep(b.project.id, s.id, { title });
+            rerender();
+          },
+        });
+      });
+      on(row, '.step-more', 'click', (e) => {
+        e.stopPropagation();
+        openStepForm(b, s, rerender, { isContainer });
+      });
+      on(row, '.bt-sub-due', 'click', (e) => {
+        e.stopPropagation();
+        const pop = popover(
+          e.currentTarget,
+          dueChips({
+            value: s.due_date,
+            onChange: async (v) => {
+              pop.close();
+              try {
+                await guard(() => API.updateStep(b.project.id, s.id, { due_date: v }));
+              } catch {
+                return;
+              }
+              rerender();
+            },
+          }),
+          { align: 'left' }
+        );
+      });
+      on(row, '.bt-sub-est', 'click', (e) => {
+        e.stopPropagation();
+        const curIdx = s.estimate_minutes ? STEP_ESTIMATES.indexOf(s.estimate_minutes) + 1 : 0;
+        const menu = h('<div></div>');
+        STEP_ESTIMATE_LABELS.forEach((label, idx) => {
+          const item = h(
+            `<button class="bt-popover-item${idx === curIdx ? ' is-sel' : ''}">${esc(label)}</button>`
+          );
+          item.addEventListener('click', async () => {
+            pop.close();
+            const mins = idx > 0 ? STEP_ESTIMATES[idx - 1] : null;
+            try {
+              await guard(() => API.updateStep(b.project.id, s.id, { estimate_minutes: mins }));
+            } catch {
+              return;
+            }
+            rerender();
+          });
+          menu.appendChild(item);
+        });
+        const pop = popover(e.currentTarget, menu, { align: 'left' });
+      });
+    } else {
+      on(row, '.check-content', 'click', () => openStepForm(b, s, rerender, { isContainer }));
+    }
     on(row, '.step-assignee', 'click', (e) => {
       e.stopPropagation();
       openAssigneeMenu(e.currentTarget, b, s, rerender);
@@ -4591,6 +4870,35 @@ function isoWeekend() {
   return d.toISOString().slice(0, 10);
 }
 
+// A "due date" control: quick chips + a native date input. `onChange(iso|null)`
+// fires on every pick. Pass `name` to make the date input a form field (the
+// step sheet reads it on submit); omit it for standalone use (the popover).
+function dueChips({ value = '', name, onChange } = {}) {
+  const wrap = h(`
+    <div class="bt-due">
+      <div class="bt-date-chips">
+        <button type="button" class="bt-chip" data-days="0">Today</button>
+        <button type="button" class="bt-chip" data-days="1">Tomorrow</button>
+        <button type="button" class="bt-chip" data-weekend>This weekend</button>
+        <button type="button" class="bt-chip" data-days="7">Next week</button>
+        <button type="button" class="bt-chip bt-chip-clear" data-clear>Clear</button>
+      </div>
+      <input class="sp-input" type="date" value="${esc(value || '')}" />
+    </div>
+  `);
+  const dateInput = wrap.querySelector('input[type=date]');
+  if (name) dateInput.name = name;
+  const set = (v) => {
+    dateInput.value = v;
+    if (onChange) onChange(v || null);
+  };
+  on(wrap, '.bt-chip[data-days]', 'click', (e) => set(isoInDays(Number(e.currentTarget.dataset.days))));
+  on(wrap, '.bt-chip[data-weekend]', 'click', () => set(isoWeekend()));
+  on(wrap, '.bt-chip[data-clear]', 'click', () => set(''));
+  dateInput.addEventListener('change', () => onChange && onChange(dateInput.value || null));
+  return wrap;
+}
+
 function openStepForm(b, existing, done, opts = {}) {
   const s = existing || {};
   const isContainer = !!opts.isContainer;
@@ -4604,14 +4912,7 @@ function openStepForm(b, existing, done, opts = {}) {
           <label class="sp-label">Step</label>
           <input class="sp-input" name="title" required value="${esc(s.title || '')}" />
           <label class="sp-label">Due date</label>
-          <div class="bt-date-chips">
-            <button type="button" class="bt-chip" data-days="0">Today</button>
-            <button type="button" class="bt-chip" data-days="1">Tomorrow</button>
-            <button type="button" class="bt-chip" data-weekend>This weekend</button>
-            <button type="button" class="bt-chip" data-days="7">Next week</button>
-            <button type="button" class="bt-chip bt-chip-clear" data-clear>Clear</button>
-          </div>
-          <input class="sp-input" type="date" name="due_date" value="${esc(s.due_date || '')}" />
+          <div id="bt-due-slot"></div>
           <label class="sp-label">Notes</label>
           <textarea class="sp-input" name="notes" rows="2">${esc(s.notes || '')}</textarea>
           ${
@@ -4633,16 +4934,9 @@ function openStepForm(b, existing, done, opts = {}) {
     </div>
   `);
   const close = () => overlay.remove();
-  const dateInput = overlay.querySelector('input[name=due_date]');
-  on(overlay, '.bt-chip[data-days]', 'click', (e) => {
-    dateInput.value = isoInDays(Number(e.currentTarget.dataset.days));
-  });
-  on(overlay, '.bt-chip[data-weekend]', 'click', () => {
-    dateInput.value = isoWeekend();
-  });
-  on(overlay, '.bt-chip[data-clear]', 'click', () => {
-    dateInput.value = '';
-  });
+  overlay
+    .querySelector('#bt-due-slot')
+    .replaceWith(dueChips({ value: s.due_date, name: 'due_date' }));
 
   const slider = overlay.querySelector('.bt-est-slider');
   if (slider) {

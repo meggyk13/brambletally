@@ -1609,11 +1609,19 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .check-row.is-container.checked > .checkbox {
   background: var(--accent); border-style: solid; opacity: 1;
 }
-#bt-app .step-bash {
+#bt-app .step-bash, #bt-app .step-more {
   background: none; border: none; cursor: pointer; font-size:16px; line-height: 1;
   padding: 2px 4px; margin-left: 4px; align-self: center; flex-shrink: 0; opacity: .4;
 }
-#bt-app .step-bash:hover { opacity: 1; }
+#bt-app .step-bash:hover, #bt-app .step-more:hover { opacity: 1; }
+#bt-app .step-more { font-size: 20px; color: var(--text); }
+#bt-app .check-title.bt-editable, #bt-app .detail-title.bt-editable,
+#bt-app .detail-desc.bt-editable { cursor: text; }
+#bt-app .detail-desc {
+  color: var(--text-muted); font-size: 16px; line-height: 1.55; margin-bottom: 14px;
+  white-space: pre-wrap;
+}
+#bt-app .detail-desc.is-empty { color: var(--text-faint); font-style: italic; }
 
 /* Step assignee chip + picker (G — multi-person projects) */
 #bt-app .step-assignee {
@@ -1641,6 +1649,41 @@ textarea{resize:vertical;min-height:60px}
 .bt-assignee-item .bt-avatar { width: 22px; height: 22px; font-size: 10px; }
 .bt-assignee-clear { color: var(--text-muted); }
 
+/* Inline editing (H) — a field that sits in place of its display node */
+#bt-app .bt-inline {
+  font: inherit; color: var(--text); width: 100%; box-sizing: border-box;
+  padding: 1px 4px; margin: -2px 0; border: 1px solid var(--accent);
+  border-radius: 6px; background: var(--card); line-height: inherit;
+}
+#bt-app textarea.bt-inline { resize: vertical; line-height: 1.5; min-height: 3em; }
+#bt-app .bt-inline:focus { outline: none; box-shadow: 0 0 0 2px var(--accent)33; }
+
+/* Anchored popover — shared by the inline due-date / estimate pickers (H) */
+.bt-popover {
+  position: absolute; z-index: 60; min-width: 180px; max-width: min(320px, 92vw);
+  padding: 6px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow);
+}
+.bt-popover-item {
+  display: flex; align-items: center; width: 100%; text-align: left;
+  padding: 7px 9px; border: none; background: none; border-radius: 7px;
+  cursor: pointer; font: inherit; color: var(--text);
+}
+.bt-popover-item:hover { background: var(--elevated); }
+.bt-popover-item.is-sel { color: var(--accent); font-weight: 600; }
+
+/* Inline status / category pickers in the project header (H) */
+#bt-app .bt-meta-select {
+  width: auto; max-width: 12rem; margin: 0; font: inherit; font-size: 13px;
+  border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px;
+  background: var(--elevated); color: var(--text-muted); cursor: pointer;
+}
+#bt-app .bt-meta-select:focus { outline: none; border-color: var(--accent); }
+#bt-app .bt-status-select {
+  font-weight: 600; letter-spacing: .03em; border-color: transparent;
+  background: var(--tab-color, var(--accent))22; color: var(--tab-color, var(--accent));
+}
+
 /* Sub-step breadcrumb in the cross-project lists (search / Next / Review / Due) */
 #bt-app .bt-crumb { color: var(--text-muted); font-weight: 400; }
 
@@ -1655,13 +1698,19 @@ textarea{resize:vertical;min-height:60px}
 
 /* Step form — due-date chips + time-needed slider */
 .modal-overlay .bt-date-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 20px 4px; }
-.modal-overlay .bt-chip {
+.bt-popover .bt-date-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.modal-overlay .bt-chip, .bt-popover .bt-chip {
   background: var(--elevated); color: var(--text-sub); border: 1px solid transparent;
   border-radius: 99px; padding: 5px 11px; font: inherit; font-size:14px; font-weight: 600;
   cursor: pointer;
 }
-.modal-overlay .bt-chip:hover { border-color: var(--border-strong); }
-.modal-overlay .bt-chip-clear { color: var(--text-muted); }
+.modal-overlay .bt-chip:hover, .bt-popover .bt-chip:hover { border-color: var(--border-strong); }
+.modal-overlay .bt-chip-clear, .bt-popover .bt-chip-clear { color: var(--text-muted); }
+.bt-popover .bt-due input[type=date] {
+  width: 100%; box-sizing: border-box; padding: 6px 8px; font: inherit;
+  border: 1px solid var(--border); border-radius: 7px; background: var(--card); color: var(--text);
+}
+#bt-app .check-sub .bt-sub-hit { cursor: pointer; text-decoration-line: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
 .modal-overlay .bt-est { display: flex; align-items: center; gap: 12px; margin: 2px 20px 4px; }
 .modal-overlay .bt-est-slider { flex: 1; accent-color: var(--accent); }
 .modal-overlay .bt-est-label {
