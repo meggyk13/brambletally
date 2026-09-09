@@ -4407,14 +4407,27 @@ function renderProject(app) {
     openListingForm(p.id, null, (id) => openListing(id))
   );
   if (canEdit) on(view, '#bt-editproj', 'click', () => openProjectForm(p));
+  // Persist a project-field edit, then refetch the bundle and repaint.
+  // refreshDetail() rebuilds only the panel, so after a step edit swaps
+  // state.project these header handlers close over a stale bundle — always
+  // re-read state.project on the way out rather than mutating the closed-over
+  // one.
+  // Caller supplies the error handling (inlineEdit wraps onSave in guard; the
+  // <select> handlers guard explicitly).
+  const saveProjectField = async (patch) => {
+    await API.updateProject(p.id, patch);
+    try {
+      state.project = await API.getProject(p.id);
+    } catch {
+      /* keep the bundle we have */
+    }
+    renderApp();
+  };
   if (canEdit)
     on(view, '.detail-title', 'click', (e) =>
       inlineEdit(e.currentTarget, {
         value: p.title,
-        onSave: async (title) => {
-          await API.updateProject(p.id, { title });
-          p.title = title;
-        },
+        onSave: (title) => saveProjectField({ title }),
       })
     );
   if (canEdit)
@@ -4423,51 +4436,38 @@ function renderProject(app) {
         value: p.description || '',
         multiline: true,
         placeholder: 'Add a description',
-        onSave: async (description) => {
-          await API.updateProject(p.id, { description: description || null });
-          p.description = description || null;
-        },
+        onSave: (description) => saveProjectField({ description: description || null }),
       })
     );
   if (canEdit) {
     on(view, '.bt-status-select', 'change', async (e) => {
-      const status = e.currentTarget.value;
       try {
-        await guard(() => API.updateProject(p.id, { status }));
+        await guard(() => saveProjectField({ status: e.currentTarget.value }));
       } catch {
-        e.currentTarget.value = p.status;
-        return;
+        e.currentTarget.value = state.project.project.status;
       }
-      p.status = status;
-      renderApp();
     });
     on(view, '.bt-cat-select', 'change', async (e) => {
       const sel = e.currentTarget;
+      const revert = () => (sel.value = state.project.project.category || '');
       let category;
       if (sel.value === '__new') {
         const name = await btPrompt('New category');
-        if (!name) {
-          sel.value = p.category || '';
-          return;
-        }
+        if (!name) return revert();
         try {
           category = (await guard(() => API.createCategory(name))).category.name;
+          await loadCategories(); // so the new one is an option everywhere
         } catch {
-          sel.value = p.category || '';
-          return;
+          return revert();
         }
       } else {
         category = sel.value || null;
       }
       try {
-        await guard(() => API.updateProject(p.id, { category }));
+        await guard(() => saveProjectField({ category }));
       } catch {
-        sel.value = p.category || '';
-        return;
+        revert();
       }
-      p.category = category;
-      await loadCategories();
-      renderApp();
     });
   }
   view.querySelector('#bt-sessions-slot').appendChild(sessionsBlock(b));

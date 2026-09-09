@@ -1674,9 +1674,9 @@ textarea{resize:vertical;min-height:60px}
 
 /* Inline status / category pickers in the project header (H) */
 #bt-app .bt-meta-select {
-  font: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: 6px;
-  padding: 2px 6px; background: var(--card); color: var(--text-muted); cursor: pointer;
-  max-width: 45vw;
+  width: auto; max-width: 12rem; margin: 0; font: inherit; font-size: 13px;
+  border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px;
+  background: var(--elevated); color: var(--text-muted); cursor: pointer;
 }
 #bt-app .bt-meta-select:focus { outline: none; border-color: var(--accent); }
 #bt-app .bt-status-select {
