@@ -638,6 +638,17 @@ is the "links back to the app" payoff.
 
 ## Planned: personal-utility batch + project export + category rework (spec'd 2026-09-08)
 
+**Status: A–G built on `personal-utility-batch` (PR #19), rebased onto `main`
+after PR #18 merged, 2026-09-08.** Eight feature commits: A category rework,
+migration `0013`, B timezone, F archive, C duplicate, G assignee, D reminders +
+email-default flip, E printable export. Each backend path unit-tested against
+`node:sqlite`; B/C/F/G/E browser-verified against `wrangler dev` (incl. after
+the rebase). **Not built:** H (inline editing) — its own follow-on, surfaces
+land independently. **Still open:** run
+`migrations/0013_personal_utility.sql` against prod D1 after merge; E's
+`work_sessions`-based "upcoming focus sessions" summary stat is still a TODO
+(the table now exists post-#18).
+
 Comes out of the "comparable apps" gap review in the 2026-09-08 session. Six
 additions (A–G) in one batch. None of it is social — this is the personal and
 small-team side of the app catching up. Ordered so the no-schema piece can land
