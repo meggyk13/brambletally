@@ -1615,6 +1615,32 @@ textarea{resize:vertical;min-height:60px}
 }
 #bt-app .step-bash:hover { opacity: 1; }
 
+/* Step assignee chip + picker (G — multi-person projects) */
+#bt-app .step-assignee {
+  background: none; border: none; cursor: pointer; padding: 0; margin-left: 4px;
+  align-self: center; flex-shrink: 0; line-height: 0;
+}
+#bt-app .step-assignee .bt-avatar { width: 24px; height: 24px; font-size: 10px; }
+#bt-app .step-assignee-empty {
+  width: 24px; height: 24px; border-radius: 999px; font-size: 15px; line-height: 22px;
+  color: var(--text-muted); border: 1px dashed var(--border-strong); opacity: .6;
+}
+#bt-app .step-assignee-empty:hover { opacity: 1; }
+.bt-assignee-menu {
+  position: absolute; z-index: 60; min-width: 180px; padding: 4px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.bt-assignee-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 7px 8px; border: none; background: none; border-radius: 7px; cursor: pointer;
+  font: inherit; color: var(--text);
+}
+.bt-assignee-item:hover { background: var(--elevated); }
+.bt-assignee-item.is-sel { color: var(--accent); font-weight: 600; }
+.bt-assignee-item .bt-avatar { width: 22px; height: 22px; font-size: 10px; }
+.bt-assignee-clear { color: var(--text-muted); }
+
 /* Sub-step breadcrumb in the cross-project lists (search / Next / Review / Due) */
 #bt-app .bt-crumb { color: var(--text-muted); font-weight: 400; }
 

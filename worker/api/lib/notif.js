@@ -9,6 +9,7 @@ export const NOTIF_TYPES = [
   'contributor_decided',
   'board_comment',
   'board_reply',
+  'step_assigned',
 ];
 
 export const DEFAULT_NOTIF_PREFS = {
@@ -19,6 +20,7 @@ export const DEFAULT_NOTIF_PREFS = {
     contributor_decided: true,
     board_comment: true,
     board_reply: true,
+    step_assigned: true,
   },
 };
 

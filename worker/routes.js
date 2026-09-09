@@ -27,6 +27,7 @@ import * as sessionsList from './api/sessions.js';
 import * as sessionDetail from './api/sessions/id.js';
 import * as calendarFeed from './api/calendar/token.js';
 import * as review from './api/review.js';
+import * as tasks from './api/tasks.js';
 import * as search from './api/search.js';
 import * as categories from './api/categories/index.js';
 import * as category from './api/categories/categoryId.js';
@@ -97,6 +98,7 @@ export const routes = [
   ['/api/sessions/:id', sessionDetail],
   ['/api/calendar/:token', calendarFeed],
   ['/api/review', review],
+  ['/api/tasks', tasks],
   ['/api/search', search],
   ['/api/categories', categories],
   ['/api/categories/:categoryId', category],

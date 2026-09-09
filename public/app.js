@@ -106,6 +106,7 @@ const API = {
   updateProject: (id, b) => api('/api/projects/' + id, { method: 'PATCH', body: b }),
   deleteProject: (id) => api('/api/projects/' + id, { method: 'DELETE' }),
   duplicateProject: (id) => api('/api/projects/' + id + '/duplicate', { method: 'POST' }),
+  getTasks: () => api('/api/tasks?scope=mine'),
 
   addStep: (pid, b) => api(`/api/projects/${pid}/steps`, { method: 'POST', body: b }),
   updateStep: (pid, sid, b) =>
@@ -528,12 +529,13 @@ const state = {
   categories: [], // [{id, name, sort_order}]
   filterStatus: 'Active',
   filterCategory: 'all', // 'all' | 'none' | a category name
-  homeMode: 'projects', // 'projects' | 'quick'
+  homeMode: 'projects', // 'projects' | 'quick' | 'mine'
   quickCap: 30, // minutes ceiling for the Quick tasks list; Infinity = all
   boardMode: 'listings', // 'listings' | 'activity'
   feedFilter: 'all', // 'all' | 'following'
   project: null, // full bundle when view === 'project'
   detailTab: 'steps',
+  stepFilterAssignee: 'all', // 'all' | 'me' | a collaborator user_id (project detail, multi-person)
   doneThisSession: 0,
 };
 
@@ -1157,6 +1159,56 @@ function initials(name) {
 }
 const avatarEl = (nameForInitials, extra = '') =>
   `<span class="bt-avatar ${extra}">${esc(initials(nameForInitials))}</span>`;
+
+// Resolve a user id to a display name from a project bundle's collaborator list.
+function collabName(b, userId) {
+  const c = (b.collaborators || []).find((x) => x.user_id === userId);
+  if (!c) return null;
+  return c.name || (c.email ? c.email.split('@')[0] : '@?');
+}
+
+// A small floating menu of the project's collaborators, anchored under `anchor`.
+// Picking one assigns the step; "Unassign" clears it.
+function openAssigneeMenu(anchor, b, s, rerender) {
+  document.querySelector('.bt-assignee-menu')?.remove();
+  const menu = h('<div class="bt-assignee-menu"></div>');
+  const pick = async (uid) => {
+    menu.remove();
+    document.removeEventListener('click', onDoc, true);
+    try {
+      await guard(() => API.updateStep(b.project.id, s.id, { assignee_id: uid }));
+    } catch {
+      return;
+    }
+    rerender();
+  };
+  (b.collaborators || []).forEach((c) => {
+    const name = c.name || (c.email ? c.email.split('@')[0] : '@?');
+    const item = h(
+      `<button class="bt-assignee-item${s.assignee_id === c.user_id ? ' is-sel' : ''}">${avatarEl(
+        name
+      )}<span>${esc(name)}</span></button>`
+    );
+    item.addEventListener('click', () => pick(c.user_id));
+    menu.appendChild(item);
+  });
+  if (s.assignee_id) {
+    const un = h('<button class="bt-assignee-item bt-assignee-clear">Unassign</button>');
+    un.addEventListener('click', () => pick(null));
+    menu.appendChild(un);
+  }
+  const r = anchor.getBoundingClientRect();
+  menu.style.top = window.scrollY + r.bottom + 4 + 'px';
+  menu.style.left = Math.max(8, window.scrollX + r.right - 190) + 'px';
+  document.body.appendChild(menu);
+  const onDoc = (e) => {
+    if (!menu.contains(e.target) && e.target !== anchor) {
+      menu.remove();
+      document.removeEventListener('click', onDoc, true);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', onDoc, true), 0);
+}
 
 function openProfile(handle) {
   if (!handle) return;
@@ -3383,8 +3435,9 @@ async function renderHome(main) {
 
   const modes = h(`
     <div class="bt-home-modes">
-      <button class="bt-home-mode${state.homeMode !== 'quick' ? ' active' : ''}" data-mode="projects">Projects</button>
+      <button class="bt-home-mode${state.homeMode === 'projects' ? ' active' : ''}" data-mode="projects">Projects</button>
       <button class="bt-home-mode${state.homeMode === 'quick' ? ' active' : ''}" data-mode="quick">Quick tasks</button>
+      <button class="bt-home-mode${state.homeMode === 'mine' ? ' active' : ''}" data-mode="mine">My tasks</button>
     </div>
   `);
   on(modes, '.bt-home-mode', 'click', (e) => {
@@ -3395,6 +3448,11 @@ async function renderHome(main) {
 
   if (state.homeMode === 'quick') {
     renderQuickTasks(wrap, review);
+    main.replaceChildren(wrap);
+    return;
+  }
+  if (state.homeMode === 'mine') {
+    await renderMyTasks(wrap);
     main.replaceChildren(wrap);
     return;
   }
@@ -3539,6 +3597,56 @@ function renderQuickTasks(wrap, review) {
       row.classList.add('done');
       try {
         await API.updateStep(r.projectId, r.id, { completed: true });
+      } catch {
+        row.classList.remove('done');
+        toast('Could not update');
+        return;
+      }
+      state.doneThisSession++;
+      setTimeout(() => {
+        row.remove();
+        if (!list.querySelector('.next-row')) renderApp();
+      }, 320);
+    });
+    list.appendChild(row);
+  });
+  wrap.appendChild(list);
+}
+
+// Home "My tasks" — open leaf steps assigned to me across every project.
+async function renderMyTasks(wrap) {
+  let tasks;
+  try {
+    ({ tasks } = await guard(() => API.getTasks()));
+  } catch {
+    return;
+  }
+  if (!tasks.length) {
+    wrap.appendChild(
+      h('<div class="empty">Nothing is assigned to you. Steps you\'re given on shared projects show up here.</div>')
+    );
+    return;
+  }
+  const list = h('<div class="next-wrap"></div>');
+  tasks.forEach((t) => {
+    const tail = [t.due_date ? 'due ' + fmtDate(t.due_date) : '', t.estimate_minutes ? '~' + fmtDuration(t.estimate_minutes) : '']
+      .filter(Boolean)
+      .join(' · ');
+    const row = h(`
+      <div class="next-row" data-step="${t.id}">
+        <button class="checkbox" aria-label="Mark done"></button>
+        <div class="next-row-main">
+          <div class="next-row-title">${crumb(t.title)}</div>
+          <div class="next-row-sub">${esc(t.project_title)}${tail ? ' · ' + esc(tail) : ''}</div>
+        </div>
+      </div>
+    `);
+    row.querySelector('.next-row-main').addEventListener('click', () => openProject(t.project_id));
+    row.querySelector('.checkbox').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      row.classList.add('done');
+      try {
+        await API.updateStep(t.project_id, t.id, { completed: true });
       } catch {
         row.classList.remove('done');
         toast('Could not update');
@@ -4254,8 +4362,19 @@ function stepsPanel(b, canEdit) {
   const wrap = h('<div class="detail-panel"></div>');
   const rerender = refreshDetail;
   const tree = stepTree(b.steps);
-  const open = tree.top.filter((s) => !s.completed);
+  let open = tree.top.filter((s) => !s.completed);
   const done = tree.top.filter((s) => s.completed);
+
+  const multiPerson = (b.collaborators || []).length > 1;
+  if (multiPerson) {
+    const af = state.stepFilterAssignee || 'all';
+    const wanted = af === 'me' ? state.me.user.id : af;
+    if (af !== 'all') {
+      const hit = (st) => st.assignee_id === wanted;
+      open = open.filter((s) => hit(s) || tree.kidsOf(s.id).some(hit));
+    }
+    wrap.appendChild(assigneeFilterRow(b));
+  }
 
   wrap.appendChild(
     sectionHeader('Steps', open.length, canEdit ? () => openStepForm(b, null, rerender) : null)
@@ -4266,6 +4385,8 @@ function stepsPanel(b, canEdit) {
     listEl.appendChild(
       h(`<div class="empty-section">${canEdit ? 'No steps yet — add the first one.' : 'No steps yet.'}</div>`)
     );
+  } else if (!open.length && multiPerson && state.stepFilterAssignee !== 'all') {
+    listEl.appendChild(h('<div class="empty-section">No open steps for that person.</div>'));
   }
   open.forEach((s) => listEl.appendChild(stepBlock(b, s, tree, canEdit, rerender)));
   wrap.appendChild(listEl);
@@ -4284,6 +4405,30 @@ function stepsPanel(b, canEdit) {
     wrap.appendChild(doneList);
   }
   return wrap;
+}
+
+// "Everyone · Me · <name>…" — narrows the step list by assignee. Shown only on
+// projects with more than one collaborator.
+function assigneeFilterRow(b) {
+  const cur = state.stepFilterAssignee || 'all';
+  const opts = [
+    ['all', 'Everyone'],
+    ['me', 'Me'],
+    ...(b.collaborators || [])
+      .filter((c) => c.user_id !== state.me.user.id)
+      .map((c) => [c.user_id, c.name || (c.email ? c.email.split('@')[0] : '@?')]),
+  ];
+  const rowEl = h('<div class="tabs bt-assignee-filter" style="margin-bottom:10px"></div>');
+  opts.forEach(([v, label]) => {
+    const bn = h(`<button class="tab${cur === v ? ' active' : ''}">${esc(label)}</button>`);
+    bn.addEventListener('click', () => {
+      state.stepFilterAssignee = v;
+      const panel = document.getElementById('bt-panel');
+      if (panel) renderPanel(panel);
+    });
+    rowEl.appendChild(bn);
+  });
+  return rowEl;
 }
 
 // A top-level step plus, if it's a container, its sub-steps indented beneath.
@@ -4314,6 +4459,18 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
 
   const boxDisabled = !canEdit || isContainer;
   const showBash = canEdit && !isChild;
+  const multiPerson = (b.collaborators || []).length > 1;
+  const assigneeNm = s.assignee_id ? collabName(b, s.assignee_id) : null;
+  const showAssignee = multiPerson || !!s.assignee_id;
+  const assigneeHtml = !showAssignee
+    ? ''
+    : assigneeNm
+      ? `<button class="step-assignee" title="Assigned to ${esc(assigneeNm)}" aria-label="Assigned to ${esc(
+          assigneeNm
+        )}">${avatarEl(assigneeNm)}</button>`
+      : canEdit
+        ? `<button class="step-assignee step-assignee-empty" title="Assign" aria-label="Assign this step">+</button>`
+        : '';
   const row = h(`
     <div class="check-row${s.completed ? ' checked' : ''}${isChild ? ' is-child' : ''}${
       isContainer ? ' is-container' : ''
@@ -4325,6 +4482,7 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
         <div class="check-title">${esc(s.title)}</div>
         ${bits.length ? `<div class="check-sub">${bits.join(' · ')}</div>` : ''}
       </div>
+      ${assigneeHtml}
       ${
         showBash
           ? `<button class="step-bash" title="${
@@ -4343,6 +4501,10 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
       });
     }
     on(row, '.check-content', 'click', () => openStepForm(b, s, rerender, { isContainer }));
+    on(row, '.step-assignee', 'click', (e) => {
+      e.stopPropagation();
+      openAssigneeMenu(e.currentTarget, b, s, rerender);
+    });
     if (showBash) {
       on(row, '.step-bash', 'click', (e) => {
         e.stopPropagation();

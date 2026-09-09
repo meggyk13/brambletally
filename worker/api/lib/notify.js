@@ -33,6 +33,11 @@ export function notifCopy(type, actorName, preview) {
       return { subject: `${actorName} commented on your listing`, line: `${actorName} commented on your listing${q}.` };
     case 'board_reply':
       return { subject: `${actorName} replied to your comment`, line: `${actorName} replied to your comment${q}.` };
+    case 'step_assigned':
+      return {
+        subject: `${actorName} assigned you a step`,
+        line: `${actorName} assigned you a step${q}.`,
+      };
     default:
       return { subject: 'New activity on Brambletally', line: 'You have new activity.' };
   }

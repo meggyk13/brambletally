@@ -1,6 +1,7 @@
 import { json, error, readJson } from '../../../lib/http.js';
 import { requireProject, touchStmt, parentRollupStmt } from '../../../lib/projects.js';
 import { pick, isNonEmptyString, STEP_ESTIMATES } from '../../../lib/validate.js';
+import { notify } from '../../../lib/notify.js';
 
 export async function onRequestPatch(context) {
   const { id, stepId } = context.params;
@@ -17,6 +18,7 @@ export async function onRequestPatch(context) {
     'notes',
     'estimate_minutes',
     'sort_order',
+    'assignee_id',
   ]);
   if ('title' in fields && !isNonEmptyString(fields.title)) return error(400, 'Title cannot be empty');
   if ('title' in fields) fields.title = fields.title.trim();
@@ -31,10 +33,22 @@ export async function onRequestPatch(context) {
       fields.estimate_minutes = n;
     }
   }
+  if ('assignee_id' in fields) {
+    if (fields.assignee_id == null || fields.assignee_id === '') {
+      fields.assignee_id = null;
+    } else {
+      const member = await context.env.DB.prepare(
+        'SELECT 1 FROM project_collaborators WHERE project_id = ? AND user_id = ?'
+      )
+        .bind(id, fields.assignee_id)
+        .first();
+      if (!member) return error(400, 'Assignee must be a project member');
+    }
+  }
   if (Object.keys(fields).length === 0) return error(400, 'Nothing to update');
 
   const step = await context.env.DB.prepare(
-    'SELECT parent_step_id FROM project_steps WHERE id = ? AND project_id = ?'
+    'SELECT parent_step_id, assignee_id FROM project_steps WHERE id = ? AND project_id = ?'
   )
     .bind(stepId, id)
     .first();
@@ -85,6 +99,24 @@ export async function onRequestPatch(context) {
   const updated = await context.env.DB.prepare('SELECT * FROM project_steps WHERE id = ?')
     .bind(stepId)
     .first();
+
+  // Tell the new assignee — only when it actually changed and isn't the actor.
+  if (
+    'assignee_id' in fields &&
+    fields.assignee_id &&
+    fields.assignee_id !== step.assignee_id &&
+    fields.assignee_id !== g.user.id
+  ) {
+    await notify(context, {
+      recipientId: fields.assignee_id,
+      actorId: g.user.id,
+      type: 'step_assigned',
+      subjectType: 'step',
+      subjectId: stepId,
+      preview: updated.title,
+    });
+  }
+
   return json({ step: updated });
 }
 
