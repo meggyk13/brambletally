@@ -1615,7 +1615,7 @@ textarea{resize:vertical;min-height:60px}
 }
 #bt-app .step-bash:hover, #bt-app .step-more:hover { opacity: 1; }
 #bt-app .step-more { font-size: 20px; color: var(--text); }
-#bt-app .check-title.bt-editable { cursor: text; }
+#bt-app .check-title.bt-editable, #bt-app .detail-title.bt-editable { cursor: text; }
 
 /* Step assignee chip + picker (G — multi-person projects) */
 #bt-app .step-assignee {

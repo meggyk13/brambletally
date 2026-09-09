@@ -411,6 +411,10 @@ function inlineEdit(displayEl, { value, multiline = false, validate, onSave } = 
       : '<input class="bt-inline editing" type="text" />'
   );
   field.value = orig;
+  const cs = getComputedStyle(displayEl);
+  ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'color'].forEach(
+    (k) => (field.style[k] = cs[k])
+  );
   displayEl.dataset.editing = '1';
   displayEl.replaceWith(field);
   field.focus();
@@ -4301,7 +4305,7 @@ function renderProject(app) {
           <button class="detail-back" id="bt-dupproj">Duplicate</button>
           ${canEdit ? '<button class="detail-back" id="bt-editproj">Edit</button>' : ''}
         </div>
-        <h1 class="detail-title">${esc(p.title)}</h1>
+        <h1 class="detail-title${canEdit ? ' bt-editable' : ''}">${esc(p.title)}</h1>
         <div class="detail-meta">
           <span class="status-pill" style="--tab-color:${STATUS_COLOR[p.status]}">${esc(p.status)}</span>
           ${p.category ? `<span>${esc(p.category)}</span>` : ''}
@@ -4356,6 +4360,16 @@ function renderProject(app) {
     openListingForm(p.id, null, (id) => openListing(id))
   );
   if (canEdit) on(view, '#bt-editproj', 'click', () => openProjectForm(p));
+  if (canEdit)
+    on(view, '.detail-title', 'click', (e) =>
+      inlineEdit(e.currentTarget, {
+        value: p.title,
+        onSave: async (title) => {
+          await API.updateProject(p.id, { title });
+          p.title = title;
+        },
+      })
+    );
   view.querySelector('#bt-sessions-slot').appendChild(sessionsBlock(b));
   on(view, '#bt-printproj', 'click', () => window.open('/api/projects/' + p.id + '/print', '_blank'));
   on(view, '#bt-dupproj', 'click', async () => {
