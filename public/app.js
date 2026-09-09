@@ -4577,7 +4577,12 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
     );
   if (isContainer)
     bits.push(`<span>${kids.filter((k) => k.completed).length}/${kids.length} done</span>`);
-  if (shownEst) bits.push(`<span>${(isContainer ? '≈ ' : '~') + esc(fmtDuration(shownEst))}</span>`);
+  if (shownEst) {
+    const estTxt = (isContainer ? '≈ ' : '~') + esc(fmtDuration(shownEst));
+    bits.push(
+      hitDue ? `<span class="bt-sub-est bt-sub-hit">${estTxt}</span>` : `<span>${estTxt}</span>`
+    );
+  }
   if (!isContainer && s.notes) bits.push(`<span>${esc(s.notes)}</span>`);
 
   const boxDisabled = !canEdit || isContainer;
@@ -4664,6 +4669,28 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
           }),
           { align: 'left' }
         );
+      });
+      on(row, '.bt-sub-est', 'click', (e) => {
+        e.stopPropagation();
+        const curIdx = s.estimate_minutes ? STEP_ESTIMATES.indexOf(s.estimate_minutes) + 1 : 0;
+        const menu = h('<div></div>');
+        STEP_ESTIMATE_LABELS.forEach((label, idx) => {
+          const item = h(
+            `<button class="bt-popover-item${idx === curIdx ? ' is-sel' : ''}">${esc(label)}</button>`
+          );
+          item.addEventListener('click', async () => {
+            pop.close();
+            const mins = idx > 0 ? STEP_ESTIMATES[idx - 1] : null;
+            try {
+              await guard(() => API.updateStep(b.project.id, s.id, { estimate_minutes: mins }));
+            } catch {
+              return;
+            }
+            rerender();
+          });
+          menu.appendChild(item);
+        });
+        const pop = popover(e.currentTarget, menu, { align: 'left' });
       });
     } else {
       on(row, '.check-content', 'click', () => openStepForm(b, s, rerender, { isContainer }));
