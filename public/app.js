@@ -3703,8 +3703,15 @@ function projectCard(p) {
     </div>
   `);
   const open = () => openProject(p.id);
-  card.addEventListener('click', open);
+  card.addEventListener('click', (e) => {
+    // Let a nested control (e.g. the Unarchive button on the Archived view)
+    // handle its own activation instead of opening the project.
+    if (e.target.closest('button, a, input, select, textarea, label')) return;
+    open();
+  });
   card.addEventListener('keydown', (e) => {
+    // Only the card itself Enter/Space-activates — not a focused child button.
+    if (e.target !== card) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       open();
@@ -4382,6 +4389,13 @@ function stepsPanel(b, canEdit) {
 
   const multiPerson = (b.collaborators || []).length > 1;
   if (multiPerson) {
+    // Drop a stale filter that points at someone no longer on this project
+    // (switched projects, or the collaborator was removed) so it can't silently
+    // empty the list with no active chip to explain why.
+    const af0 = state.stepFilterAssignee;
+    if (af0 && af0 !== 'all' && af0 !== 'me' && !b.collaborators.some((c) => c.user_id === af0)) {
+      state.stepFilterAssignee = 'all';
+    }
     const af = state.stepFilterAssignee || 'all';
     const wanted = af === 'me' ? state.me.user.id : af;
     if (af !== 'all') {
