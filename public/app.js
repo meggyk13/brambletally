@@ -4290,6 +4290,12 @@ function renderProject(app) {
   }
   const p = b.project;
   const canEdit = p.role === 'owner' || p.role === 'editor';
+  // Deep-linking straight to a project can land here before Home has loaded the
+  // category list; fetch it once so the inline category picker is populated.
+  if (canEdit && !state.categories.length && !state._catsLoaded) {
+    state._catsLoaded = true;
+    loadCategories().then(() => state.view === 'project' && renderApp());
+  }
   // Progress counts leaf steps only — a container's state is derived from them.
   const leaves = b.steps.filter((s) => !b.steps.some((o) => o.parent_step_id === s.id));
   const done = leaves.filter((s) => s.completed).length;
@@ -4307,8 +4313,36 @@ function renderProject(app) {
         </div>
         <h1 class="detail-title${canEdit ? ' bt-editable' : ''}">${esc(p.title)}</h1>
         <div class="detail-meta">
-          <span class="status-pill" style="--tab-color:${STATUS_COLOR[p.status]}">${esc(p.status)}</span>
-          ${p.category ? `<span>${esc(p.category)}</span>` : ''}
+          ${
+            canEdit
+              ? `<select class="bt-meta-select bt-status-select" style="--tab-color:${
+                  STATUS_COLOR[p.status]
+                }" aria-label="Status">${STATUSES.map(
+                  (s) => `<option ${p.status === s ? 'selected' : ''}>${esc(s)}</option>`
+                ).join('')}</select>`
+              : `<span class="status-pill" style="--tab-color:${STATUS_COLOR[p.status]}">${esc(
+                  p.status
+                )}</span>`
+          }
+          ${
+            canEdit
+              ? `<select class="bt-meta-select bt-cat-select" aria-label="Category">
+                  <option value=""${!p.category ? ' selected' : ''}>+ category</option>
+                  ${(p.category && !state.categories.some((c) => c.name === p.category)
+                    ? [{ name: p.category }]
+                    : []
+                  )
+                    .concat(state.categories)
+                    .map(
+                      (c) => `<option ${p.category === c.name ? 'selected' : ''}>${esc(c.name)}</option>`
+                    )
+                    .join('')}
+                  <option value="__new">＋ New category…</option>
+                </select>`
+              : p.category
+                ? `<span>${esc(p.category)}</span>`
+                : ''
+          }
           ${p.deadline ? `<span>due ${esc(fmtDate(p.deadline))}</span>` : ''}
           <button class="meta-people" id="bt-people">${icon('people', 16)} ${b.collaborators.length}${
             p.role !== 'owner' ? ` &middot; ${esc(p.role)}` : ''
@@ -4370,6 +4404,47 @@ function renderProject(app) {
         },
       })
     );
+  if (canEdit) {
+    on(view, '.bt-status-select', 'change', async (e) => {
+      const status = e.currentTarget.value;
+      try {
+        await guard(() => API.updateProject(p.id, { status }));
+      } catch {
+        e.currentTarget.value = p.status;
+        return;
+      }
+      p.status = status;
+      renderApp();
+    });
+    on(view, '.bt-cat-select', 'change', async (e) => {
+      const sel = e.currentTarget;
+      let category;
+      if (sel.value === '__new') {
+        const name = await btPrompt('New category');
+        if (!name) {
+          sel.value = p.category || '';
+          return;
+        }
+        try {
+          category = (await guard(() => API.createCategory(name))).category.name;
+        } catch {
+          sel.value = p.category || '';
+          return;
+        }
+      } else {
+        category = sel.value || null;
+      }
+      try {
+        await guard(() => API.updateProject(p.id, { category }));
+      } catch {
+        sel.value = p.category || '';
+        return;
+      }
+      p.category = category;
+      await loadCategories();
+      renderApp();
+    });
+  }
   view.querySelector('#bt-sessions-slot').appendChild(sessionsBlock(b));
   on(view, '#bt-printproj', 'click', () => window.open('/api/projects/' + p.id + '/print', '_blank'));
   on(view, '#bt-dupproj', 'click', async () => {

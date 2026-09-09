@@ -1666,6 +1666,18 @@ textarea{resize:vertical;min-height:60px}
 .bt-popover-item:hover { background: var(--elevated); }
 .bt-popover-item.is-sel { color: var(--accent); font-weight: 600; }
 
+/* Inline status / category pickers in the project header (H) */
+#bt-app .bt-meta-select {
+  font: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: 6px;
+  padding: 2px 6px; background: var(--card); color: var(--text-muted); cursor: pointer;
+  max-width: 45vw;
+}
+#bt-app .bt-meta-select:focus { outline: none; border-color: var(--accent); }
+#bt-app .bt-status-select {
+  font-weight: 600; letter-spacing: .03em; border-color: transparent;
+  background: var(--tab-color, var(--accent))22; color: var(--tab-color, var(--accent));
+}
+
 /* Sub-step breadcrumb in the cross-project lists (search / Next / Review / Due) */
 #bt-app .bt-crumb { color: var(--text-muted); font-weight: 400; }
 
