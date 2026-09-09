@@ -776,8 +776,10 @@ decides whether/when it emails.
   rows through `notify()` so the immediate-mode email path is reused.
 - **Cron:** add `"0 12 * * *"` (12:00 UTC daily) to `wrangler.jsonc`
   `triggers.crons` (keep the Sunday entry). In `worker/index.js` `scheduled()`,
-  branch on `event.cron`: `"0 15 * * 0"` → `runWeeklyDigest`; `"0 12 * * *"` →
+  branch on `event.cron`: `"0 15 * * 1"` → `runWeeklyDigest`; `"0 12 * * *"` →
   `runDueReminders`. Both under `ctx.waitUntil` with a `.catch`.
+  (CF day-of-week is 1-7, 1 = Sunday; `0` is rejected on deploy — fixed
+  2026-09-09, the digest cron never registered before that.)
 - **Settings:** the Notifications section's per-type toggle list gains
   `step_due` ("Reminders for steps due soon"); update the helper text to
   describe the new default (digest only).
