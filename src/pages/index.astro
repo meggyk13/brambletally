@@ -1,8 +1,7 @@
 ---
 // Brambletally — public landing page. The one indexable page; the app itself
 // lives at /app behind the login wall (see docs/plan.md "Planned: Landing page").
-// Own <html> shell, self-contained styles. Screenshot slots are placeholders
-// until the Pass-1 redesign is captured from the live app.
+// Own <html> shell, self-contained styles.
 const canonical = 'https://brambletally.com/';
 ---
 <!doctype html>
@@ -14,18 +13,18 @@ const canonical = 'https://brambletally.com/';
     <title>Brambletally — a keeping-book for makers</title>
     <meta
       name="description"
-      content="A quiet place to track craft, research, and event projects — steps, supplies, a timeline, focus time, and projects you share with others."
+      content="Track your sewing, research, event prep, and everything else with steps and a deadline."
     />
     <link rel="canonical" href={canonical} />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Brambletally — a keeping-book for makers" />
     <meta
       property="og:description"
-      content="A quiet place to track craft, research, and event projects. Free, works on your phone."
+      content="Project tracking for makers. Steps, supplies, deadlines. Free."
     />
     <meta property="og:url" content={canonical} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preload" href="/fonts/im-fell-english-400-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/uncial-antiqua-400-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/alegreya-sans-400-latin.woff2" as="font" type="font/woff2" crossorigin />
 
     <style>
@@ -46,8 +45,8 @@ const canonical = 'https://brambletally.com/';
         src: url('/fonts/eb-garamond-600-latin.woff2') format('woff2');
       }
       @font-face {
-        font-family: 'IM Fell English'; font-style: normal; font-weight: 400; font-display: swap;
-        src: url('/fonts/im-fell-english-400-latin.woff2') format('woff2');
+        font-family: 'Uncial Antiqua'; font-style: normal; font-weight: 400; font-display: swap;
+        src: url('/fonts/uncial-antiqua-400-latin.woff2') format('woff2');
       }
       @font-face {
         font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400; font-display: swap;
@@ -62,7 +61,7 @@ const canonical = 'https://brambletally.com/';
         --gold: #9a7526;
         --head: 'EB Garamond', Georgia, 'Times New Roman', serif;
         --body: 'Alegreya Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-        --display: 'IM Fell English', 'EB Garamond', Georgia, serif;
+        --display: 'Uncial Antiqua', 'EB Garamond', Georgia, serif;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -81,84 +80,122 @@ const canonical = 'https://brambletally.com/';
         font-family: var(--body); font-size: 1.0625rem; line-height: 1.65;
         -webkit-font-smoothing: antialiased;
       }
+
+      /* parchment grain */
+      body::after {
+        content: ''; position: fixed; inset: 0; pointer-events: none;
+        z-index: 9999; opacity: 0.028; mix-blend-mode: multiply;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+      @media (prefers-color-scheme: dark) {
+        body::after { mix-blend-mode: soft-light; opacity: 0.06; }
+      }
+
       .wrap { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
-      .prose { max-width: 62ch; }
+      .prose { max-width: 60ch; }
 
       a { color: var(--accent); }
       h1, h2, h3 { font-family: var(--head); font-weight: 600; line-height: 1.15; text-wrap: balance; margin: 0; }
       p { margin: 0 0 1rem; }
 
+      /* ── Topbar ──────────────────────────────────────────── */
       .topbar { display: flex; align-items: baseline; justify-content: space-between; padding: 22px 0 0; }
       .brand { font-family: var(--display); font-size: 1.5rem; color: var(--accent-2); letter-spacing: .01em; }
       .brand b { color: var(--gold); font-weight: 400; }
       .topbar a.signin {
         font-family: var(--body); font-weight: 600; font-size: .95rem;
         color: var(--text-sub); text-decoration: none; border: 1px solid var(--border-strong);
-        border-radius: 8px; padding: 7px 14px;
+        border-radius: 8px; padding: 7px 14px; transition: all .2s;
       }
       .topbar a.signin:hover { border-color: var(--accent); color: var(--accent); }
 
-      .hero { padding: clamp(48px, 9vw, 96px) 0 clamp(40px, 7vw, 72px); }
+      /* ── Hero ────────────────────────────────────────────── */
+      .hero { padding: clamp(44px, 8vw, 84px) 0 clamp(36px, 6vw, 56px); }
       .hero h1 {
         font-family: var(--display); font-weight: 400;
-        font-size: clamp(2.6rem, 7vw, 4.5rem); color: var(--accent-2); margin-bottom: .5rem;
+        font-size: clamp(2.6rem, 7vw, 4.5rem); color: var(--accent-2); margin-bottom: .4rem;
       }
       .hero .tagline {
         font-family: 'IBM Plex Mono', ui-monospace, monospace;
         text-transform: uppercase; letter-spacing: .18em; font-size: .8rem;
-        color: var(--text-muted); margin-bottom: 1.5rem;
+        color: var(--text-muted); margin-bottom: .75rem;
       }
-      .hero .lede { font-size: clamp(1.15rem, 2.4vw, 1.4rem); color: var(--text-sub); margin-bottom: 1.75rem; }
+      .hero-ornament { color: var(--accent); font-size: 1.3rem; margin-bottom: 1rem; opacity: 0.5; }
+      .hero .lede {
+        font-size: clamp(1.1rem, 2.2vw, 1.32rem);
+        color: var(--text-sub); margin-bottom: 1.75rem;
+      }
+
+      /* ── CTAs ────────────────────────────────────────────── */
       .cta {
         display: inline-block; background: var(--accent); color: var(--on-accent);
         font-family: var(--body); font-weight: 700; font-size: 1.05rem;
-        text-decoration: none; border-radius: 10px; padding: 13px 26px;
+        text-decoration: none; border-radius: 10px; padding: 13px 28px;
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 25%, transparent);
+        transition: transform .15s, box-shadow .15s;
       }
-      .cta:hover { opacity: .92; }
-      .cta.ghost { background: none; color: var(--text-sub); border: 1px solid var(--border-strong); margin-left: 10px; }
-      .cta.ghost:hover { color: var(--accent); border-color: var(--accent); }
-
-      .shot {
-        margin-top: clamp(32px, 6vw, 56px);
-        border: 1.5px dashed var(--border-strong); border-radius: 14px;
-        background: var(--card); aspect-ratio: 16 / 10; max-height: 460px;
-        display: flex; align-items: center; justify-content: center;
-        color: var(--text-muted); font-size: .95rem; text-align: center; padding: 20px;
+      .cta:hover { transform: translateY(-1px); box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 30%, transparent); }
+      .cta:active { transform: translateY(0); }
+      .cta.ghost {
+        background: none; color: var(--text-sub); border: 1px solid var(--border-strong);
+        margin-left: 10px; box-shadow: none;
       }
-      .shot.sm { aspect-ratio: 4 / 3; max-height: 220px; margin: 0; font-size: .85rem; }
+      .cta.ghost:hover { color: var(--accent); border-color: var(--accent); transform: none; }
 
-      section { padding: clamp(44px, 8vw, 80px) 0; border-top: 1px solid var(--border); }
-      section h2 { font-size: clamp(1.7rem, 4vw, 2.4rem); color: var(--text); margin-bottom: .75rem; }
-      section .intro { color: var(--text-sub); font-size: 1.1rem; margin-bottom: 2rem; }
+      /* ── Bramble divider ─────────────────────────────────── */
+      .vine { display: block; margin: 0 auto; width: 180px; height: 28px; }
 
+      /* ── Sections ────────────────────────────────────────── */
+      section { padding: clamp(36px, 6vw, 64px) 0; }
+      section h2 { font-size: clamp(1.6rem, 3.6vw, 2.25rem); color: var(--text); margin-bottom: .6rem; }
+      section .intro { color: var(--text-sub); font-size: 1.06rem; margin-bottom: 1.75rem; }
+
+      /* ── Category pills ──────────────────────────────────── */
       .kinds { display: flex; flex-wrap: wrap; gap: 10px; padding: 0; margin: 0; list-style: none; }
       .kinds li {
         border: 1px solid var(--border-strong); border-radius: 999px;
-        padding: 7px 15px; font-size: .95rem; color: var(--text-sub);
+        padding: 7px 16px; font-size: .95rem; color: var(--text-sub);
+        background: var(--card);
       }
 
-      .steps { display: grid; gap: 22px; grid-template-columns: repeat(2, 1fr); }
-      @media (max-width: 720px) { .steps { grid-template-columns: 1fr; } }
-      .step { border: 1px solid var(--border); border-radius: 14px; background: var(--card); padding: 20px; }
-      .step .n {
+      /* ── Feature cards ───────────────────────────────────── */
+      .features { display: grid; gap: 16px; grid-template-columns: repeat(2, 1fr); }
+      @media (max-width: 640px) { .features { grid-template-columns: 1fr; } }
+      .feature {
+        border: 1px solid var(--border); border-radius: 14px;
+        background: var(--card); padding: 20px 22px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.04);
+        transition: box-shadow .2s;
+      }
+      .feature:hover { box-shadow: 0 3px 12px rgba(0,0,0,.07); }
+      .feature .label {
         font-family: var(--head); font-weight: 600; color: var(--accent-2);
-        font-size: 1.25rem; margin-bottom: .35rem;
+        font-size: 1.2rem; margin-bottom: .3rem;
       }
-      .step p { margin: 0; color: var(--text-sub); font-size: 1rem; }
+      .feature p { margin: 0; color: var(--text-sub); font-size: .98rem; line-height: 1.55; }
 
+      /* ── Theme swatches ──────────────────────────────────── */
       .themes { display: flex; gap: 14px; flex-wrap: wrap; margin: 0 0 1.5rem; }
       .sw {
         display: flex; align-items: center; gap: 10px;
-        border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 10px 14px;
+        border: 1px solid var(--border); border-radius: 12px;
+        background: var(--card); padding: 12px 16px;
         font-weight: 600; color: var(--text);
       }
-      .sw .chip { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(0,0,0,.12); display: flex; align-items: flex-end; justify-content: center; gap: 3px; padding-bottom: 5px; }
+      .sw .chip {
+        width: 36px; height: 36px; border-radius: 8px;
+        border: 1px solid rgba(0,0,0,.1);
+        display: flex; align-items: flex-end; justify-content: center;
+        gap: 3px; padding-bottom: 5px;
+      }
       .sw .chip i { width: 8px; height: 8px; border-radius: 50%; display: block; }
-      .sw small { display: block; font-weight: 400; color: var(--text-muted); font-size: .8rem; }
+      .sw small { display: block; font-weight: 400; color: var(--text-muted); font-size: .82rem; }
 
-      .close { text-align: center; padding: clamp(56px, 10vw, 100px) 0; border-top: 1px solid var(--border); }
-      .close h2 { margin-bottom: 1.25rem; }
+      /* ── Closing ─────────────────────────────────────────── */
+      .closing { text-align: center; padding: clamp(28px, 5vw, 48px) 0 clamp(48px, 8vw, 80px); }
+      .closing .note { color: var(--text-muted); font-size: .95rem; margin-top: 1.25rem; }
 
+      /* ── Footer ──────────────────────────────────────────── */
       footer {
         border-top: 1px solid var(--border); padding: 28px 0 48px;
         display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
@@ -182,25 +219,33 @@ const canonical = 'https://brambletally.com/';
       <div class="hero prose">
         <h1>brambletally.</h1>
         <div class="tagline">a keeping-book for makers</div>
+        <div class="hero-ornament" aria-hidden="true">&#10087;</div>
         <p class="lede">
-          A quiet place to track the things you make — steps, supplies, a
-          timeline, a bit of focused time, and projects you keep with other
-          people.
+          Track the projects you're actually working on. Steps, supplies,
+          deadlines, and somewhere to write down where you left off.
         </p>
-        <a class="cta" href="/app">Start your keeping-book</a>
-        <a class="cta ghost" href="#how">See how it works</a>
+        <a class="cta" href="/app">Get started</a>
+        <a class="cta ghost" href="#how">How it works</a>
       </div>
-      <div class="shot" aria-hidden="true">Your projects, at a glance — screenshot coming once the new look ships</div>
     </div>
 
     <main class="wrap">
+      <svg class="vine" viewBox="0 0 200 28" aria-hidden="true">
+        <path d="M 0 14 Q 50 6, 100 14 T 200 14" fill="none" stroke="var(--border-strong)" stroke-width="0.75" opacity="0.5"/>
+        <circle cx="100" cy="10" r="3.2" fill="var(--accent)" opacity="0.65"/>
+        <circle cx="93" cy="14" r="2.5" fill="var(--accent)" opacity="0.45"/>
+        <circle cx="107" cy="14" r="2.5" fill="var(--accent)" opacity="0.45"/>
+        <path d="M 60 13 Q 56 7, 51 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+        <path d="M 140 13 Q 144 7, 149 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+      </svg>
+
       <section id="who">
         <div class="prose">
-          <h2>For long projects that live in your head</h2>
+          <h2>For the stuff that takes a while</h2>
           <p class="intro">
-            Sewing and making, a research project, prep for the next event,
-            admin that piles up, the household list that never ends. If it has
-            steps and it takes a while, it belongs here.
+            A costume with six parts. Research that won't stop branching.
+            Event prep with a hard deadline. The household list you keep
+            putting off.
           </p>
         </div>
         <ul class="kinds">
@@ -212,47 +257,72 @@ const canonical = 'https://brambletally.com/';
         </ul>
       </section>
 
+      <svg class="vine" viewBox="0 0 200 28" aria-hidden="true">
+        <path d="M 0 14 Q 55 20, 100 14 T 200 14" fill="none" stroke="var(--border-strong)" stroke-width="0.75" opacity="0.5"/>
+        <circle cx="96" cy="10" r="3" fill="var(--accent)" opacity="0.6"/>
+        <circle cx="103" cy="13" r="2.6" fill="var(--accent)" opacity="0.45"/>
+        <circle cx="90" cy="14.5" r="2.3" fill="var(--accent)" opacity="0.4"/>
+        <path d="M 55 15 Q 51 10, 47 14" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+        <path d="M 148 13 Q 153 8, 157 13" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+      </svg>
+
       <section id="how">
         <div class="prose">
           <h2>How it works</h2>
-          <p class="intro">Four small habits, nothing to learn.</p>
         </div>
-        <div class="steps">
-          <div class="step">
-            <div class="n">Catch the thought</div>
-            <p>Drop a loose idea in the inbox before it's gone. Sort it into a project later.</p>
+        <div class="features">
+          <div class="feature">
+            <div class="label">Inbox</div>
+            <p>Something pops into your head, throw it in. Sort it into a project later.</p>
           </div>
-          <div class="step">
-            <div class="n">Break it down</div>
-            <p>Turn a project into steps, and a step into sub-steps. Add supplies, a due date, notes.</p>
+          <div class="feature">
+            <div class="label">Steps</div>
+            <p>Break a project into pieces. Each step gets sub-steps, supplies, a due date, notes.</p>
           </div>
-          <div class="step">
-            <div class="n">Plan some focus</div>
-            <p>Pick a step, set a length, and work by candlelight. Stop whenever you need to.</p>
+          <div class="feature">
+            <div class="label">Focus</div>
+            <p>Pick a step and set a timer. A candle burns while you work.</p>
           </div>
-          <div class="step">
-            <div class="n">Look back weekly</div>
-            <p>One screen of everything active and waiting, for a calm review pass.</p>
+          <div class="feature">
+            <div class="label">Review</div>
+            <p>Once a week, everything active on one screen. What moved, what's stuck, what's next.</p>
           </div>
         </div>
       </section>
+
+      <svg class="vine" viewBox="0 0 200 28" aria-hidden="true">
+        <path d="M 0 14 Q 50 6, 100 14 T 200 14" fill="none" stroke="var(--border-strong)" stroke-width="0.75" opacity="0.5"/>
+        <circle cx="102" cy="10.5" r="3.1" fill="var(--accent)" opacity="0.65"/>
+        <circle cx="95" cy="14" r="2.4" fill="var(--accent)" opacity="0.45"/>
+        <circle cx="109" cy="13.5" r="2.6" fill="var(--accent)" opacity="0.45"/>
+        <path d="M 63 13 Q 59 7, 54 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+        <path d="M 142 14 Q 146 8, 151 13" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+      </svg>
 
       <section id="share">
         <div class="prose">
-          <h2>Made to share</h2>
+          <h2>Bring people in</h2>
           <p class="intro">
-            Invite someone to a project as a viewer or an editor. Hand a whole
-            project over when it's not yours to run any more. Everyone works
-            from the same steps and the same timeline.
+            Someone helping with a project? Add them. They can view or edit,
+            and they see the same steps and timeline you do. If a project
+            changes hands, pass it along.
           </p>
         </div>
-        <div class="shot sm" aria-hidden="true">A shared project — screenshot coming</div>
       </section>
 
-      <section id="keep">
+      <svg class="vine" viewBox="0 0 200 28" aria-hidden="true">
+        <path d="M 0 14 Q 48 20, 100 14 T 200 14" fill="none" stroke="var(--border-strong)" stroke-width="0.75" opacity="0.5"/>
+        <circle cx="98" cy="10" r="2.8" fill="var(--accent)" opacity="0.6"/>
+        <circle cx="105" cy="13" r="2.5" fill="var(--accent)" opacity="0.45"/>
+        <circle cx="92" cy="14" r="2.3" fill="var(--accent)" opacity="0.4"/>
+        <path d="M 57 15 Q 53 9, 48 14" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+        <path d="M 145 13 Q 150 7, 154 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+      </svg>
+
+      <section id="look">
         <div class="prose">
-          <h2>Yours to keep</h2>
-          <p class="intro">Pick a look that suits the work.</p>
+          <h2>Three palettes</h2>
+          <p class="intro">Each one in light and dark.</p>
         </div>
         <div class="themes">
           <span class="sw"><span class="chip" style="background:#f3ecdc"><i style="background:#6b3457"></i><i style="background:#4b6b3a"></i></span>Bramble<br /><small>blackberry &amp; hedgerow</small></span>
@@ -260,21 +330,21 @@ const canonical = 'https://brambletally.com/';
           <span class="sw"><span class="chip" style="background:#e9ece4"><i style="background:#2f6b6b"></i><i style="background:#54763a"></i></span>Fen<br /><small>misty marsh</small></span>
         </div>
         <div class="prose">
-          <p>
-            Light or dark, on your phone or a laptop. Sign in with a one-time
-            email link — no password to keep.
-          </p>
-          <p style="color:var(--text-muted); font-size:.98rem;">
-            Free, and staying that way. If it earns a place in your week, a
-            small yearly Supporter fee will add a badge and a few extra themes —
-            not built yet.
-          </p>
+          <p>Sign in with an email link. No password. Works on your phone.</p>
         </div>
       </section>
 
-      <div class="close wrap">
-        <h2>Tend your projects.</h2>
-        <a class="cta" href="/app">Start your keeping-book</a>
+      <div class="closing">
+        <svg class="vine" viewBox="0 0 200 28" aria-hidden="true">
+          <path d="M 0 14 Q 50 6, 100 14 T 200 14" fill="none" stroke="var(--border-strong)" stroke-width="0.75" opacity="0.5"/>
+          <circle cx="100" cy="10" r="3.2" fill="var(--accent)" opacity="0.65"/>
+          <circle cx="93" cy="14" r="2.5" fill="var(--accent)" opacity="0.45"/>
+          <circle cx="107" cy="14" r="2.5" fill="var(--accent)" opacity="0.45"/>
+          <path d="M 60 13 Q 56 7, 51 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+          <path d="M 140 13 Q 144 7, 149 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+        </svg>
+        <a class="cta" href="/app" style="margin-top:20px">Get started</a>
+        <div class="note">Free. No catch.</div>
       </div>
     </main>
 
@@ -290,14 +360,13 @@ const canonical = 'https://brambletally.com/';
     </div>
 
     <script is:inline>
-      // Swap the sign-in affordance for people who already have a session.
       fetch('/api/auth/me', { credentials: 'same-origin' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (me) {
           if (!me || !me.user) return;
           document.querySelectorAll('a.signin').forEach(function (a) { a.textContent = 'Open your projects'; });
           document.querySelectorAll('a.cta[href="/app"]').forEach(function (a) {
-            if (a.textContent.trim() === 'Start your keeping-book') a.textContent = 'Open your projects';
+            if (a.textContent.trim() === 'Get started') a.textContent = 'Open your projects';
           });
         })
         .catch(function () {});
