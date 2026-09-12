@@ -169,7 +169,8 @@ CREATE INDEX idx_reports_status ON reports(status, created_at);
 CREATE UNIQUE INDEX idx_reports_one_open
   ON reports(reporter_id, target_type, target_id) WHERE status = 'open';
 
--- Audit trail for admin sanctions.
+-- Audit trail for admin sanctions, and (migration 0014) manual Supporter
+-- grant/revoke — the stand-in for billing until a payment processor lands.
 CREATE TABLE moderation_actions (
   id             TEXT PRIMARY KEY,           -- uuid
   admin_id       TEXT NOT NULL REFERENCES users(id),
@@ -177,7 +178,8 @@ CREATE TABLE moderation_actions (
   report_id      TEXT REFERENCES reports(id) ON DELETE SET NULL,
   action         TEXT NOT NULL
                    CHECK(action IN ('board_block','board_unblock',
-                                    'disable','enable','content_removed')),
+                                    'disable','enable','content_removed',
+                                    'grant_supporter','revoke_supporter')),
   note           TEXT,
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -64,6 +64,7 @@ import * as adminReport from './api/admin/reports/reportId.js';
 import * as adminListings from './api/admin/listings.js';
 import * as adminUser from './api/admin/users/handle.js';
 import * as adminUserSanction from './api/admin/users/handle/sanction.js';
+import * as adminUserPlan from './api/admin/users/handle/plan.js';
 import * as settingsNotifPrefs from './api/settings/notif-prefs.js';
 import * as settingsExport from './api/settings/export.js';
 import * as settingsEmail from './api/settings/email.js';
@@ -139,6 +140,7 @@ export const routes = [
   ['/api/admin/listings', adminListings],
   ['/api/admin/users/:handle', adminUser],
   ['/api/admin/users/:handle/sanction', adminUserSanction],
+  ['/api/admin/users/:handle/plan', adminUserPlan],
   ['/api/settings/notif-prefs', settingsNotifPrefs],
   ['/api/settings/export', settingsExport],
   ['/api/settings/email', settingsEmail],

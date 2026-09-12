@@ -164,7 +164,11 @@ are what Supporter buys.
 - A **Supporter** section in Settings showing plan status — inert until there
   is something to buy.
 - **Manual grant** through the admin panel (set `plan`), so early supporters
-  and testers can be comped before Stripe exists.
+  and testers can be comped before Stripe exists. **Built 2026-09-12** —
+  `POST /api/admin/users/:handle/plan`, a Grant/Revoke Supporter button on the
+  admin User lookup card, logged to `moderation_actions` alongside sanctions
+  (migration 0014 widened its `action` CHECK to allow `grant_supporter` /
+  `revoke_supporter`).
 
 ### Gates (designed now, enforced as each feature lands)
 
@@ -690,6 +694,7 @@ DELETE /api/admin/interests/:slug      remove a junk/unused tag
 GET    /api/admin/listings             every listing incl. closed/archived
 GET    /api/admin/users/:handle        user detail + moderation history
 POST   /api/admin/users/:handle/sanction   { action: 'board_block'|'board_unblock'|'disable'|'enable', note?, reportId? }
+POST   /api/admin/users/:handle/plan   { plan: 'free'|'supporter', note? } — manual grant/revoke (2026-09-12)
 ```
 
 Taking down reported content reuses the existing owner-or-admin

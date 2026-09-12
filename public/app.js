@@ -231,6 +231,8 @@ const API = {
   adminUser: (handle) => api('/api/admin/users/' + encodeURIComponent(handle)),
   sanctionUser: (handle, body) =>
     api('/api/admin/users/' + encodeURIComponent(handle) + '/sanction', { method: 'POST', body }),
+  setUserPlan: (handle, body) =>
+    api('/api/admin/users/' + encodeURIComponent(handle) + '/plan', { method: 'POST', body }),
   saveNotifPrefs: (prefs) => api('/api/settings/notif-prefs', { method: 'PATCH', body: prefs }),
   changeEmail: (email) => api('/api/settings/email', { method: 'POST', body: { email } }),
   acceptTos: () => api('/api/legal/accept', { method: 'POST' }),
@@ -2239,6 +2241,22 @@ async function sanctionFromReport(handle, action, reportId, reload) {
   reload();
 }
 
+// Manual Supporter grant/revoke — the stand-in for billing until a payment
+// processor is wired up (docs/social-plan.md "Supporter tier").
+async function setPlanFromAdmin(handle, plan, reload) {
+  const verb = plan === 'supporter' ? 'Grant Supporter' : 'Revoke Supporter';
+  if (!(await btConfirm(`${verb} for @${handle}?`))) return;
+  const note = (await btPrompt('Note (optional)', '')) || null;
+  try {
+    await API.setUserPlan(handle, { plan, note });
+  } catch (ex) {
+    toast(ex.message || 'Could not apply');
+    return;
+  }
+  toast(`${verb} — done`);
+  reload();
+}
+
 // ── Admin: users ───────────────────────────────────────────────────────
 function adminUsersSection(host) {
   host.replaceChildren(
@@ -2304,6 +2322,15 @@ function adminUserCard(d, reload) {
     </div>
   `);
   const acts = card.querySelector('.bt-au-actions');
+  const planBtn = h(
+    `<button class="btn-sm ${u.plan === 'supporter' ? 'btn-sm-ghost' : ''}">${
+      u.plan === 'supporter' ? 'Revoke Supporter' : 'Grant Supporter'
+    }</button>`
+  );
+  planBtn.addEventListener('click', () =>
+    setPlanFromAdmin(u.handle, u.plan === 'supporter' ? 'free' : 'supporter', reload)
+  );
+  acts.appendChild(planBtn);
   if (!u.is_admin) {
     const mk = (action, label, danger) => {
       const b = h(`<button class="btn-sm ${danger ? 'btn-danger' : 'btn-sm-ghost'}">${label}</button>`);
