@@ -16,6 +16,13 @@ const STATUS_COLOR = {
   Paused: '#8a8578', // warm grey
   Done: '#5a8a5f', // settled green
 };
+const STATUS_ICON = {
+  Active: 'candle',
+  'Waiting For': 'hourglass',
+  Someday: 'leaf',
+  Paused: 'pause',
+  Done: 'check',
+};
 const CAT_COLOR = '#3a5fb0'; // cobalt for category chips
 const UNCATEGORIZED = 'Uncategorized';
 
@@ -265,7 +272,10 @@ const ICONS = {
   people: '<circle cx="9" cy="9" r="3.2"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M16 7.2A3.2 3.2 0 0 1 19.5 12M15.5 14.4c2.7.2 4.7 2.2 4.7 4.9"/>',
   steps: '<path d="M4 6h16"/><path d="M9 12h11M9 18h11"/><path d="M4.5 12h.01M4.5 18h.01"/>',
   candle: '<path d="M12 3c1.6 1.2 1.6 3 0 4-1.6-1-1.6-2.8 0-4z" fill="currentColor" stroke="none"/><rect x="8.5" y="8" width="7" height="12" rx="1"/><path d="M6 20h12"/>',
-  leaf: '<path d="M12 21V7"/><path d="M12 12c-3 0-5-1.6-5.5-4.5C9.4 7 12 8.6 12 12zM12 15c3 0 5-1.6 5.5-4.5C14.6 10 12 11.6 12 15z"/><path d="M12 9c-2.2 0-3.7-1.2-4-3.3M12 9c2.2 0 3.7-1.2 4-3.3"/>',
+  // Simplified 2026-09-12: dropped the extra vein-fork above the leaf pair —
+  // it read as a busy three-tier sprout rather than a single leaf, especially
+  // small. Stem + one two-lobe leaf is enough.
+  leaf: '<path d="M12 20V9"/><path d="M12 9c-3 0-5-1.6-5.5-4.5C9.4 4 12 5.6 12 9zM12 12c3 0 5-1.6 5.5-4.5C14.6 7 12 8.6 12 12z"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   back: '<path d="M14 5l-7 7 7 7"/>',
@@ -279,9 +289,44 @@ const ICONS = {
   at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/>',
   bell: '<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+
+  // ── Batch 1 (docs/icon-spec.md, design/icons-batch1.js) ────────────
+  more: '<circle cx="5.5" cy="12" r=".75"/><circle cx="12" cy="12" r=".75"/><circle cx="18.5" cy="12" r=".75"/>',
+  grip: '<circle cx="9" cy="6.5" r=".75"/><circle cx="15" cy="6.5" r=".75"/><circle cx="9" cy="12" r=".75"/><circle cx="15" cy="12" r=".75"/><circle cx="9" cy="17.5" r=".75"/><circle cx="15" cy="17.5" r=".75"/>',
+  play: '<path d="M7.5 5.2 19 12 7.5 18.8Z"/>',
+  pause: '<path d="M9.5 5.5v13M14.5 5.5v13"/>',
+  // Widened 2026-09-12 after the true-16px raster test showed the original
+  // four uprights merging into a blob. Still dense at 16px by nature of
+  // five strokes in one glyph — fine from the default 20px up.
+  tally: '<path d="M3.2 4.7 2.9 19.5"/><path d="M9.7 4.4 10.1 19.6"/><path d="M14.6 4.8 14.3 19.3"/><path d="M20.1 4.5 19.8 19.6"/><path d="M2.3 19.8 21 4.3"/>',
+  smoke: '<rect x="8.5" y="8" width="7" height="12" rx="1"/><path d="M6 20h12"/><path d="M12 8V6.6"/><path d="M11.9 6.6c2.6-1.2-.4-2.8 2.2-3.8"/>',
+  tag: '<path d="M19.5 4.5h-6.2l-8.8 8.8 6.2 6.2 8.8-8.8z"/><circle cx="16.3" cy="7.7" r="1.2"/>',
+  basket: '<path d="M3.5 10h17l-1.4 7.8a2 2 0 0 1-2 1.7H6.9a2 2 0 0 1-2-1.7z"/><path d="M8 10a4 4 0 0 1 8 0"/><path d="M4.6 14h14.8"/>',
+  // 2026-09-12: dropped a stroke that retraced the silhouette's own right
+  // edge almost exactly — it was doubling the ink right on that boundary,
+  // which is what merged into a blob at 16px. The nib line is enough.
+  quill: '<path d="M7.8 16.4c-.6-4.6 2.6-9 8-11.4 1.8 5-.4 9.6-5.2 11.6z"/><path d="M4 20.2 8.6 15.6"/>',
+  calendar: '<rect x="3.5" y="5.5" width="17" height="14.5" rx="1.5"/><path d="M3.5 10.2h17"/><path d="M8 3.5v4M16 3.5v4"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.2V12l3.4 2.4"/>',
+  hourglass: '<path d="M6.5 3.5h11M6.5 20.5h11"/><path d="M8 3.5c0 5 4 5.5 4 8.5s-4 3.5-4 8.5"/><path d="M16 3.5c0 5-4 5.5-4 8.5s4 3.5 4 8.5"/>',
+  trash: '<path d="M4.5 6.5h15"/><path d="M9.5 6.5V4.6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.9"/><path d="M6.5 6.5l1 12.4a1.6 1.6 0 0 0 1.6 1.5h5.8a1.6 1.6 0 0 0 1.6-1.5l1-12.4"/><path d="M10.3 10.5v6M13.7 10.5v6"/>',
+  warning: '<path d="M12 4.3 21 19.6H3z"/><path d="M12 10v4"/><path d="M12 17.2h.01"/>',
+
 };
 function icon(name, size = 20) {
   return `<svg class="bt-ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+
+// Same bramble-and-berry divider used on the landing page (src/pages/index.astro
+// ".vine"). Reused here rather than drawing a new empty-state mark, so a genuine
+// blank slate (not a filtered/error empty message) gets the same quiet flourish.
+function emptyVine() {
+  return `<svg class="empty-vine" viewBox="0 0 200 28" aria-hidden="true">
+    <path d="M 0 14 Q 50 6, 100 14 T 200 14" fill="none" stroke="var(--border-strong)" stroke-width="0.75" opacity="0.5"/>
+    <circle cx="100" cy="10" r="3.2" fill="var(--accent)" opacity="0.65"/>
+    <circle cx="93" cy="14" r="2.5" fill="var(--accent)" opacity="0.45"/>
+    <circle cx="107" cy="14" r="2.5" fill="var(--accent)" opacity="0.45"/>
+  </svg>`;
 }
 
 function on(el, sel, evt, fn) {
@@ -889,7 +934,7 @@ function renderSettings(app) {
   const el = h(`
     <div class="settings-screen">
       <div class="settings-body">
-        <div class="detail-topbar"><button class="detail-back" id="bt-set-back">← Back</button></div>
+        <div class="detail-topbar"><button class="detail-back" id="bt-set-back">${icon('back', 16)} Back</button></div>
         <h1 class="detail-title">Settings</h1>
 
         <div class="sp-section">
@@ -1396,7 +1441,7 @@ async function renderProfile(app) {
   const el = h(`
     <div class="settings-screen">
       <div class="settings-body">
-        <div class="detail-topbar"><button class="detail-back" id="bt-prof-back">← Back</button></div>
+        <div class="detail-topbar"><button class="detail-back" id="bt-prof-back">${icon('back', 16)} Back</button></div>
         <div id="bt-prof-body"><div class="empty">Loading…</div></div>
       </div>
     </div>
@@ -1553,7 +1598,7 @@ async function renderProfileEdit(app) {
   const el = h(`
     <div class="settings-screen">
       <div class="settings-body">
-        <div class="detail-topbar"><button class="detail-back" id="bt-pe-back">← Back</button></div>
+        <div class="detail-topbar"><button class="detail-back" id="bt-pe-back">${icon('back', 16)} Back</button></div>
         <h1 class="detail-title">Edit profile</h1>
         <div id="bt-pe-body"><div class="empty">Loading…</div></div>
       </div>
@@ -1806,7 +1851,7 @@ async function renderDiscover(app) {
   const el = h(`
     <div class="settings-screen">
       <div class="settings-body">
-        <div class="detail-topbar"><button class="detail-back" id="bt-disc-back">← Back</button></div>
+        <div class="detail-topbar"><button class="detail-back" id="bt-disc-back">${icon('back', 16)} Back</button></div>
         <div id="bt-disc-body"><div class="empty">Loading…</div></div>
       </div>
     </div>
@@ -1868,7 +1913,7 @@ async function renderFollowList(app) {
   const el = h(`
     <div class="settings-screen">
       <div class="settings-body">
-        <div class="detail-topbar"><button class="detail-back" id="bt-fl-back">← Back</button></div>
+        <div class="detail-topbar"><button class="detail-back" id="bt-fl-back">${icon('back', 16)} Back</button></div>
         <div id="bt-fl-body"><div class="empty">Loading…</div></div>
       </div>
     </div>
@@ -1935,7 +1980,7 @@ async function renderBlocked(app) {
   const el = h(`
     <div class="settings-screen">
       <div class="settings-body">
-        <div class="detail-topbar"><button class="detail-back" id="bt-bl-back">← Back</button></div>
+        <div class="detail-topbar"><button class="detail-back" id="bt-bl-back">${icon('back', 16)} Back</button></div>
         <h1 class="detail-title">Blocked accounts</h1>
         <div id="bt-bl-body"><div class="empty">Loading…</div></div>
       </div>
@@ -2011,7 +2056,7 @@ async function renderAdmin(app) {
   const el = h(`
     <div class="settings-screen">
       <div class="settings-body">
-        <div class="detail-topbar"><button class="detail-back" id="bt-adm-back">← Back</button></div>
+        <div class="detail-topbar"><button class="detail-back" id="bt-adm-back">${icon('back', 16)} Back</button></div>
         <h1 class="detail-title">Admin</h1>
         <div class="bt-seg" id="bt-adm-tabs" style="margin:4px 20px 12px">
           ${ADMIN_TABS.map(
@@ -2838,7 +2883,7 @@ async function renderListing(app) {
   const el = h(`
     <div class="settings-screen">
       <div class="settings-body">
-        <div class="detail-topbar"><button class="detail-back" id="bt-lst-back">← Board</button></div>
+        <div class="detail-topbar"><button class="detail-back" id="bt-lst-back">${icon('back', 16)} Board</button></div>
         <div id="bt-lst-body"><div class="empty">Loading…</div></div>
       </div>
     </div>
@@ -3430,7 +3475,7 @@ async function renderArchived(main) {
 
   const wrap = h('<div></div>');
   const bar = h(
-    `<div class="detail-topbar"><button class="detail-back" id="bt-arch-back">← Back</button></div>`
+    `<div class="detail-topbar"><button class="detail-back" id="bt-arch-back">${icon('back', 16)} Back</button></div>`
   );
   on(bar, '#bt-arch-back', 'click', () => {
     state.view = 'home';
@@ -3573,9 +3618,10 @@ async function renderHome(main) {
   const statusTabs = h(`<div class="tabs" style="margin-bottom:8px"></div>`);
   STATUSES.forEach((s) => {
     const b = h(
-      `<button class="tab${state.filterStatus === s ? ' active' : ''}" style="--tab-color:${STATUS_COLOR[s]}">${s}${
-        counts[s] ? `<span class="tab-count">${counts[s]}</span>` : ''
-      }</button>`
+      `<button class="tab${state.filterStatus === s ? ' active' : ''}" style="--tab-color:${STATUS_COLOR[s]}">${icon(
+        STATUS_ICON[s],
+        14
+      )}${s}${counts[s] ? `<span class="tab-count">${counts[s]}</span>` : ''}</button>`
     );
     b.addEventListener('click', () => {
       state.filterStatus = s;
@@ -3630,9 +3676,9 @@ async function renderHome(main) {
             ? ' in ' + esc(state.filterCategory)
             : ''
         }.`;
-    const empty = h(`<div class="empty">${msg}</div>`);
+    const empty = h(`<div class="empty">${!projects.length ? emptyVine() : ''}${msg}</div>`);
     if (!projects.length) {
-      const b = h('<button class="btn-empty">+ New project</button>');
+      const b = h(`<button class="btn-empty">${icon('plus', 14)} New project</button>`);
       b.addEventListener('click', () => openProjectForm(null));
       empty.appendChild(h('<div style="margin-top:12px"></div>')).appendChild(b);
     }
@@ -4313,7 +4359,7 @@ function renderProject(app) {
       <div class="detail-strip" style="background:${STATUS_COLOR[p.status]}"></div>
       <div class="detail-body">
         <div class="detail-topbar">
-          <button class="detail-back" id="bt-back">← Back</button>
+          <button class="detail-back" id="bt-back">${icon('back', 16)} Back</button>
           <button class="detail-back" id="bt-printproj">Print</button>
           <button class="detail-back" id="bt-dupproj">Duplicate</button>
           ${canEdit ? '<button class="detail-back" id="bt-editproj">Edit</button>' : ''}
@@ -4381,12 +4427,18 @@ function renderProject(app) {
         <button class="focus-detail-btn" id="bt-focus">${icon('candle')} Start a focus session</button>
         <div id="bt-sessions-slot"></div>
         <div class="detail-tabs">
-          ${['steps', 'supplies', 'links', 'timeline']
+          ${[
+            ['steps', 'steps'],
+            ['supplies', 'basket'],
+            ['links', 'link'],
+            ['timeline', 'quill'],
+          ]
             .map(
-              (t) =>
-                `<button class="detail-tab${state.detailTab === t ? ' active' : ''}" data-tab="${t}">${
-                  t[0].toUpperCase() + t.slice(1)
-                }</button>`
+              ([t, ic]) =>
+                `<button class="detail-tab${state.detailTab === t ? ' active' : ''}" data-tab="${t}">${icon(
+                  ic,
+                  15
+                )}${t[0].toUpperCase() + t.slice(1)}</button>`
             )
             .join('')}
         </div>
@@ -4571,11 +4623,11 @@ function renderPickup(box, canEdit) {
   show();
 }
 
-function sectionHeader(label, count, onAdd) {
+function sectionHeader(label, count, onAdd, iconName) {
   const el = h(`
     <div class="section-header">
-      <span class="section-label">${label}${count != null ? ` <span class="section-count">${count}</span>` : ''}</span>
-      ${onAdd ? '<button class="btn-section-add" aria-label="Add">+</button>' : ''}
+      <span class="section-label">${iconName ? icon(iconName, 14) : ''}${label}${count != null ? ` <span class="section-count">${count}</span>` : ''}</span>
+      ${onAdd ? `<button class="btn-section-add" aria-label="Add">${icon('plus', 14)}</button>` : ''}
     </div>
   `);
   if (onAdd) on(el, '.btn-section-add', 'click', onAdd);
@@ -4609,7 +4661,7 @@ function stepsPanel(b, canEdit) {
   }
 
   wrap.appendChild(
-    sectionHeader('Steps', open.length, canEdit ? () => openStepForm(b, null, rerender) : null)
+    sectionHeader('Steps', open.length, canEdit ? () => openStepForm(b, null, rerender) : null, 'steps')
   );
 
   const listEl = h('<div></div>');
@@ -4737,7 +4789,7 @@ function stepRow(b, s, canEdit, rerender, opts = {}) {
       }
       ${
         inlineTitle
-          ? `<button class="step-more" title="More" aria-label="Step options">⋯</button>`
+          ? `<button class="step-more" title="More" aria-label="Step options">${icon('more', 18)}</button>`
           : ''
       }
     </div>
@@ -5036,7 +5088,8 @@ function suppliesPanel(b, canEdit) {
     sectionHeader(
       'Supplies',
       b.supplies.length,
-      canEdit ? () => openSupplyForm(b, null, rerender) : null
+      canEdit ? () => openSupplyForm(b, null, rerender) : null,
+      'basket'
     )
   );
   wrap.appendChild(listEl);
@@ -5146,7 +5199,7 @@ function linksPanel(b, canEdit) {
     if (canEdit) listEl.appendChild(linkAddRow(b, rerender));
   };
   wrap.appendChild(
-    sectionHeader('Links', b.links.length, canEdit ? () => openLinkForm(b, null, rerender) : null)
+    sectionHeader('Links', b.links.length, canEdit ? () => openLinkForm(b, null, rerender) : null, 'link')
   );
   wrap.appendChild(listEl);
   fill();
@@ -5244,7 +5297,7 @@ function openLinkForm(b, existing, done) {
 // timeline / journal
 function timelinePanel(b, canEdit) {
   const wrap = h('<div class="detail-panel"></div>');
-  wrap.appendChild(h('<div class="section-header"><span class="section-label">Timeline</span></div>'));
+  wrap.appendChild(h(`<div class="section-header"><span class="section-label">${icon('quill', 14)}Timeline</span></div>`));
 
   if (canEdit) {
     const form = h(`
@@ -5306,7 +5359,7 @@ async function renderInbox(main) {
   const paint = (arr) => {
     listEl.replaceChildren();
     if (!arr.length) {
-      listEl.appendChild(h('<div class="empty">Inbox is clear.</div>'));
+      listEl.appendChild(h(`<div class="empty">${emptyVine()}Inbox is clear.</div>`));
       return;
     }
     arr.forEach((it) => {
@@ -5401,7 +5454,7 @@ function renderSearch(app) {
   const bar = h(`
     <div class="header">
       <div class="search-row">
-        <button class="search-back" id="bt-s-back" aria-label="Back">←</button>
+        <button class="search-back" id="bt-s-back" aria-label="Back">${icon('back', 18)}</button>
         <input class="search-field" id="bt-s-input" type="search"
           placeholder="Search projects, steps, inbox" autocomplete="off" />
         <button class="search-clear" id="bt-s-clear" aria-label="Clear" hidden>${icon('close', 16)}</button>
@@ -5718,7 +5771,7 @@ async function renderReview(main) {
   }
 
   const section = (title, projects) => {
-    const s = h(`<div style="margin-bottom:22px"><div class="section-header"><span class="section-label">${title} <span class="section-count">${projects.length}</span></span></div></div>`);
+    const s = h(`<div style="margin-bottom:22px"><div class="section-header"><span class="section-label">${icon(STATUS_ICON[title], 14)}${title} <span class="section-count">${projects.length}</span></span></div></div>`);
     if (!projects.length) {
       s.appendChild(h('<div class="empty-section">Nothing here.</div>'));
       return s;
