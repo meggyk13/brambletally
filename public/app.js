@@ -545,11 +545,13 @@ function popover(anchorEl, contentEl, { align = 'right' } = {}) {
 }
 
 // ── Theme ──────────────────────────────────────────────────────────────────
-// Two choices: bt-mode (light | dark | system) and bt-palette (bramble | hearth
-// | fen). They resolve to data-theme="<palette>-<mode>". The full palette picker
-// lands with the Settings Appearance section; the header button just flips
-// light/dark for now.
-const PALETTES = ['bramble', 'hearth', 'fen'];
+// Two choices: bt-mode (light | dark | system) and bt-palette. They resolve to
+// data-theme="<palette>-<mode>". The full palette picker lands with the
+// Settings Appearance section; the header button just flips light/dark for
+// now. Damson/Vellum/Raven are Supporter-gated (PALETTE_CARDS below) but still
+// listed here — a stored choice always renders; the picker is what enforces
+// the gate, same as everywhere else Supporter-only cosmetics live client-side.
+const PALETTES = ['bramble', 'hearth', 'fen', 'damson', 'vellum', 'raven'];
 function lsGet(k) {
   try {
     return localStorage.getItem(k);
@@ -614,7 +616,13 @@ const PALETTE_CARDS = [
   { id: 'bramble', name: 'Bramble', note: 'blackberry & hedgerow', c: ['#f3ecdc', '#6b3457', '#4b6b3a'] },
   { id: 'hearth', name: 'Hearth', note: 'tavern warmth', c: ['#f6eede', '#a8482b', '#8a6a1f'] },
   { id: 'fen', name: 'Fen', note: 'misty marsh', c: ['#e9ece4', '#2f6b6b', '#54763a'] },
+  { id: 'damson', name: 'Damson', note: 'moorland purple', c: ['#ece8f0', '#6a3d8f', '#8e4370'], supporter: true },
+  { id: 'vellum', name: 'Vellum', note: 'cool stationery', c: ['#e6e4dd', '#22305a', '#5a6270'], supporter: true },
+  { id: 'raven', name: 'Raven', note: 'obsidian & oxblood', c: ['#e8e4de', '#8a1c28', '#6b665c'], supporter: true },
 ];
+function isLockedPalette(p) {
+  return !!p.supporter && !(state.me && state.me.supporter);
+}
 
 function appearanceControls() {
   const wrap = h(`
@@ -630,18 +638,21 @@ function appearanceControls() {
       </div>
       <div class="bt-appr-label">Theme</div>
       <div class="bt-swatches">
-        ${PALETTE_CARDS.map(
-          (p) => `
+        ${PALETTE_CARDS.map((p) => {
+          const locked = isLockedPalette(p);
+          return `
           <button type="button" data-palette="${p.id}" class="bt-swatch${
             currentPalette() === p.id ? ' is-sel' : ''
-          }" aria-pressed="${currentPalette() === p.id}">
+          }${locked ? ' is-locked' : ''}" aria-pressed="${currentPalette() === p.id}">
             <span class="bt-swatch-chip" style="background:${p.c[0]}">
               <i style="background:${p.c[1]}"></i><i style="background:${p.c[2]}"></i>
             </span>
-            <span class="bt-swatch-name">${p.name}</span>
+            <span class="bt-swatch-name">${p.name}${
+              locked ? ' <span class="bt-supporter">Supporter</span>' : ''
+            }</span>
             <span class="bt-swatch-note">${p.note}</span>
-          </button>`
-        ).join('')}
+          </button>`;
+        }).join('')}
       </div>
     </div>
   `);
@@ -653,7 +664,13 @@ function appearanceControls() {
       .forEach((b) => b.classList.toggle('is-sel', b.dataset.mode === currentMode()));
   });
   on(wrap, '[data-palette]', 'click', (e) => {
-    lsSet('bt-palette', e.currentTarget.dataset.palette);
+    const id = e.currentTarget.dataset.palette;
+    const card = PALETTE_CARDS.find((p) => p.id === id);
+    if (isLockedPalette(card)) {
+      toast(`${card.name} is a Supporter theme.`);
+      return;
+    }
+    lsSet('bt-palette', id);
     applyTheme();
     wrap.querySelectorAll('[data-palette]').forEach((b) => {
       const sel = b.dataset.palette === currentPalette();
@@ -1037,7 +1054,7 @@ function renderSettings(app) {
           }<div class="sp-row-sub">${
             me.supporter
               ? 'Thank you for supporting Brambletally.'
-              : 'Brambletally is free. A Supporter tier with extra themes and a badge is coming.'
+              : 'Brambletally is free. Supporter adds three more themes, a profile badge, and more later.'
           }</div></div></div></div>
         </div>
         ${

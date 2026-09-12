@@ -9,12 +9,14 @@ four tiers, Appearance picker, self-hosted fonts, `noodle`→`focus`, wordmark,
 2026-09-12 (was IM Fell English). **No brand mark** (hedgehog attempts
 dropped; favicon is a placeholder berry). **Pass 3 is spec'd, mostly not
 built** — 3a and 3b-1…4 spec'd 2026-09-09, the card (3b-5) spec'd 2026-09-12
-after the direction was chosen. See Pass 3 below. One piece of it is already
-live: the **Damson/Vellum/Raven CSS token blocks** (built 2026-09-12) — the
-six new `data-theme` blocks exist in `app.css` with real values, but nothing
-selects them yet; the Appearance picker still only offers Bramble/Hearth/Fen
-(`PALETTES` in `app.js`), and the gated-swatch UI for the three Supporter
-themes isn't built. A real mark is still later work.
+after the direction was chosen. See Pass 3 below. Two pieces of it are already live, both
+2026-09-12: the **Damson/Vellum/Raven CSS token blocks** (`app.css`), and the
+**Appearance picker's gated-swatch UI** — all six themes are selectable in
+Settings, with Damson/Vellum/Raven shown dimmed with a "Supporter" pill and a
+toast ("X is a Supporter theme.") on click for non-Supporters; Supporters get
+them full-colour and selectable like any other theme. Verified end-to-end
+against a local dev session in both plan states. A real mark is still later
+work.
 
 ## Direction
 
@@ -474,11 +476,14 @@ a DOM node that `renderSettings()` slots in. Styles unchanged
 (`.bt-appr-*` / `.bt-seg*` / `.bt-swatch*`).
 
 - **Mode** — Light / Dark / System segmented control.
-- **Theme** — swatch cards (Bramble / Hearth / Fen, plus Damson / Vellum /
-  Raven once Pass 3 ships), colours mirrored from this doc in
-  `PALETTE_CARDS` (a nested element can't read `:root[data-theme]` tokens).
-  The three Supporter swatches need a locked/gated visual state once the
-  gate is enforced — not designed yet, flag for Pass 3 build.
+- **Theme** — swatch cards for all six themes, colours mirrored from this doc
+  in `PALETTE_CARDS` (a nested element can't read `:root[data-theme]`
+  tokens). **Built 2026-09-12**: the three Supporter swatches
+  (`isLockedPalette()`) render at 55% opacity with a grayscale chip and a
+  small "Supporter" pill; clicking one as a non-Supporter shows a toast
+  instead of applying it. `PALETTES` recognizes all six ids regardless of
+  plan — a stored choice always renders, even if Supporter status is later
+  revoked; only the picker enforces the gate.
 - Live-apply on tap (`lsSet` + `applyTheme()`), no Save button.
 
 The header `#bt-theme` button is now a **blind light/dark flip**
@@ -926,11 +931,9 @@ only 4 exist, splitting them isn't a real tier. Emblems split 16/10:
   new motion in this pass is the candle flame, and it is opt-out.
 - **A brand mark** — still later work, still the user's to design. Pass 3 does
   not attempt another one.
-- **Vellum / Raven / Damson selection.** The token CSS for all three is built
-  (`app.css`, 2026-09-12) — see Themes above — but nothing lets a user reach
-  them yet. `PALETTES` in `app.js` still only lists `bramble`/`hearth`/`fen`,
-  and the Appearance picker's gated-swatch UI for Supporter themes isn't
-  designed. Not attempted in this pass.
+- **Vellum / Raven / Damson selection — built 2026-09-12**, ahead of the rest
+  of this pass. Token CSS, `PALETTES`, and the Appearance picker's gated-swatch
+  UI all shipped together; see Themes above.
 
 ### Open decisions for Pass 3
 

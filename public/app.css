@@ -1936,6 +1936,15 @@ textarea{resize:vertical;min-height:60px}
 .bt-swatch-chip i { width: 10px; height: 10px; border-radius: 50%; display: block; }
 .bt-swatch-name { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
 .bt-swatch-note { font-size: var(--fs-label); color: var(--text-muted); text-align: center; line-height: 1.3; }
+.bt-swatch.is-locked { opacity: .55; }
+.bt-swatch.is-locked:hover { border-color: var(--border); }
+.bt-swatch.is-locked .bt-swatch-chip { filter: grayscale(35%); }
+.bt-swatch .bt-swatch-name .bt-supporter {
+  font-family: var(--font-ui); font-size: 9px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--gold);
+  border: 1px solid var(--gold); border-radius: 999px; padding: 0 5px;
+  margin-left: 3px; vertical-align: 1px;
+}
 
 /* ── Inline-SVG icons (icon() in app.js) ───────────────────────────────── */
 .bt-ic { display: inline-block; vertical-align: -0.15em; flex-shrink: 0; }
