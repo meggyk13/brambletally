@@ -140,8 +140,17 @@ A **$10/year "Supporter"** plan. Scaffolded alongside Phase 1; **billing is not
 built until there are real users who might pay.** Nothing about it gates the
 core app — projects, steps, supplies, journal, links, collaboration, the inbox,
 review, and the calculators stay free and unlimited. Gating cheap text rows
-would contradict the "self-manageable, everything behind login" ethos; the
-perks that cost money (R2 storage, Resend volume) are what the tier offsets.
+would contradict the "self-manageable, everything behind login" ethos.
+
+**Rationale (rewritten 2026-09-12).** The free tier isn't stripped down —
+Pass 3b (`design.md`) fixes "the app looks plain" for everyone: the tally, the
+hero/compact hierarchy, three full themes, all 4 cover hues, and 16 of 26
+project emblems are free and unlimited. Supporter doesn't unlock a better-
+looking free tier; it buys **capacity** that costs money to serve (photo
+storage, an uploaded avatar) and **extra character** beyond an already-complete
+free experience (three more themes, the rest of the emblem set, a profile
+badge, curated accent swaps). Function is free; capacity and extra character
+are what Supporter buys.
 
 ### Ships in Phase 1 (no billing)
 
@@ -166,7 +175,17 @@ perks that cost money (R2 storage, Resend volume) are what the tier offsets.
 | Avatar (Phase 4) | initials | uploaded image |
 | Email notification frequency | any of Right away / Weekly digest / Never — **default Weekly digest** | same (see note) |
 | Active board listings (Phase 3) | 1 | 3 |
-| Profile badge + accent colour | — | yes |
+| Profile badge | — | yes |
+| Accent colour | — | curated swap list (a dozen pre-checked options — no free-form picker, see `design.md` Themes and `open-questions.md` Q4) |
+| Themes (Pass 3, `design.md`) | Bramble, Hearth, Fen — both modes | + Damson (purple 4th theme), Vellum, Raven |
+| Project emblems (Pass 3, `design.md` 3b-5c) | 16 of 26 (all Workshop & hearth tools, plus bramble-sprig and oak-leaf) | + 10 heraldic/mythical emblems (mushroom, hedgehog, hare, raven, dragon, griffin, unicorn, phoenix, shield, banner) |
+| Cover hues (Pass 3, `design.md` 3b-5c) | all 4 | all 4 — not gated |
+
+**Note (2026-09-12):** Damson (briefly named Heather, renamed the same day —
+that name belongs to a real person) was briefly free-for-everyone, added for
+a specific person. Now that there's a real 3-standard/3-Supporter theme
+split, that person is **manually granted Supporter** through the admin panel
+instead of the theme being ungated — see `design.md` Themes.
 
 **Note (2026-09-08):** email frequency is no longer a Supporter gate. Every
 user picks Right away / Weekly digest / Never; the default is Weekly digest.

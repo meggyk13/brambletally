@@ -51,8 +51,10 @@ fully replaced.)
   $10/year plan, scaffolded with social Phase 1 (`isSupporter()` helper,
   badge, inert Settings section, admin manual-grant); billing deferred until
   there are users who might pay. Gates: project photo count, uploaded vs
-  initials avatar, active board-listing count, profile badge — never the core
-  project/step/collaboration features. (Email frequency was on this list;
+  initials avatar, active board-listing count, profile badge, accent colour,
+  3 of 6 Pass 3 themes, 10 of 26 project emblems (`design.md` Themes, 3b-5c) —
+  never the core project/step/collaboration features. (Email frequency was on
+  this list;
   dropped 2026-09-08 — everyone picks Right away / Weekly digest / Never, and
   gating a setting that mostly reduces our own send cost made no sense.) Adding
   payment later is additive — no schema rework.
