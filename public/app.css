@@ -232,10 +232,12 @@ body{
 }
 
 /* ── Design tokens — Brambletally.
-   Palette: Bramble (default) / Hearth / Fen, each light + dark.
+   Palette: Bramble (default) / Hearth / Fen — free. Damson / Vellum / Raven —
+   Supporter (see isSupporter() in worker/api/lib/plan.js; the Appearance
+   picker's gated-swatch UI is separate, not-yet-built work). Each light + dark.
    Selector: :root[data-theme="<palette>-<mode>"]; bare :root = bramble-light.
-   Type: EB Garamond headings / Alegreya Sans body / IBM Plex Mono / IM Fell
-   English (display). Contrast-checked against WCAG 2.1 AA. Full spec:
+   Type: EB Garamond headings / Alegreya Sans body / IBM Plex Mono / Uncial
+   Antiqua (display). Contrast-checked against WCAG 2.1 AA. Full spec:
    docs/design.md ────────────────────────────────────────────────────────── */
 :root{
   --font-ui:'Alegreya Sans',system-ui,-apple-system,sans-serif;
@@ -385,6 +387,141 @@ body{
   --warn-text:#c9bd6a;
   --header-bg:#161c1a;
   --shadow:0 1px 3px rgba(0,0,0,.38);
+}
+
+/* ── Supporter themes — Damson / Vellum / Raven, gated via isSupporter().
+   docs/design.md → Themes. Added 2026-09-12. ─────────────────────────────── */
+:root[data-theme="damson-light"]{
+  --bg:#ece8f0;
+  --card:#f7f4fa;
+  --elevated:#e2dcea;
+  --input:#f2eef6;
+  --border:#ddd5e6;
+  --border-strong:#a294b3;
+  --text:#262130;
+  --text-sub:#463c52;
+  --text-muted:#635871;
+  --text-disabled:#b0a7ba;
+  --accent:#6a3d8f;
+  --accent-2:#8e4370;
+  --on-accent:#ffffff;
+  --gold:#8a7220;
+  --danger:#a2333f;
+  --warn-bg:#f1e9d8;
+  --warn-border:#d6bf90;
+  --warn-text:#6f5417;
+  --header-bg:#e6e0ee;
+  --shadow:0 1px 3px rgba(38,33,48,.10),0 1px 2px rgba(38,33,48,.06);
+}
+:root[data-theme="damson-dark"]{
+  --bg:#1b1622;
+  --card:#251e2e;
+  --elevated:#302738;
+  --input:#292130;
+  --border:#392f44;
+  --border-strong:#665a7a;
+  --text:#ebe4f0;
+  --text-sub:#c8bcd2;
+  --text-muted:#a095ab;
+  --text-disabled:#5c5268;
+  --accent:#b98ede;
+  --accent-2:#d590b4;
+  --on-accent:#201828;
+  --gold:#d4b46c;
+  --danger:#e08a90;
+  --warn-bg:#2b2418;
+  --warn-border:#584a24;
+  --warn-text:#d9ba68;
+  --header-bg:#1b1622;
+  --shadow:0 1px 3px rgba(0,0,0,.40);
+}
+:root[data-theme="vellum-light"]{
+  --bg:#e6e4dd;
+  --card:#f4f3ee;
+  --elevated:#dad7cd;
+  --input:#eeece4;
+  --border:#d3d0c4;
+  --border-strong:#9d9a8c;
+  --text:#1f1e28;
+  --text-sub:#423f4d;
+  --text-muted:#6a6673;
+  --text-disabled:#9d9aa8;
+  --accent:#22305a;
+  --accent-2:#5a6270;
+  --on-accent:#f4f3ee;
+  --gold:#8a7038;
+  --danger:#9c2f30;
+  --warn-bg:#ece7d4;
+  --warn-border:#c7b98a;
+  --warn-text:#6b5518;
+  --header-bg:#dedbd0;
+  --shadow:0 1px 3px rgba(31,30,40,.10),0 1px 2px rgba(31,30,40,.06);
+}
+:root[data-theme="vellum-dark"]{
+  --bg:#191b22;
+  --card:#212330;
+  --elevated:#2a2d3c;
+  --input:#1e202b;
+  --border:#383b4c;
+  --border-strong:#5c5f74;
+  --text:#e6e5ee;
+  --text-sub:#bcbac8;
+  --text-muted:#8b899a;
+  --text-disabled:#565566;
+  --accent:#7b8fd4;
+  --accent-2:#8f96a8;
+  --on-accent:#14151c;
+  --gold:#c9a860;
+  --danger:#d97579;
+  --warn-bg:#262316;
+  --warn-border:#564a26;
+  --warn-text:#d1ab5e;
+  --header-bg:#191b22;
+  --shadow:0 1px 3px rgba(0,0,0,.40),0 1px 2px rgba(0,0,0,.28);
+}
+:root[data-theme="raven-light"]{
+  --bg:#e8e4de;
+  --card:#f3f0ea;
+  --elevated:#dcd6cc;
+  --input:#efece5;
+  --border:#cfc7ba;
+  --border-strong:#9c9284;
+  --text:#1c1a17;
+  --text-sub:#3d3833;
+  --text-muted:#6b645a;
+  --text-disabled:#9c9284;
+  --accent:#8a1c28;
+  --accent-2:#6b665c;
+  --on-accent:#f5ece9;
+  --gold:#7d6b46;
+  --danger:#a3283a;
+  --warn-bg:#ece2cc;
+  --warn-border:#c7ab7a;
+  --warn-text:#6b4f1e;
+  --header-bg:#e8e4de;
+  --shadow:0 1px 3px rgba(28,26,23,.14),0 1px 2px rgba(28,26,23,.08);
+}
+:root[data-theme="raven-dark"]{
+  --bg:#121213;
+  --card:#1c1c1f;
+  --elevated:#262629;
+  --input:#18181b;
+  --border:#333336;
+  --border-strong:#57575c;
+  --text:#ece9e6;
+  --text-sub:#c2beb9;
+  --text-muted:#8f8b87;
+  --text-disabled:#4f4f52;
+  --accent:#c23347;
+  --accent-2:#6b6a66;
+  --on-accent:#f5ece9;
+  --gold:#b39f6e;
+  --danger:#e2586c;
+  --warn-bg:#201a16;
+  --warn-border:#4a3a2c;
+  --warn-text:#c9a468;
+  --header-bg:#121213;
+  --shadow:0 2px 6px rgba(0,0,0,.55),0 1px 3px rgba(0,0,0,.4);
 }
 body{background:var(--bg);color:var(--text)}
 

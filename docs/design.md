@@ -4,11 +4,17 @@ Brambletally's own visual identity, separate from Rayhana's Repositorium.
 Companion to `plan.md` and `social-plan.md`.
 
 Status: **Pass 1–2 shipped 2026-09-07** (PRs #1, #3, #4). Palettes, type,
-four tiers, Appearance picker, self-hosted fonts, `noodle`→`focus`, IM Fell
-wordmark, `icon()` line set — all live. **No brand mark** (hedgehog attempts
-dropped; favicon is a placeholder berry). **Pass 3 is spec'd but not built** —
-3a and 3b-1…4 on 2026-09-09, the card (3b-5) on 2026-09-12 after the direction
-was chosen. See Pass 3 below. A real mark is still later work.
+four tiers, Appearance picker, self-hosted fonts, `noodle`→`focus`, wordmark,
+`icon()` line set — all live. Display font changed to **Uncial Antiqua**
+2026-09-12 (was IM Fell English). **No brand mark** (hedgehog attempts
+dropped; favicon is a placeholder berry). **Pass 3 is spec'd, mostly not
+built** — 3a and 3b-1…4 spec'd 2026-09-09, the card (3b-5) spec'd 2026-09-12
+after the direction was chosen. See Pass 3 below. One piece of it is already
+live: the **Damson/Vellum/Raven CSS token blocks** (built 2026-09-12) — the
+six new `data-theme` blocks exist in `app.css` with real values, but nothing
+selects them yet; the Appearance picker still only offers Bramble/Hearth/Fen
+(`PALETTES` in `app.js`), and the gated-swatch UI for the three Supporter
+themes isn't built. A real mark is still later work.
 
 ## Direction
 
@@ -920,9 +926,11 @@ only 4 exist, splitting them isn't a real tier. Emblems split 16/10:
   new motion in this pass is the candle flame, and it is opt-out.
 - **A brand mark** — still later work, still the user's to design. Pass 3 does
   not attempt another one.
-- **Vellum / Raven build.** Both are named as the Supporter theme set now
-  (see Themes above), but neither is drawn yet — values, tokens, and Raven's
-  light variant are still to spec. Not attempted in this pass.
+- **Vellum / Raven / Damson selection.** The token CSS for all three is built
+  (`app.css`, 2026-09-12) — see Themes above — but nothing lets a user reach
+  them yet. `PALETTES` in `app.js` still only lists `bramble`/`hearth`/`fen`,
+  and the Appearance picker's gated-swatch UI for Supporter themes isn't
+  designed. Not attempted in this pass.
 
 ### Open decisions for Pass 3
 
