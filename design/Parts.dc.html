@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Alegreya Sans', system-ui, sans-serif;
+      background: #f3ecdc;
+      color: #2a2230;
+      line-height: 1.6;
+    }
+    a { color: #6b3457; }
+    a:hover { color: #4b6b3a; }
+  </style>
+</helmet>
+
+<div style="width: 560px; background: #f3ecdc; padding: 22px 20px 30px; box-sizing: border-box;">
+
+  <div style="font-family: 'EB Garamond', Georgia, serif; font-size: 25px; font-weight: 600; color: #4b6b3a;">The parts</div>
+  <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .12em; color: #6f6374; margin-top: 3px; text-transform: uppercase;">shared by both directions</div>
+
+  <!-- ── Tally ──────────────────────────────────────────── -->
+  <div style="margin-top: 24px; background: #fbf6ea; border: 1px solid #e0d4b8; border-radius: 10px; padding: 16px 18px;">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .14em; color: #6b3457;">THE TALLY</div>
+    <div style="font-size: 15px; color: #4a3f4e; margin-top: 6px; line-height: 1.5;">Replaces the 5px progress bar. Five-bar gate, cut left to right — done steps inked, the rest ghosted.</div>
+
+    <div style="display: flex; flex-direction: column; gap: 13px; margin-top: 16px;">
+
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <svg width="150" height="26" viewBox="0 0 150 26" fill="none">
+          <g stroke="#cdbb96" stroke-width="2.2" stroke-linecap="round"><path d="M2 5 L2.6 21"/><path d="M9 4.6 L8.6 21.2"/><path d="M16 5.2 L16.6 21"/><path d="M23 4.8 L23.5 21"/></g>
+        </svg>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6f6374;">0 / 4 &nbsp;· not started</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <svg width="150" height="26" viewBox="0 0 150 26" fill="none">
+          <g stroke="#4b6b3a" stroke-width="2.2" stroke-linecap="round"><path d="M2 5 L2.6 21"/><path d="M9 4.6 L8.6 21.2"/><path d="M16 5.2 L16.6 21"/></g>
+          <g stroke="#cdbb96" stroke-width="2.2" stroke-linecap="round"><path d="M23 4.8 L23.5 21"/><path d="M30 4.6 L29.6 21.2"/><path d="M42 5 L42.6 21"/><path d="M49 4.6 L48.6 21.2"/></g>
+        </svg>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6f6374;">3 / 7</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <svg width="150" height="26" viewBox="0 0 150 26" fill="none">
+          <g stroke="#4b6b3a" stroke-width="2.2" stroke-linecap="round">
+            <path d="M2 5 L2.6 21"/><path d="M9 4.6 L8.6 21.2"/><path d="M16 5.2 L16.6 21"/><path d="M23 4.8 L23.5 21"/><path d="M0 20 L26 6"/>
+            <path d="M37 5 L37.6 21"/>
+          </g>
+          <g stroke="#cdbb96" stroke-width="2.2" stroke-linecap="round"><path d="M44 4.8 L44.5 21"/><path d="M51 4.6 L50.6 21.2"/><path d="M58 5 L58.6 21"/></g>
+        </svg>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6f6374;">6 / 9 &nbsp;· one gate closed</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <svg width="150" height="26" viewBox="0 0 150 26" fill="none">
+          <g stroke="#4b6b3a" stroke-width="2.2" stroke-linecap="round">
+            <path d="M2 5 L2.6 21"/><path d="M9 4.6 L8.6 21.2"/><path d="M16 5.2 L16.6 21"/><path d="M23 4.8 L23.5 21"/><path d="M0 20 L26 6"/>
+            <path d="M37 5 L37.6 21"/><path d="M44 4.6 L43.6 21.2"/><path d="M51 5.2 L51.6 21"/><path d="M58 4.8 L58.5 21"/><path d="M35 20 L61 6"/>
+            <path d="M72 5 L72.6 21"/><path d="M79 4.6 L78.6 21.2"/>
+          </g>
+        </svg>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4b6b3a; font-weight: 600;">12 / 12 &nbsp;· done</span>
+      </div>
+
+    </div>
+
+    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e0d4b8; font-family: 'EB Garamond', Georgia, serif; font-style: italic; font-size: 16px; color: #4a3f4e; line-height: 1.45;">Checking a step off cuts the next notch — a short stroke-draw, ~250ms. That is the payoff moment the app has never had.</div>
+  </div>
+
+  <!-- ── Emblems ────────────────────────────────────────── -->
+  <div style="margin-top: 16px; background: #fbf6ea; border: 1px solid #e0d4b8; border-radius: 10px; padding: 16px 18px;">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .14em; color: #6b3457;">EMBLEMS</div>
+    <div style="font-size: 15px; color: #4a3f4e; margin-top: 6px; line-height: 1.5;">One per project, picked on create. Needs one <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">cover</span> column — no uploads, no storage.</div>
+
+    <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 16px;">
+      <div style="height: 46px; border-radius: 9px; background: #f2e6ee; display: flex; align-items: center; justify-content: center; color: #6b3457;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3.2c2.6 1.6 3.6 4.6 2.4 7.2l-6.6 12c-.5.9-1.7 1-2.3.2-.4-.6-.3-1.4.2-1.9l7-6.6"/><path d="M12.4 6.6l3.2 2"/><circle cx="16.6" cy="4.4" r="1.3"/></svg>
+      </div>
+      <div style="height: 46px; border-radius: 9px; background: #eef0e4; display: flex; align-items: center; justify-content: center; color: #4b6b3a;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5c3-1 6-1 8 .6v13c-2-1.6-5-1.6-8-.6z"/><path d="M20 5.5c-3-1-6-1-8 .6v13c2-1.6 5-1.6 8-.6z"/></svg>
+      </div>
+      <div style="height: 46px; border-radius: 9px; background: #f3e9d3; display: flex; align-items: center; justify-content: center; color: #9a7526;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14l-1.4 9.2a2 2 0 0 1-2 1.8H8.4a2 2 0 0 1-2-1.8z"/><path d="M8.5 9V6.5a3.5 3.5 0 0 1 7 0V9"/></svg>
+      </div>
+      <div style="height: 46px; border-radius: 9px; background: #f0e4d8; display: flex; align-items: center; justify-content: center; color: #7a4a2c;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M8 12h8l1.5 8h-11z"/><path d="M10 20v-5M14 20v-5"/></svg>
+      </div>
+      <div style="height: 46px; border-radius: 9px; background: #e9e9f0; display: flex; align-items: center; justify-content: center; color: #5a5a7a;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20c2-7 7-13 15-16-1 9-6 14-13 15"/><path d="M4 20l5-5"/></svg>
+      </div>
+      <div style="height: 46px; border-radius: 9px; background: #eef0e4; display: flex; align-items: center; justify-content: center; color: #4b6b3a;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18l-2 10a2 2 0 0 1-2 1.6H7A2 2 0 0 1 5 19z"/><path d="M8 9l3-5M16 9l-3-5"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Status beads ───────────────────────────────────── -->
+  <div style="margin-top: 16px; background: #fbf6ea; border: 1px solid #e0d4b8; border-radius: 10px; padding: 16px 18px;">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .14em; color: #6b3457;">STATUS BEADS</div>
+    <div style="font-size: 15px; color: #4a3f4e; margin-top: 6px; line-height: 1.5;">The Pass 3 pill — neutral label, hue demoted to a bead. Values from the spec, Bramble light.</div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px;">
+      <div style="display: flex; align-items: center; gap: 7px; border-radius: 6px; padding: 4px 11px 4px 9px; background: #f0e6ea; color: #4a3f4e; font-size: 13px; font-weight: 600; letter-spacing: .03em;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #6b3457;"></span>Active
+      </div>
+      <div style="display: flex; align-items: center; gap: 7px; border-radius: 6px; padding: 4px 11px 4px 9px; background: #f3ecdb; color: #4a3f4e; font-size: 13px; font-weight: 600; letter-spacing: .03em;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #9a7526;"></span>Waiting For
+      </div>
+      <div style="display: flex; align-items: center; gap: 7px; border-radius: 6px; padding: 4px 11px 4px 9px; background: #eeecee; color: #4a3f4e; font-size: 13px; font-weight: 600; letter-spacing: .03em;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #63607a;"></span>Someday
+      </div>
+      <div style="display: flex; align-items: center; gap: 7px; border-radius: 6px; padding: 4px 11px 4px 9px; background: #f1ece3; color: #4a3f4e; font-size: 13px; font-weight: 600; letter-spacing: .03em;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #7a6a58;"></span>Paused
+      </div>
+      <div style="display: flex; align-items: center; gap: 7px; border-radius: 6px; padding: 4px 11px 4px 9px; background: #ecf0e6; color: #4a3f4e; font-size: 13px; font-weight: 600; letter-spacing: .03em;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #4b6b3a;"></span>Done
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

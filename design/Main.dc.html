@@ -1,0 +1,243 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=IM+Fell+English&display=swap">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Alegreya Sans', system-ui, -apple-system, sans-serif;
+      background: #f3ecdc;
+      color: #2a2230;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #6b3457; }
+    a:hover { color: #4b6b3a; }
+    .grain::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      opacity: .035; mix-blend-mode: multiply;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+  </style>
+</helmet>
+
+<div style="width: 560px; background: #f3ecdc; position: relative; min-height: 100%;" class="grain">
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <div style="background: #efe6cf; border-bottom: 1px solid #e0d4b8; padding: 16px 16px 0;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px;">
+      <div>
+        <div style="font-family: 'IM Fell English', 'EB Garamond', Georgia, serif; font-size: 30px; line-height: 1; letter-spacing: .01em; color: #4b6b3a;">brambletally<span style="color: #9a7526;">.</span></div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; color: #6f6374; letter-spacing: .1em; text-transform: uppercase; margin-top: 5px;">a keeping-book for makers</div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <div style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: #4a3f4e;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 13.5A7.5 7.5 0 1 1 10.5 5a6 6 0 0 0 8.5 8.5z"/></svg>
+        </div>
+        <div style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: #4a3f4e; position: relative;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+          <span style="position: absolute; top: 2px; right: 2px; min-width: 15px; height: 15px; border-radius: 999px; background: #a3402f; color: #fff; font-size: 10px; font-weight: 700; line-height: 15px; text-align: center;">2</span>
+        </div>
+        <div style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: #4a3f4e;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>
+        </div>
+        <div style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: #4a3f4e;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h9M17 8h3"/><path d="M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2.3"/><circle cx="9" cy="16" r="2.3"/></svg>
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; gap: 2px;">
+      <div style="font-family: 'Alegreya Sans', sans-serif; font-size: 15px; font-weight: 600; color: #4b6b3a; padding: 8px 12px 9px; border-bottom: 2px solid #9a7526;">Projects</div>
+      <div style="font-size: 15px; font-weight: 500; color: #6f6374; padding: 8px 12px 9px; border-bottom: 2px solid transparent;">Next</div>
+      <div style="font-size: 15px; font-weight: 500; color: #6f6374; padding: 8px 12px 9px; border-bottom: 2px solid transparent;">Inbox</div>
+      <div style="font-size: 15px; font-weight: 500; color: #6f6374; padding: 8px 12px 9px; border-bottom: 2px solid transparent;">Review</div>
+      <div style="font-size: 15px; font-weight: 500; color: #6f6374; padding: 8px 12px 9px; border-bottom: 2px solid transparent;">Board</div>
+    </div>
+  </div>
+
+  <!-- ── The sheet ──────────────────────────────────────────── -->
+  <div style="padding: 14px 12px 40px;">
+    <div style="background: #fbf6ea; border: 1px solid #d8c9a8; box-shadow: 0 1px 3px rgba(42,34,48,.10), 0 1px 2px rgba(42,34,48,.06); position: relative; overflow: hidden;">
+
+      <!-- ruled margin -->
+      <div style="position: absolute; left: 52px; top: 0; bottom: 0; width: 1px; background: #e7d9bb;"></div>
+      <div style="position: absolute; left: 55px; top: 0; bottom: 0; width: 1px; background: #f0e5cd;"></div>
+
+      <!-- column heading -->
+      <div style="display: flex; align-items: center; border-bottom: 1.5px solid #a89670; padding: 10px 14px 8px 14px;">
+        <div style="width: 38px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: .14em; color: #6f6374;">№</div>
+        <div style="flex-grow: 1; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: .14em; color: #6f6374;">PROJECT</div>
+        <div style="width: 132px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: .14em; color: #6f6374;">TALLY</div>
+        <div style="width: 62px; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: .14em; color: #6f6374;">DUE</div>
+      </div>
+
+      <!-- ── IN HAND ────────────────────────────────────── -->
+      <div style="background: #f6efdd; border-bottom: 1px solid #e0d4b8; padding: 7px 14px;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .16em; color: #6b3457;">IN HAND</span>
+      </div>
+
+      <div style="display: flex; padding: 16px 14px 18px; border-bottom: 1px solid #e0d4b8; position: relative;">
+        <div style="width: 38px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <div style="color: #6b3457;">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3.2c2.6 1.6 3.6 4.6 2.4 7.2l-6.6 12c-.5.9-1.7 1-2.3.2-.4-.6-.3-1.4.2-1.9l7-6.6"/><path d="M12.4 6.6l3.2 2"/><circle cx="16.6" cy="4.4" r="1.3"/></svg>
+          </div>
+          <div style="width: 7px; height: 7px; border-radius: 50%; background: #6b3457;"></div>
+        </div>
+        <div style="flex-grow: 1; padding-left: 18px;">
+          <div style="font-family: 'EB Garamond', Georgia, serif; font-size: 23px; font-weight: 600; color: #4b6b3a; line-height: 1.2;">Elizabethan loose gown</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .06em; color: #6f6374; margin-top: 5px;">MAKING &nbsp;·&nbsp; 12 steps &nbsp;·&nbsp; ~9h left</div>
+
+          <div style="margin-top: 14px; display: flex; align-items: flex-end; gap: 14px;">
+            <svg width="196" height="34" viewBox="0 0 196 34" fill="none">
+              <g stroke="#4b6b3a" stroke-width="2.6" stroke-linecap="round">
+                <path d="M2 6.5 L3 27"/><path d="M11 6 L11.6 27.5"/><path d="M20 6.8 L19.6 27"/><path d="M29 6 L29.8 27.2"/><path d="M0 25.5 L33 8"/>
+                <path d="M47 6.5 L47.6 27"/><path d="M56 6 L55.4 27.4"/><path d="M65 6.6 L65.8 27"/><path d="M74 6.2 L73.6 27.3"/><path d="M45 25.8 L78 8.2"/>
+              </g>
+              <g stroke="#cdbb96" stroke-width="2.6" stroke-linecap="round">
+                <path d="M92 6.5 L92.6 27"/><path d="M101 6 L100.4 27.4"/>
+              </g>
+            </svg>
+            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; color: #4b6b3a; padding-bottom: 6px;">10<span style="color: #b3a9b0;">/12</span></div>
+          </div>
+
+          <div style="font-family: 'EB Garamond', Georgia, serif; font-style: italic; font-size: 17px; color: #4a3f4e; line-height: 1.45; margin-top: 14px; padding-left: 12px; border-left: 2px solid #d8c9a8;">Left the sleeves pinned on the form — check the pleat depth against the Arnold pattern before stitching.</div>
+
+          <div style="display: flex; align-items: center; gap: 10px; margin-top: 16px; background: #f3ecdc; border: 1px solid #e0d4b8; padding: 11px 12px;">
+            <div style="width: 22px; height: 22px; border: 2px solid #a89670; flex-shrink: 0;"></div>
+            <div style="flex-grow: 1; font-size: 16px; color: #2a2230; line-height: 1.35;">Set the sleeve pleats</div>
+            <div style="display: flex; align-items: center; gap: 6px; background: #4b6b3a; color: #fff; padding: 9px 14px; font-size: 14px; font-weight: 700; letter-spacing: .02em; flex-shrink: 0;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1.6 1.2 1.6 3 0 4-1.6-1-1.6-2.8 0-4z" fill="currentColor" stroke="none"/><rect x="8.5" y="8" width="7" height="12" rx="1"/><path d="M6 20h12"/></svg>
+              Focus 25m
+            </div>
+          </div>
+        </div>
+        <div style="width: 62px; flex-shrink: 0; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; color: #a3402f;">14 Sep</div>
+      </div>
+
+      <!-- ── ALSO ACTIVE ────────────────────────────────── -->
+      <div style="background: #f6efdd; border-bottom: 1px solid #e0d4b8; padding: 7px 14px;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .16em; color: #6b3457;">ALSO ACTIVE &nbsp;·&nbsp; 3</span>
+      </div>
+
+      <div style="display: flex; align-items: center; padding: 13px 14px; border-bottom: 1px solid #e8dcc1; min-height: 46px;">
+        <div style="width: 38px; flex-shrink: 0; display: flex; align-items: center; gap: 7px;">
+          <div style="color: #4b6b3a;">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5c3-1 6-1 8 .6v13c-2-1.6-5-1.6-8-.6z"/><path d="M20 5.5c-3-1-6-1-8 .6v13c2-1.6 5-1.6 8-.6z"/></svg>
+          </div>
+        </div>
+        <div style="flex-grow: 1; padding-left: 18px; min-width: 0;">
+          <div style="font-family: 'EB Garamond', Georgia, serif; font-size: 19px; font-weight: 600; color: #4b6b3a; line-height: 1.25;">Dyeing with woad — trial notes</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .05em; color: #6f6374; margin-top: 2px;">RESEARCH &nbsp;·&nbsp; ~4h left</div>
+        </div>
+        <div style="width: 132px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
+          <svg width="86" height="24" viewBox="0 0 86 24" fill="none">
+            <g stroke="#4b6b3a" stroke-width="2.2" stroke-linecap="round">
+              <path d="M2 5 L2.6 19"/><path d="M9 4.6 L8.6 19.2"/><path d="M16 5.2 L16.6 19"/>
+            </g>
+            <g stroke="#cdbb96" stroke-width="2.2" stroke-linecap="round">
+              <path d="M23 4.8 L23.5 19"/><path d="M30 4.6 L29.6 19.2"/>
+              <path d="M42 5 L42.6 19"/><path d="M49 4.6 L48.6 19.2"/>
+            </g>
+          </svg>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6f6374;">3<span style="color: #b3a9b0;">/7</span></span>
+        </div>
+        <div style="width: 62px; flex-shrink: 0; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6f6374;">—</div>
+      </div>
+
+      <div style="display: flex; align-items: center; padding: 13px 14px; border-bottom: 1px solid #e8dcc1; min-height: 46px;">
+        <div style="width: 38px; flex-shrink: 0; display: flex; align-items: center; gap: 7px;">
+          <div style="color: #9a7526;">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14l-1.4 9.2a2 2 0 0 1-2 1.8H8.4a2 2 0 0 1-2-1.8z"/><path d="M8.5 9V6.5a3.5 3.5 0 0 1 7 0V9"/></svg>
+          </div>
+        </div>
+        <div style="flex-grow: 1; padding-left: 18px; min-width: 0;">
+          <div style="font-family: 'EB Garamond', Georgia, serif; font-size: 19px; font-weight: 600; color: #4b6b3a; line-height: 1.25;">Twelfth Night feast prep</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .05em; color: #6f6374; margin-top: 2px;">EVENT PREP &nbsp;·&nbsp; ~11h left</div>
+        </div>
+        <div style="width: 132px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
+          <svg width="86" height="24" viewBox="0 0 86 24" fill="none">
+            <g stroke="#4b6b3a" stroke-width="2.2" stroke-linecap="round">
+              <path d="M2 5 L2.6 19"/><path d="M9 4.6 L8.6 19.2"/><path d="M16 5.2 L16.6 19"/><path d="M23 4.8 L23.5 19"/><path d="M0 18 L26 6"/>
+              <path d="M37 5 L37.6 19"/>
+            </g>
+            <g stroke="#cdbb96" stroke-width="2.2" stroke-linecap="round">
+              <path d="M44 4.8 L44.5 19"/><path d="M51 4.6 L50.6 19.2"/><path d="M58 5 L58.6 19"/>
+            </g>
+          </svg>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6f6374;">6<span style="color: #b3a9b0;">/9</span></span>
+        </div>
+        <div style="width: 62px; flex-shrink: 0; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; color: #2a2230;">6 Jan</div>
+      </div>
+
+      <div style="display: flex; align-items: center; padding: 13px 14px; border-bottom: 1px solid #e8dcc1; min-height: 46px;">
+        <div style="width: 38px; flex-shrink: 0; display: flex; align-items: center; gap: 7px;">
+          <div style="color: #7a4a2c;">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M8 12h8l1.5 8h-11z"/><path d="M10 20v-5M14 20v-5"/></svg>
+          </div>
+        </div>
+        <div style="flex-grow: 1; padding-left: 18px; min-width: 0;">
+          <div style="font-family: 'EB Garamond', Georgia, serif; font-size: 19px; font-weight: 600; color: #4b6b3a; line-height: 1.25;">Clear the workroom shelves</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .05em; color: #6f6374; margin-top: 2px;">HOUSEHOLD</div>
+        </div>
+        <div style="width: 132px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
+          <svg width="86" height="24" viewBox="0 0 86 24" fill="none">
+            <g stroke="#cdbb96" stroke-width="2.2" stroke-linecap="round">
+              <path d="M2 5 L2.6 19"/><path d="M9 4.6 L8.6 19.2"/><path d="M16 5.2 L16.6 19"/><path d="M23 4.8 L23.5 19"/>
+            </g>
+          </svg>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #b3a9b0;">0<span style="color: #b3a9b0;">/4</span></span>
+        </div>
+        <div style="width: 62px; flex-shrink: 0; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6f6374;">—</div>
+      </div>
+
+      <!-- ── WAITING FOR ────────────────────────────────── -->
+      <div style="background: #f6efdd; border-bottom: 1px solid #e0d4b8; border-top: 1px solid #e0d4b8; padding: 7px 14px;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .16em; color: #785412;">WAITING FOR &nbsp;·&nbsp; 1</span>
+      </div>
+
+      <div style="display: flex; align-items: center; padding: 13px 14px; border-bottom: 1px solid #e8dcc1; min-height: 46px;">
+        <div style="width: 38px; flex-shrink: 0; display: flex; align-items: center; gap: 7px;">
+          <div style="color: #9a7526;">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12"/><path d="M6 21h12"/><path d="M7.5 3c0 5 4.5 6 4.5 9s-4.5 4-4.5 9"/><path d="M16.5 3c0 5-4.5 6-4.5 9s4.5 4 4.5 9"/></svg>
+          </div>
+        </div>
+        <div style="flex-grow: 1; padding-left: 18px; min-width: 0;">
+          <div style="font-family: 'EB Garamond', Georgia, serif; font-size: 19px; font-weight: 600; color: #6f6374; line-height: 1.25;">Silk order — Renaissance Fabrics</div>
+          <div style="font-family: 'EB Garamond', Georgia, serif; font-style: italic; font-size: 15px; color: #6f6374; margin-top: 2px;">waiting on dispatch since 28 Aug</div>
+        </div>
+        <div style="width: 132px; flex-shrink: 0;"></div>
+        <div style="width: 62px; flex-shrink: 0; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6f6374;">—</div>
+      </div>
+
+      <!-- ── foot ───────────────────────────────────────── -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #f6efdd;">
+        <div style="display: flex; align-items: center; gap: 8px; color: #6b3457; font-size: 15px; font-weight: 600;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          New project
+        </div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .08em; color: #6f6374;">5 OPEN &nbsp;·&nbsp; 19 NOTCHES CUT THIS MONTH</div>
+      </div>
+
+    </div>
+
+    <div style="display: flex; justify-content: center; margin-top: 22px;">
+      <svg width="180" height="26" viewBox="0 0 180 26" fill="none" stroke="#c3b294" stroke-width="1.2" stroke-linecap="round">
+        <path d="M6 15c30 4 56-6 84-6s54 10 84 6"/>
+        <path d="M72 11c-3-4-8-4-10-1 3 2 7 2 10 1z" fill="#c3b294" stroke="none"/>
+        <path d="M108 11c3-4 8-4 10-1-3 2-7 2-10 1z" fill="#c3b294" stroke="none"/>
+        <circle cx="86" cy="11.5" r="2.4" fill="#6b3457" stroke="none"/>
+        <circle cx="94" cy="10" r="2.4" fill="#6b3457" stroke="none"/>
+        <circle cx="90" cy="15" r="2.4" fill="#6b3457" stroke="none"/>
+      </svg>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

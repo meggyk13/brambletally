@@ -1,0 +1,55 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Home directions" },
+    { "id": "page-2", "name": "Palettes" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "title": "B — Ledger", "page": "page-1", "x": 0, "y": 0, "w": 560, "h": 1420 },
+    { "file": "EnrichedCards.dc.html", "title": "A — Enriched cards (chosen)", "page": "page-1", "x": 700, "y": 0, "w": 560, "h": 1420 },
+    { "file": "Parts.dc.html", "title": "Shared parts", "page": "page-1", "x": 1400, "y": 0, "w": 560, "h": 900 },
+    { "file": "PaletteCompare.dc.html", "title": "Bramble vs purple", "page": "page-2", "x": 0, "y": 0, "w": 1060, "h": 1180 }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "page": "page-1",
+      "x": 0,
+      "y": -150,
+      "w": 560,
+      "text": "Brambletally — logged-in home screen.\nTwo containers for the same content: a ruled ledger sheet vs enriched cards.\nBoth get the tally, the emblems and the hero/rest hierarchy — those are the parts that fix \"plain text boxes\"."
+    },
+    {
+      "id": "note-ledger",
+      "page": "page-1",
+      "x": 0,
+      "y": 1460,
+      "w": 560,
+      "text": "B — LEDGER — not chosen.\nCommits to the brand's own metaphor: one parchment sheet, ruled margin, mono column heads, rubrics, red ink for overdue, marginalia in italic Garamond.\nLost on touch targets and density in a 560px column."
+    },
+    {
+      "id": "note-cards",
+      "page": "page-1",
+      "x": 700,
+      "y": 1460,
+      "w": 560,
+      "text": "A — ENRICHED CARDS — chosen 2026-09-12.\nKeeps the card shape already shipping and loads it up: a coloured cover band on the hero, emblem tiles, per-project accent edge, tally, hierarchy.\nSpec'd into docs/design.md as Pass 3b-5."
+    },
+    {
+      "id": "note-parts",
+      "page": "page-1",
+      "x": 1400,
+      "y": 940,
+      "w": 560,
+      "text": "The tally and the emblems drop into either container.\nThe tally needs no schema change. The emblems need one `cover` column."
+    },
+    {
+      "id": "note-palette",
+      "page": "page-2",
+      "x": 0,
+      "y": 1220,
+      "w": 1060,
+      "text": "A fourth palette, purple-dominant — free, not Supporter-gated.\nAll 43 pairings clear WCAG AA. Values are in docs/design.md → Values.\nThe name is still open: Heather was the first pass and is being replaced."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "page-2" }
+}
