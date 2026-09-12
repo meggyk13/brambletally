@@ -617,7 +617,7 @@ body{background:var(--bg);color:var(--text)}
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
 .btn-icon{
   width:40px;height:40px;border-radius:8px;border:none;
-  background:var(--elevated);color:var(--text-muted);
+  background:var(--elevated);color:var(--text-sub);
   font-size:17px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   transition:background .2s;flex-shrink:0;
@@ -696,7 +696,7 @@ body{background:var(--bg);color:var(--text)}
   cursor:pointer;display:flex;align-items:center;gap:8px;
   font-family:var(--font-ui);
 }
-.status-menu-item.danger{color:#ef4444}
+.status-menu-item.danger{color:var(--danger)}
 .status-menu-divider{height:1px;background:var(--border);margin:4px 0}
 .status-dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}
 
@@ -800,7 +800,7 @@ textarea{resize:vertical;min-height:60px}
 .btn-edit-mode{
   padding:3px 10px;border-radius:6px;border:1px solid var(--border-strong);
   font-size:13px;font-weight:700;font-family:var(--font-ui);
-  background:var(--elevated);color:var(--text-muted);cursor:pointer;
+  background:var(--elevated);color:var(--text-sub);cursor:pointer;
   transition:all .15s;
 }
 .btn-edit-mode.active{background:var(--accent-2);color:var(--on-accent);border-color:var(--accent-2)}
@@ -821,7 +821,7 @@ textarea{resize:vertical;min-height:60px}
 .check-title.done{text-decoration:line-through;color:var(--text-disabled)}
 .check-sub{font-size:14px;color:var(--text-muted);margin-top:2px}
 .check-cost{font-size:14px;color:var(--text-muted);flex-shrink:0;align-self:center}
-.shortfall{color:#f59e0b;margin-left:6px}
+.shortfall{color:var(--warn-text);margin-left:6px}
 .empty-section{font-size:14px;color:var(--text-muted);padding:8px 0 12px;font-style:italic}
 
 /* ── Profile panel ────────────────────────────────────────────────────────── */
@@ -918,7 +918,7 @@ textarea{resize:vertical;min-height:60px}
 .export-preview{flex:1;overflow-y:auto;padding:0}
 .export-table{width:100%;border-collapse:collapse;font-size:14px}
 .export-table th{
-  background:var(--elevated);color:var(--text-muted);
+  background:var(--elevated);color:var(--text-sub);
   font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
   padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);
   position:sticky;top:0;
@@ -977,7 +977,7 @@ textarea{resize:vertical;min-height:60px}
 
 /* ── Step notes (tap to expand) ───────────────────────────────────────────── */
 .step-notes-toggle{font-size:13px;color:var(--accent-2);cursor:pointer;margin-top:3px;display:inline-block;user-select:none}
-.step-notes-body{font-size:14px;color:var(--text-muted);line-height:1.5;margin-top:5px;padding:7px 10px;background:var(--elevated);border-radius:6px;display:none}
+.step-notes-body{font-size:14px;color:var(--text-sub);line-height:1.5;margin-top:5px;padding:7px 10px;background:var(--elevated);border-radius:6px;display:none}
 .step-notes-body.open{display:block}
 
 /* ── Journal entries ──────────────────────────────────────────────────────── */
@@ -986,8 +986,8 @@ textarea{resize:vertical;min-height:60px}
 
 /* ── Category / priority badges ──────────────────────────────────────────── */
 .cat-badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:13px;font-weight:600;background:var(--elevated);color:var(--text-muted)}
-.priority-badge-high{color:#ef4444}
-.priority-badge-medium{color:#E8A020}
+.priority-badge-high{color:var(--danger)}
+.priority-badge-medium{color:var(--warn-text)}
 .priority-badge-low{color:var(--text-muted)}
 
 /* ── New project category bubbles ─────────────────────────────────────────── */
@@ -1045,7 +1045,7 @@ textarea{resize:vertical;min-height:60px}
 }
 .subpanel-back{
   width:34px;height:34px;border-radius:8px;border:none;
-  background:var(--elevated);color:var(--text-muted);
+  background:var(--elevated);color:var(--text-sub);
   font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;
 }
 .subpanel-title{font-size:18px;font-weight:800;color:var(--text)}
@@ -1129,10 +1129,10 @@ textarea{resize:vertical;min-height:60px}
 }
 .due-today-label{
   font-size:13px;font-weight:700;text-transform:uppercase;
-  letter-spacing:.1em;color:#ef4444;display:flex;align-items:center;gap:6px;
+  letter-spacing:.1em;color:var(--danger);display:flex;align-items:center;gap:6px;
 }
 .due-today-count{
-  background:#ef444422;color:#ef4444;
+  background:color-mix(in srgb, var(--danger) 13%, transparent);color:var(--danger);
   font-size:12px;font-weight:700;padding:2px 7px;border-radius:99px;
 }
 .due-today-see-more{
@@ -1468,7 +1468,7 @@ textarea{resize:vertical;min-height:60px}
 
 /* Danger button */
 #bt-app .btn-danger, .modal-overlay .btn-danger {
-  background: #ef444418; color: #ef4444; border: none;
+  background: color-mix(in srgb, var(--danger) 9%, transparent); color: var(--danger); border: none;
   padding: 10px 16px; border-radius: 7px; font: inherit; font-size:16px;
   font-weight: 600; cursor: pointer;
 }
@@ -1489,7 +1489,7 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .due-band-row:first-of-type { border-top: none; }
 #bt-app .due-band-title { display: block; font-size:16px; color: var(--text); }
 #bt-app .due-band-sub { display: block; font-size:14px; color: var(--text-muted); margin-top: 1px; }
-#bt-app .due-over { color: #ef4444; font-weight: 600; }
+#bt-app .due-over { color: var(--danger); font-weight: 600; }
 #bt-app .due-today { color: var(--warn-text); font-weight: 600; }
 
 .modal-overlay .sp-input, .modal-overlay .sp-select { margin: 0 20px 2px; width: calc(100% - 40px); }
@@ -1598,7 +1598,7 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .next-row-main { flex: 1; cursor: pointer; min-width: 0; }
 #bt-app .next-row-title { font-size:16px; color: var(--text); line-height: 1.35; }
 #bt-app .next-row-sub { font-size:14px; color: var(--text-muted); margin-top: 2px; }
-#bt-app .next-group[data-key="overdue"] .next-row-sub { color: #ef4444; }
+#bt-app .next-group[data-key="overdue"] .next-row-sub { color: var(--danger); }
 .next-nice {
   position: fixed; left: 50%; top: 38%; transform: translate(-50%, 0) scale(.7);
   font-size:30px; font-weight: 800; color: var(--accent);
@@ -1717,7 +1717,7 @@ textarea{resize:vertical;min-height:60px}
   transition: border-color .15s, transform .15s, box-shadow .15s;
 }
 @media (hover: hover) {
-  #bt-app .card:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(38,48,74,.12); }
+  #bt-app .card:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: 0 4px 14px color-mix(in srgb, var(--text) 12%, transparent); }
   :root[data-theme$="-dark"] #bt-app .card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.4); }
 }
 #bt-app .card-meta { color: var(--text-muted); font-size:14px; }
@@ -1764,8 +1764,8 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .empty { color: var(--text-muted); }
 
 /* Modals */
-.modal { box-shadow: 0 -8px 40px rgba(38,48,74,.22); }
-@media (min-width: 720px) { .modal { box-shadow: 0 20px 60px rgba(38,48,74,.3); } }
+.modal { box-shadow: 0 -8px 40px color-mix(in srgb, var(--text) 22%, transparent); }
+@media (min-width: 720px) { .modal { box-shadow: 0 20px 60px color-mix(in srgb, var(--text) 30%, transparent); } }
 .modal-title { font-family: var(--font-head); font-weight: 600; font-size:20px; color: var(--accent-2); }
 
 /* Focus session */
@@ -1899,7 +1899,7 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .bt-meta-select {
   width: auto; max-width: 12rem; margin: 0; font: inherit; font-size: 13px;
   border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px;
-  background: var(--elevated); color: var(--text-muted); cursor: pointer;
+  background: var(--elevated); color: var(--text-sub); cursor: pointer;
 }
 #bt-app .bt-meta-select:focus { outline: none; border-color: var(--accent); }
 #bt-app .bt-status-select {
@@ -1972,7 +1972,7 @@ textarea{resize:vertical;min-height:60px}
 .modal-overlay.bt-ask { align-items: center; justify-content: center; padding: 24px; }
 .modal-overlay.bt-ask .modal {
   width: 380px; max-width: 100%; border-radius: 16px; padding: 22px;
-  transform: none; box-shadow: 0 20px 60px rgba(38,48,74,.3);
+  transform: none; box-shadow: 0 20px 60px color-mix(in srgb, var(--text) 30%, transparent);
 }
 .bt-ask-msg { font-size:16px; line-height: 1.5; color: var(--text); margin-bottom: 16px; }
 .bt-ask .sp-input { margin-bottom: 16px; }

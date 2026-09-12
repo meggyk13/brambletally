@@ -16,8 +16,12 @@ ones dimmed with a toast-gate for non-Supporters); and **3a-1/3a-2/3a-3** —
 status colours are now per-theme `--status-*` tokens (extended to Vellum and
 Raven, not in the table when this was first spec'd), the pill label went
 neutral with a coloured dot, `STATUS_COLOR`/`CAT_COLOR` are gone, and
-category tabs take `--accent-2`. 3a-4 (remaining off-palette hex),
-3a-5 (housekeeping), 3a-6 (stale copy), and all of 3b are still open. A real
+category tabs take `--accent-2`. **3a-4** also shipped: the remaining
+hardcoded reds/ambers/slates moved onto tokens, the blue-grey shadow tint
+became a per-theme `color-mix()` of `--text`, and the real `--text-muted`-on-
+`--elevated` AA failure is fixed at 6 call sites (verified 7.08–8.16:1 across
+all twelve theme-modes). 3a-5 (housekeeping), 3a-6 (stale copy), and all of
+3b are still open. A real
 mark is still later work.
 
 ## Direction
@@ -149,8 +153,9 @@ hairline, not a 1.4.11 boundary (see notes).
 >
 > **Fix: those rules take `var(--text-sub)`.** Checked across all eight
 > palettes — 7.08–7.86:1, comfortable. This is cheaper and safer than re-tuning
-> six `--text-muted` values, which ripple through ~40 other rules. Folded into
-> Pass 3a-4.
+> six `--text-muted` values, which ripple through ~40 other rules. **Built
+> 2026-09-12** as part of Pass 3a-4 — extended to Vellum/Raven too
+> (7.08–8.16:1 across all twelve theme-modes).
 >
 > Damson's own `--text-muted` was tuned to clear the pairing anyway
 > (4.95 / 5.01), so the new theme is correct either way.
@@ -670,22 +675,41 @@ superseded by the color-mix version further down) is gone; `#bt-app
 .bt-status-select` (the one live site) now uses
 `color-mix(in srgb, var(--tab-color, var(--accent)) 13%, transparent)`.
 
-### 3a-4 Remaining off-palette colour
+### 3a-4 Remaining off-palette colour — built 2026-09-12
 
-Everything below is a Tailwind or slate leftover sitting in a hand-mixed
-earth palette. All of it has a token already.
+Everything below was a Tailwind or slate leftover sitting in a hand-mixed
+earth palette. All of it had a token already.
 
-| value | where | → |
-| --- | --- | --- |
-| `#ef4444` (×8) | `.status-menu-item.danger`, `.priority-badge-high`, and six more | `var(--danger)` |
-| `#f59e0b` | `.shortfall` | `var(--warn-text)` |
-| `#E8A020` | `.priority-badge-medium` | `var(--warn-text)` |
-| `#f1f5f9` (×2) | slate-100 | `var(--elevated)` |
-| `rgba(38,48,74,…)` (×4) | card hover + modal shadows | per-theme `--shadow`, or a warm-tinted equivalent |
-| `var(--text-muted)` on `var(--elevated)` (×6) | `.btn-icon` 402, `.btn-edit-mode` 586, export control 704, `.step-notes-body` 763, `.sp-*` control 831, `.bt-meta-select` 1679 | `var(--text-sub)` — **an AA failure, not a taste call.** See Values → Known AA failure |
+| value | where | → | done |
+| --- | --- | --- | --- |
+| `#ef4444` (×9 found, not 8) | `.status-menu-item.danger`, `.priority-badge-high`, `.due-today-label`, `.due-today-count` (×2, one an alpha-hex background), `.btn-danger` (alpha-hex background), `.due-over`, `.next-group[data-key="overdue"] .next-row-sub` | `var(--danger)`, alpha-hex backgrounds → `color-mix(in srgb, var(--danger) N%, transparent)` | ✅ |
+| `#f59e0b` | `.shortfall` | `var(--warn-text)` | ✅ |
+| `#E8A020` | `.priority-badge-medium` | `var(--warn-text)` | ✅ |
+| `#f1f5f9` (×2) | `.detail-back`, `.detail-export` (base rules, not `#bt-app`-scoped) | **left as-is, see note below** | ⏭ |
+| `rgba(38,48,74,…)` (×4) | `.card:hover`, `.modal` (×2), `.modal-overlay.bt-ask .modal` | `color-mix(in srgb, var(--text) N%, transparent)` — each theme's own ink at the original alpha, rather than a fixed blue-grey | ✅ |
+| `var(--text-muted)` on `var(--elevated)` (×6) | `.btn-icon`, `.btn-edit-mode`, `.export-table th`, `.step-notes-body`, `.subpanel-back`, `#bt-app .bt-meta-select` | `var(--text-sub)` — **an AA failure, not a taste call.** See Values → Known AA failure. Verified: 7.08–8.16:1 across all twelve theme-modes (script-checked) | ✅ |
 
-The `rgba(38,48,74,…)` shadows are a blue-grey cast on a warm ground — subtle,
-but it is why the cards read slightly cold in Bramble and Hearth.
+**The two `#f1f5f9` sites were left alone, deliberately.** Both are the base
+(non-`#bt-app`-scoped) `.detail-back`/`.detail-export` rules from the
+noodlr-era cover-photo header — floating buttons on a `rgba(0,0,0,.3)` scrim
+meant to sit over an unknown photo, always confirmed dead (fully overridden
+by the live `#bt-app`-scoped versions actually used today, and `.detail-cover`
+that they belong to is unrendered — see Themes → 3b-5c). The doc's original
+mapping (`var(--elevated)`) would be a real bug if this code were ever
+revived: `--elevated` is dark in dark mode, which would put dark text on a
+dark scrim. A floating control over unknown photo content needs a
+theme-*independent* light colour, not a theme token — this is a case where
+the literal instruction was wrong for this specific site. Left as literal hex
+since nothing renders it either way; flag for whoever builds 3b-5c's cover
+photos for real.
+
+The `rgba(38,48,74,…)` shadows were a blue-grey cast on a warm ground —
+subtle, but it is why the cards read slightly cold in Bramble and Hearth.
+`color-mix(in srgb, var(--text) N%, transparent)` reuses each theme's own
+`--text` as the shadow tint — the same relationship the per-theme `--shadow`
+token already has to its own theme (e.g. Bramble's `--shadow` uses
+`rgba(42,34,48,…)`, which is exactly Bramble-light's `--text` as RGB) —
+without needing a new per-theme RGB-triplet token just for this.
 
 ### 3a-5 Housekeeping (same PR — the reason changes feel like whack-a-mole)
 
@@ -1060,13 +1084,17 @@ Still to add: PNG favicon fallbacks; more icons as later features need them.
 of it is a correctness fix, not decoration. Two PRs — full spec in the Pass 3
 section above.
 
-- **3a — colour + housekeeping.** **3a-1/2/3 built 2026-09-12**: status
+- **3a — colour + housekeeping.** **3a-1/2/3/4 built 2026-09-12**: status
   colours are per-theme `--status-*` tokens (extended to Vellum/Raven, added
   2026-09-12 after this section was first written), the pill label is neutral
   with a coloured dot, `STATUS_COLOR`/`CAT_COLOR` are deleted, the alpha-hex
-  `--tab-color` sites are cleared, category tabs take `--accent-2`. **Still
-  open — 3a-4/5/6**: the remaining Tailwind/slate leftovers (`#ef4444` ×8,
-  `#f59e0b`, `#E8A020`, `#f1f5f9` ×2, the blue-grey shadows) onto tokens; the
+  `--tab-color` sites are cleared, category tabs take `--accent-2`; the
+  remaining hardcoded reds/ambers onto `--danger`/`--warn-text`, the blue-grey
+  shadow tint became a per-theme `color-mix()` of `--text`, and the real
+  `--text-muted`-on-`--elevated` AA failure is fixed at 6 sites. One deliberate
+  exception: two `#f1f5f9` sites in dead noodlr-era cover-photo buttons were
+  left as literal hex rather than applying the doc's original (wrong for that
+  context) `--elevated` mapping — see 3a-4 above. **Still open — 3a-5/6**: the
   housekeeping deferred twice (fold the `#bt-app` override layer back in,
   adopt the `--fs-*` tokens rule-by-rule, add `tnum`, add radius tokens); two
   stale-copy bugs (auth screen, landing footer).
