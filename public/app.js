@@ -9,13 +9,6 @@ const TURNSTILE_SITE_KEY = '0x4AAAAAAEr4nA7ZBjWvB0Ai';
 const APP_PATH = '/app';
 
 const STATUSES = ['Active', 'Waiting For', 'Someday', 'Paused', 'Done'];
-const STATUS_COLOR = {
-  Active: '#2f9491', // turquoise
-  'Waiting For': '#bd8a34', // gold
-  Someday: '#5566a8', // cobalt-violet
-  Paused: '#8a8578', // warm grey
-  Done: '#5a8a5f', // settled green
-};
 const STATUS_ICON = {
   Active: 'candle',
   'Waiting For': 'hourglass',
@@ -23,8 +16,16 @@ const STATUS_ICON = {
   Paused: 'pause',
   Done: 'check',
 };
-const CAT_COLOR = '#3a5fb0'; // cobalt for category chips
 const UNCATEGORIZED = 'Uncategorized';
+
+// Renders a status pill: a neutral (--text-sub) label with a coloured dot at
+// its head, rather than the hue as the label's own colour — the old
+// construction (hue-as-text on a 16%-tint-of-itself) structurally caps
+// contrast below AA no matter which hue is chosen. The hue comes from
+// data-status via the --tab-color plumbing in app.css (docs/design.md 3a-1).
+function statusPill(status) {
+  return `<span class="status-pill" data-status="${esc(status)}"><span class="status-dot"></span>${esc(status)}</span>`;
+}
 
 // Stepped "time needed" slider. Index 0 = no estimate; 1..7 map to these
 // minute values. Must match STEP_ESTIMATES in worker/api/lib/validate.js.
@@ -3662,7 +3663,7 @@ async function renderHome(main) {
   const statusTabs = h(`<div class="tabs" style="margin-bottom:8px"></div>`);
   STATUSES.forEach((s) => {
     const b = h(
-      `<button class="tab${state.filterStatus === s ? ' active' : ''}" style="--tab-color:${STATUS_COLOR[s]}">${icon(
+      `<button class="tab${state.filterStatus === s ? ' active' : ''}" data-status="${s}">${icon(
         STATUS_ICON[s],
         14
       )}${s}${counts[s] ? `<span class="tab-count">${counts[s]}</span>` : ''}</button>`
@@ -3691,7 +3692,7 @@ async function renderHome(main) {
     const catRow = h(`<div class="tabs" style="margin-bottom:14px"></div>`);
     catFilters.forEach(([v, label]) => {
       const b = h(
-        `<button class="tab${state.filterCategory === v ? ' active' : ''}" style="--tab-color:${CAT_COLOR}">${esc(
+        `<button class="tab${state.filterCategory === v ? ' active' : ''}" style="--tab-color:var(--accent-2)">${esc(
           label
         )}</button>`
       );
@@ -3875,7 +3876,7 @@ function projectCard(p) {
     <div class="card" role="button" tabindex="0">
       <div class="card-top">
         <h3 class="card-title">${esc(p.title)}</h3>
-        <span class="status-pill" style="--tab-color:${STATUS_COLOR[p.status]}">${esc(p.status)}</span>
+        ${statusPill(p.status)}
       </div>
       <div class="card-meta">
         ${esc(p.category || UNCATEGORIZED)}
@@ -3886,7 +3887,7 @@ function projectCard(p) {
       </div>
       ${
         total
-          ? `<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%;background:${STATUS_COLOR[p.status]}"></div></div>`
+          ? `<div class="progress-bar-wrap"><div class="progress-bar-fill" data-status="${esc(p.status)}" style="width:${pct}%"></div></div>`
           : ''
       }
       ${p.pickup_note ? `<div class="card-footer">${esc(p.pickup_note)}</div>` : ''}
@@ -4400,7 +4401,7 @@ function renderProject(app) {
 
   const view = h(`
     <div>
-      <div class="detail-strip" style="background:${STATUS_COLOR[p.status]}"></div>
+      <div class="detail-strip" data-status="${esc(p.status)}"></div>
       <div class="detail-body">
         <div class="detail-topbar">
           <button class="detail-back" id="bt-back">${icon('back', 16)} Back</button>
@@ -4412,14 +4413,12 @@ function renderProject(app) {
         <div class="detail-meta">
           ${
             canEdit
-              ? `<select class="bt-meta-select bt-status-select" style="--tab-color:${
-                  STATUS_COLOR[p.status]
-                }" aria-label="Status">${STATUSES.map(
+              ? `<select class="bt-meta-select bt-status-select" data-status="${esc(
+                  p.status
+                )}" aria-label="Status">${STATUSES.map(
                   (s) => `<option ${p.status === s ? 'selected' : ''}>${esc(s)}</option>`
                 ).join('')}</select>`
-              : `<span class="status-pill" style="--tab-color:${STATUS_COLOR[p.status]}">${esc(
-                  p.status
-                )}</span>`
+              : statusPill(p.status)
           }
           ${
             canEdit
@@ -4465,7 +4464,7 @@ function renderProject(app) {
         <div class="pickup-box" id="bt-pickup-box"></div>
         ${
           leaves.length
-            ? `<div class="progress-bar-wrap" style="margin:14px 0"><div class="progress-bar-fill" style="width:${pct}%;background:${STATUS_COLOR[p.status]}"></div></div>`
+            ? `<div class="progress-bar-wrap" style="margin:14px 0"><div class="progress-bar-fill" data-status="${esc(p.status)}" style="width:${pct}%"></div></div>`
             : ''
         }
         <button class="focus-detail-btn" id="bt-focus">${icon('candle')} Start a focus session</button>
@@ -5837,7 +5836,7 @@ async function renderReview(main) {
       const card = h(`
         <div class="card" role="button" tabindex="0" style="cursor:pointer">
           <div class="card-top"><h3 class="card-title">${esc(p.title)}</h3>
-            <span class="status-pill" style="--tab-color:${STATUS_COLOR[p.status]}">${esc(p.status)}</span></div>
+            ${statusPill(p.status)}</div>
           <div class="card-meta">${esc(p.category || UNCATEGORIZED)}${
             p.deadline ? ` · due ${esc(fmtDate(p.deadline))}` : ''
           }</div>

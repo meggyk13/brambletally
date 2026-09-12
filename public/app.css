@@ -277,6 +277,11 @@ body{
   --warn-text:#785412;
   --header-bg:#efe6cf;
   --shadow:0 1px 3px rgba(42,34,48,.10),0 1px 2px rgba(42,34,48,.06);
+  --status-active:var(--accent);
+  --status-waiting:var(--gold);
+  --status-someday:#63607a;
+  --status-paused:#7a6a58;
+  --status-done:var(--accent-2);
 }
 :root[data-theme="bramble-dark"]{
   --bg:#1e1a22;
@@ -299,6 +304,11 @@ body{
   --warn-text:#dcbd6a;
   --header-bg:#1e1a22;
   --shadow:0 1px 3px rgba(0,0,0,.38);
+  --status-active:var(--accent);
+  --status-waiting:var(--gold);
+  --status-someday:#9d95ad;
+  --status-paused:#a2968b;
+  --status-done:var(--accent-2);
 }
 :root[data-theme="hearth-light"]{
   --bg:#f6eede;
@@ -321,6 +331,11 @@ body{
   --warn-text:#7c5312;
   --header-bg:#f2e7d1;
   --shadow:0 1px 3px rgba(51,38,28,.10),0 1px 2px rgba(51,38,28,.06);
+  --status-active:var(--accent);
+  --status-waiting:var(--gold);
+  --status-someday:#605d6b;
+  --status-paused:#7a6857;
+  --status-done:#5c6b30;
 }
 :root[data-theme="hearth-dark"]{
   --bg:#211a15;
@@ -343,6 +358,11 @@ body{
   --warn-text:#ddba64;
   --header-bg:#211a15;
   --shadow:0 1px 3px rgba(0,0,0,.40);
+  --status-active:var(--accent);
+  --status-waiting:var(--gold);
+  --status-someday:#a397a8;
+  --status-paused:#a4968a;
+  --status-done:#a3b473;
 }
 :root[data-theme="fen-light"]{
   --bg:#e9ece4;
@@ -365,6 +385,11 @@ body{
   --warn-text:#6d5f2a;
   --header-bg:#e2e6da;
   --shadow:0 1px 3px rgba(32,48,43,.10),0 1px 2px rgba(32,48,43,.06);
+  --status-active:var(--accent);
+  --status-waiting:var(--gold);
+  --status-someday:#5c6472;
+  --status-paused:#6e6a5f;
+  --status-done:var(--accent-2);
 }
 :root[data-theme="fen-dark"]{
   --bg:#161c1a;
@@ -387,6 +412,11 @@ body{
   --warn-text:#c9bd6a;
   --header-bg:#161c1a;
   --shadow:0 1px 3px rgba(0,0,0,.38);
+  --status-active:var(--accent);
+  --status-waiting:var(--gold);
+  --status-someday:#93a0a8;
+  --status-paused:#a0998c;
+  --status-done:var(--accent-2);
 }
 
 /* ── Supporter themes — Damson / Vellum / Raven, gated via isSupporter().
@@ -412,6 +442,11 @@ body{
   --warn-text:#6f5417;
   --header-bg:#e6e0ee;
   --shadow:0 1px 3px rgba(38,33,48,.10),0 1px 2px rgba(38,33,48,.06);
+  --status-active:var(--accent);
+  --status-waiting:var(--gold);
+  --status-someday:#5f5c78;
+  --status-paused:#6f6560;
+  --status-done:#4d6b4a;
 }
 :root[data-theme="damson-dark"]{
   --bg:#1b1622;
@@ -434,6 +469,11 @@ body{
   --warn-text:#d9ba68;
   --header-bg:#1b1622;
   --shadow:0 1px 3px rgba(0,0,0,.40);
+  --status-active:var(--accent);
+  --status-waiting:var(--gold);
+  --status-someday:#9a92ad;
+  --status-paused:#a2958b;
+  --status-done:#93b584;
 }
 :root[data-theme="vellum-light"]{
   --bg:#e6e4dd;
@@ -456,6 +496,11 @@ body{
   --warn-text:#6b5518;
   --header-bg:#dedbd0;
   --shadow:0 1px 3px rgba(31,30,40,.10),0 1px 2px rgba(31,30,40,.06);
+  --status-active:var(--accent);
+  --status-waiting:var(--gold);
+  --status-someday:#5f6478;
+  --status-paused:#766b58;
+  --status-done:#3f6b46;
 }
 :root[data-theme="vellum-dark"]{
   --bg:#191b22;
@@ -478,6 +523,11 @@ body{
   --warn-text:#d1ab5e;
   --header-bg:#191b22;
   --shadow:0 1px 3px rgba(0,0,0,.40),0 1px 2px rgba(0,0,0,.28);
+  --status-active:var(--accent);
+  --status-waiting:var(--gold);
+  --status-someday:#9ea3b8;
+  --status-paused:#b0a58c;
+  --status-done:#8bb08f;
 }
 :root[data-theme="raven-light"]{
   --bg:#e8e4de;
@@ -500,6 +550,11 @@ body{
   --warn-text:#6b4f1e;
   --header-bg:#e8e4de;
   --shadow:0 1px 3px rgba(28,26,23,.14),0 1px 2px rgba(28,26,23,.08);
+  --status-active:var(--accent);
+  --status-waiting:var(--gold);
+  --status-someday:#5c6470;
+  --status-paused:#6b5f52;
+  --status-done:#55684a;
 }
 :root[data-theme="raven-dark"]{
   --bg:#121213;
@@ -522,7 +577,23 @@ body{
   --warn-text:#c9a468;
   --header-bg:#121213;
   --shadow:0 2px 6px rgba(0,0,0,.55),0 1px 3px rgba(0,0,0,.4);
+  --status-active:#d34f5e;
+  --status-waiting:var(--gold);
+  --status-someday:#8f96a4;
+  --status-paused:#a2917f;
+  --status-done:#7f9f74;
 }
+
+/* ── Status → --tab-color plumbing (docs/design.md Pass 3, 3a-3).
+   A status pill/tab/progress-fill/detail-strip/status-select carries
+   data-status="<Status>" instead of an inline hex; this maps it onto the
+   already-themed token so it re-colours per palette for free. ──────────── */
+[data-status="Active"]      { --tab-color: var(--status-active); }
+[data-status="Waiting For"] { --tab-color: var(--status-waiting); }
+[data-status="Someday"]     { --tab-color: var(--status-someday); }
+[data-status="Paused"]      { --tab-color: var(--status-paused); }
+[data-status="Done"]        { --tab-color: var(--status-done); }
+
 body{background:var(--bg);color:var(--text)}
 
 /* ── Layout ───────────────────────────────────────────────────────────────── */
@@ -574,9 +645,7 @@ body{background:var(--bg);color:var(--text)}
   background:transparent;color:var(--text-disabled);
   transition:all .15s;flex-shrink:0;
 }
-.tab.active{border-color:var(--tab-color,var(--accent))4d;background:var(--tab-color,var(--accent))18;color:var(--tab-color,var(--accent))}
 .tab-count{border-radius:99px;font-size:12px;padding:1px 6px;font-weight:700;background:var(--elevated);color:var(--text-disabled)}
-.tab.active .tab-count{background:var(--tab-color,var(--accent))2a;color:var(--tab-color,var(--accent))}
 
 /* ── Project list ─────────────────────────────────────────────────────────── */
 .project-list{padding:14px 16px 80px}
@@ -694,7 +763,7 @@ textarea{resize:vertical;min-height:60px}
 .detail-title{font-size:22px;font-weight:700;color:var(--text);margin:0 0 6px;line-height:1.2}
 .detail-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:14px;color:var(--text-muted)}
 .progress-bar-wrap{height:4px;background:var(--elevated);border-radius:99px;overflow:hidden;margin-bottom:18px}
-.progress-bar-fill{height:100%;border-radius:99px;transition:width .4s ease;background:var(--accent)}
+.progress-bar-fill{height:100%;border-radius:99px;transition:width .4s ease;background:var(--tab-color,var(--accent))}
 .pickup-box{
   background:var(--card);border-radius:12px;padding:12px 14px;
   margin-bottom:20px;border:1px solid color-mix(in srgb, var(--accent-2) 20%, transparent);
@@ -1360,7 +1429,6 @@ textarea{resize:vertical;min-height:60px}
   background: none; border: none; color: var(--text-muted);
   font-size:16px; cursor: pointer; padding: 4px 6px; flex-shrink: 0; align-self: center;
 }
-#bt-app .status-pill { background: var(--tab-color, var(--accent))22; color: var(--tab-color, var(--accent)); }
 #bt-app .detail-body { padding: 12px 16px 120px; }
 #bt-app .detail-strip { height: 5px; }
 #bt-app .detail-topbar { display: flex; justify-content: space-between; margin-bottom: 12px; }
@@ -1683,8 +1751,9 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .pickup-box { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--accent-2); border-radius: 10px; padding: 12px 14px; }
 #bt-app .pickup-label { color: var(--accent-2); }
 
-/* Detail top accent already coloured per status; make it a touch bolder */
-#bt-app .detail-strip { height: 6px; }
+/* Detail top accent — coloured per status via data-status (see the
+   --tab-color plumbing near the theme blocks); a touch bolder than the tab. */
+#bt-app .detail-strip { height: 6px; background: var(--tab-color, var(--accent)); }
 
 /* Focus-visible — accent ring; also the affordance for form fields (border-strong is decorative) */
 #bt-app :focus-visible, .modal-overlay :focus-visible, #focus-screen :focus-visible {
@@ -1714,11 +1783,17 @@ textarea{resize:vertical;min-height:60px}
 /* Account bars on the tool pages already ship their own colours; nudge them
    toward the palette when they render inside a themed context is not needed. */
 
-/* Tint chips & pills via color-mix so any --tab-color works on both grounds */
+/* Tint chips & pills via color-mix so any --tab-color works on both grounds.
+   The pill label goes neutral (docs/design.md 3a-1) — a status hue as both
+   the tint AND the label text structurally caps contrast below AA regardless
+   of hue; the hue now carries only the dot, the tab, the progress fill, and
+   the detail strip. */
 #bt-app .status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
   background: color-mix(in srgb, var(--tab-color, var(--accent)) 16%, transparent);
-  color: var(--tab-color, var(--accent));
+  color: var(--text-sub);
 }
+#bt-app .status-pill .status-dot { background: var(--tab-color, var(--accent)); }
 #bt-app .tab.active {
   background: color-mix(in srgb, var(--tab-color, var(--accent)) 14%, transparent);
   border-color: color-mix(in srgb, var(--tab-color, var(--accent)) 38%, transparent);
@@ -1829,7 +1904,8 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .bt-meta-select:focus { outline: none; border-color: var(--accent); }
 #bt-app .bt-status-select {
   font-weight: 600; letter-spacing: .03em; border-color: transparent;
-  background: var(--tab-color, var(--accent))22; color: var(--tab-color, var(--accent));
+  background: color-mix(in srgb, var(--tab-color, var(--accent)) 13%, transparent);
+  color: var(--tab-color, var(--accent));
 }
 
 /* Sub-step breadcrumb in the cross-project lists (search / Next / Review / Due) */

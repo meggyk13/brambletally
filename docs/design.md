@@ -7,16 +7,18 @@ Status: **Pass 1–2 shipped 2026-09-07** (PRs #1, #3, #4). Palettes, type,
 four tiers, Appearance picker, self-hosted fonts, `noodle`→`focus`, wordmark,
 `icon()` line set — all live. Display font changed to **Uncial Antiqua**
 2026-09-12 (was IM Fell English). **No brand mark** (hedgehog attempts
-dropped; favicon is a placeholder berry). **Pass 3 is spec'd, mostly not
-built** — 3a and 3b-1…4 spec'd 2026-09-09, the card (3b-5) spec'd 2026-09-12
-after the direction was chosen. See Pass 3 below. Two pieces of it are already live, both
-2026-09-12: the **Damson/Vellum/Raven CSS token blocks** (`app.css`), and the
-**Appearance picker's gated-swatch UI** — all six themes are selectable in
-Settings, with Damson/Vellum/Raven shown dimmed with a "Supporter" pill and a
-toast ("X is a Supporter theme.") on click for non-Supporters; Supporters get
-them full-colour and selectable like any other theme. Verified end-to-end
-against a local dev session in both plan states. A real mark is still later
-work.
+dropped; favicon is a placeholder berry). **Pass 3 is spec'd, partly built** —
+3a and 3b-1…4 spec'd 2026-09-09, the card (3b-5) spec'd 2026-09-12 after the
+direction was chosen. See Pass 3 below. Built so far, all 2026-09-12: the
+**Damson/Vellum/Raven CSS token blocks** and the **Appearance picker's
+gated-swatch UI** (all six themes selectable in Settings, the three Supporter
+ones dimmed with a toast-gate for non-Supporters); and **3a-1/3a-2/3a-3** —
+status colours are now per-theme `--status-*` tokens (extended to Vellum and
+Raven, not in the table when this was first spec'd), the pill label went
+neutral with a coloured dot, `STATUS_COLOR`/`CAT_COLOR` are gone, and
+category tabs take `--accent-2`. 3a-4 (remaining off-palette hex),
+3a-5 (housekeeping), 3a-6 (stale copy), and all of 3b are still open. A real
+mark is still later work.
 
 ## Direction
 
@@ -524,7 +526,7 @@ Two PRs, in order.
 3a first. 3b sits on top of it and is much less satisfying if the status
 colours are still shouting over it.
 
-### 3a-1 Status colours become theme tokens
+### 3a-1 Status colours become theme tokens — built 2026-09-12
 
 **The problem.** `STATUS_COLOR` in `app.js:12` is a hardcoded İznik map that
 predates the rebrand:
@@ -563,59 +565,87 @@ The pill stops being five shouting colours and becomes a quiet chip with a
 coloured bead. This is also the answer to "everything is competing" — the hue
 still encodes status, it just stops setting the type.
 
-### 3a-2 Status token values
+### 3a-2 Status token values — built 2026-09-12, extended to Vellum/Raven
 
 Five new tokens per theme block: `--status-active`, `--status-waiting`,
 `--status-someday`, `--status-paused`, `--status-done`.
 
 Most of them are not new colours. `active` is each theme's `--accent`,
-`waiting` is its `--gold`, and `done` is its `--accent-2` — except Hearth,
-which has no green in its set and gets a new olive. Only the two neutrals and
-Hearth's `done` are genuinely new values, so statuses stop being a second
-palette and become derived from the first.
+`waiting` is its `--gold`, and `done` is its `--accent-2` — except where a
+theme's `--accent-2` isn't itself green (Hearth, Damson, Vellum, Raven all
+get a hand-drawn olive instead; Bramble and Fen alias straight through).
+Someday/paused are hand-drawn neutrals in every theme. Vellum and Raven
+didn't exist when this table was first drafted (2026-09-09) — their values
+were derived the same day the token CSS actually landed (2026-09-12), same
+method, same three contrast constructions below.
 
 **Someday is cool-lean, Paused is warm-lean** — both are "not now" states and
 neither should have chroma, but the temperature split keeps them apart at a
 glance without adding a sixth hue.
 
-| token | bramble-light | bramble-dark | hearth-light | hearth-dark | fen-light | fen-dark | damson-light | damson-dark |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `--status-active` | `#6b3457` | `#c17ba3` | `#a8482b` | `#d97a55` | `#2f6b6b` | `#5cb0ab` | `#6a3d8f` | `#b98ede` |
-| `--status-waiting` | `#9a7526` | `#d8b768` | `#a9781f` | `#d0a94e` | `#8f7d33` | `#c3b06a` | `#8a7220` | `#d4b46c` |
-| `--status-someday` | `#63607a` | `#9d95ad` | `#605d6b` | `#a397a8` | `#5c6472` | `#93a0a8` | `#5f5c78` | `#9a92ad` |
-| `--status-paused` | `#7a6a58` | `#a2968b` | `#7a6857` | `#a4968a` | `#6e6a5f` | `#a0998c` | `#6f6560` | `#a2958b` |
-| `--status-done` | `#4b6b3a` | `#8fb073` | `#5c6b30` | `#a3b473` | `#54763a` | `#8bab63` | `#4d6b4a` | `#93b584` |
+| token | bramble-light | bramble-dark | hearth-light | hearth-dark | fen-light | fen-dark |
+| --- | --- | --- | --- | --- | --- | --- |
+| `--status-active` | `#6b3457` | `#c17ba3` | `#a8482b` | `#d97a55` | `#2f6b6b` | `#5cb0ab` |
+| `--status-waiting` | `#9a7526` | `#d8b768` | `#a9781f` | `#d0a94e` | `#8f7d33` | `#c3b06a` |
+| `--status-someday` | `#63607a` | `#9d95ad` | `#605d6b` | `#a397a8` | `#5c6472` | `#93a0a8` |
+| `--status-paused` | `#7a6a58` | `#a2968b` | `#7a6857` | `#a4968a` | `#6e6a5f` | `#a0998c` |
+| `--status-done` | `#4b6b3a` | `#8fb073` | `#5c6b30` | `#a3b473` | `#54763a` | `#8bab63` |
 
-Damson, like Hearth, has no green of its own, so its `--status-done` is a
-cooled olive drawn for the purpose.
+| token | damson-light | damson-dark | vellum-light | vellum-dark | raven-light | raven-dark |
+| --- | --- | --- | --- | --- | --- | --- |
+| `--status-active` | `#6a3d8f` | `#b98ede` | `#22305a` | `#7b8fd4` | `#8a1c28` | `#d34f5e`* |
+| `--status-waiting` | `#8a7220` | `#d4b46c` | `#8a7038` | `#c9a860` | `#7d6b46` | `#b39f6e` |
+| `--status-someday` | `#5f5c78` | `#9a92ad` | `#5f6478` | `#9ea3b8` | `#5c6470` | `#8f96a4` |
+| `--status-paused` | `#6f6560` | `#a2958b` | `#766b58` | `#b0a58c` | `#6b5f52` | `#a2917f` |
+| `--status-done` | `#4d6b4a` | `#93b584` | `#3f6b46` | `#8bb08f` | `#55684a` | `#7f9f74` |
+
+Damson, Vellum and Raven, like Hearth, have no green of their own, so their
+`--status-done` is a cooled olive/moss drawn for the purpose rather than an
+`--accent-2` alias.
+
+**\*Raven-dark `--status-active` does not alias `--accent`.** The base
+`--accent` (`#c23347`) clears the *original* palette audit's
+accent-as-graphic-element check (≥3:1 against `--card`/`--bg`), but fails
+this token's own dot/fill constructions against `--elevated` and a 16% tint
+(2.76–2.77:1, need ≥3) — a stricter, narrower ground than that first check
+used. Rather than re-brighten the shared `--accent` (which would also move
+every button, link and icon that uses it), `--status-active` gets its own
+brightened value for this one theme-mode. Same *why* as the two fixes already
+made to Raven's dark accent/danger during the original palette audit — a hue
+that reads fine as text or a filled button can still be too close in
+luminance to a specific small-graphic ground.
 
 Aliases (`active` = `--accent`, `waiting` = `--gold`, `done` = `--accent-2`
-outside Hearth) may be written as `var(--accent)` rather than repeating the
+where it's green) may be written as `var(--accent)` rather than repeating the
 hex — but write them as their own declarations in every theme block, so a
-later divergence is a one-line change.
+later divergence (like Raven-dark's) is a one-line change, not a token
+redefinition.
 
-**Contrast — checked 2026-09-09, extended to Damson 2026-09-12; all 40 pass.**
-Three constructions, against
+**Contrast — checked 2026-09-09 for the first four themes, extended to
+Damson/Vellum/Raven 2026-09-12; all 60 pass.** Three constructions, against
 the treatment in 3a-1:
 
 - pill label — `--text-sub` on a 16% status tint over `--card`, needs ≥4.5:1 →
-  **range 5.80–7.65**
+  **range 5.80–8.40**
 - status dot — the hue on that same tint, graphic, needs ≥3:1 →
-  **range 3.09–6.63**
+  **range 3.09–8.62**
 - progress fill — the hue on `--elevated`, graphic, needs ≥3:1 →
-  **range 3.05–7.05**
+  **range 3.05–8.90**
 
-The tightest values are `waiting` in the three light themes (3.05–3.27 on the
-dot and bar). That is deliberate: `waiting` is each theme's `--gold`, and the
+The tightest values are `waiting` in the light themes (3.05–3.58 on the dot
+and bar). That is deliberate: `waiting` is each theme's `--gold`, and the
 Contrast-notes rule that **gold is a graphic token, never a text colour**
 still holds — under this treatment gold is only ever a dot or a fill, never
-type. Do not "fix" it by darkening; that breaks the alias.
+type. Do not "fix" it by darkening; that breaks the alias. Raven-dark
+`--status-active` (3.46/3.63, see above) is the next-tightest, by design —
+brightened only as far as the checks require.
 
-### 3a-3 Plumbing: `data-status`, and finishing the `--tab-color` cleanup
+### 3a-3 Plumbing: `data-status`, and finishing the `--tab-color` cleanup — built 2026-09-12
 
-The inline `style="--tab-color:#2f9491"` comes out of the render code. The
-pill, the tab, the progress fill and the detail strip take a
-`data-status="Active"` attribute instead, and five CSS rules map it:
+The inline `style="--tab-color:#2f9491"` came out of the render code. The
+pill, the tab, the progress fill, the detail strip, and `.bt-status-select`
+now carry a `data-status="Active"` attribute instead, mapped by five CSS
+rules:
 
 ```
 [data-status="Active"]      { --tab-color: var(--status-active); }
@@ -623,25 +653,22 @@ pill, the tab, the progress fill and the detail strip take a
 ...
 ```
 
-`STATUS_COLOR` and `CAT_COLOR` are deleted. The category filter tabs
-(`app.js:3604`) take `--accent-2` and stop needing a colour constant at all.
-`.progress-bar-fill` keeps an inline `style="width:N%"` — width has to be
-inline — but its `background` moves to `var(--tab-color)` in CSS.
+`STATUS_COLOR` and `CAT_COLOR` are gone. The category filter tabs take
+`--accent-2` directly (`style="--tab-color:var(--accent-2)"`) rather than a
+colour constant. `.progress-bar-fill` keeps an inline `style="width:N%"` —
+width has to be inline — but its `background` moved to `var(--tab-color)` in
+CSS. A `statusPill()` helper in `app.js` renders the dot + neutral-label
+markup once, used at all four call sites (home card, project detail
+read-only, review-screen card) instead of repeating the template.
 
-**Blocker: three surviving alpha-hex sites.** `var(--tab-color)NN` only parses
-while the value is a bare 6-digit hex, so it breaks the moment the token holds
-`var(--status-active)`. The `--tab-color` cleanup section called this in Pass 1
-and it was only half done. Remaining:
-
-| site | rule | state |
-| --- | --- | --- |
-| `app.css:430` | `.tab.active` | dead — overridden at 1575, delete |
-| `app.css:432` | `.tab.active .tab-count` | dead — overridden at 1580, delete |
-| `app.css:1215` | `#bt-app .status-pill` | dead — overridden at 1570, delete |
-| `app.css:1684` | `#bt-app .bt-status-select` | **live** — port to `color-mix()` |
-
-Only 1684 is a real change; the other three are dead declarations that will
-mislead the next person. Delete them.
+**The three dead alpha-hex sites were deleted, the one live site ported.**
+`var(--tab-color)NN` only parses while the value is a bare 6-digit hex, so it
+broke the moment the token held `var(--status-active)`. `.tab.active` and
+`.tab.active .tab-count` (dead, already overridden by `#bt-app`-scoped rules)
+are gone; `#bt-app .status-pill`'s old alpha-hex background (also dead,
+superseded by the color-mix version further down) is gone; `#bt-app
+.bt-status-select` (the one live site) now uses
+`color-mix(in srgb, var(--tab-color, var(--accent)) 13%, transparent)`.
 
 ### 3a-4 Remaining off-palette colour
 
@@ -1029,18 +1056,20 @@ Mark dropped (two hedgehog attempts rejected) — wordmark-only for now. Favicon
 every emoji and symbol glyph swapped. IM Fell wordmark + gold dot.
 Still to add: PNG favicon fallbacks; more icons as later features need them.
 
-**Pass 3 — polish (spec'd 2026-09-09, not built).** No longer optional; the
-colour half of it is a correctness fix, not decoration. Two PRs — full spec in
-the Pass 3 section above.
+**Pass 3 — polish (spec'd 2026-09-09).** No longer optional; the colour half
+of it is a correctness fix, not decoration. Two PRs — full spec in the Pass 3
+section above.
 
-- **3a — colour + housekeeping.** Status colours become per-theme tokens and
-  the pill label goes neutral; `STATUS_COLOR` / `CAT_COLOR` deleted; the last
-  alpha-hex `--tab-color` sites cleared; the remaining Tailwind/slate leftovers
-  (`#ef4444` ×8, `#f59e0b`, `#E8A020`, `#f1f5f9` ×2, the blue-grey shadows)
-  moved onto tokens. Plus the housekeeping that has been deferred twice: fold
-  the `#bt-app` override layer back into the original declarations, adopt the
-  `--fs-*` tokens rule-by-rule, add `tnum`, add radius tokens. Two stale-copy
-  bugs (auth screen, landing footer) ride along.
+- **3a — colour + housekeeping.** **3a-1/2/3 built 2026-09-12**: status
+  colours are per-theme `--status-*` tokens (extended to Vellum/Raven, added
+  2026-09-12 after this section was first written), the pill label is neutral
+  with a coloured dot, `STATUS_COLOR`/`CAT_COLOR` are deleted, the alpha-hex
+  `--tab-color` sites are cleared, category tabs take `--accent-2`. **Still
+  open — 3a-4/5/6**: the remaining Tailwind/slate leftovers (`#ef4444` ×8,
+  `#f59e0b`, `#E8A020`, `#f1f5f9` ×2, the blue-grey shadows) onto tokens; the
+  housekeeping deferred twice (fold the `#bt-app` override layer back in,
+  adopt the `--fs-*` tokens rule-by-rule, add `tnum`, add radius tokens); two
+  stale-copy bugs (auth screen, landing footer).
 - **3b — the drawn things.** The focus-screen candle (replaces the ring),
   empty-state illustrations, paper texture ported from the landing page,
   flourish dividers, and **the card** — the tally replacing the progress bar,
