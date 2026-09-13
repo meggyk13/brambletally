@@ -1,7 +1,7 @@
 import { uuid } from './id.js';
 import { blockedBetween } from './blocks.js';
 import { readNotifPrefs } from './notif.js';
-import { sendEmail, emailShell } from './email.js';
+import { sendEmail, emailShell, EMAIL_LINK_COLOR } from './email.js';
 import { appOrigin } from './constants.js';
 
 const appUrl = (env) => appOrigin(env) + '/app';
@@ -96,7 +96,7 @@ export async function notify(
       const { subject, line } = notifCopy(type, actorName, preview);
       const url = appUrl(env);
       const html = emailShell(
-        `<p>${escapeHtml(line)}</p><p><a href="${url}" style="color:#6B8E23">Open Brambletally</a></p>`
+        `<p>${escapeHtml(line)}</p><p><a href="${url}" style="color:${EMAIL_LINK_COLOR}">Open Brambletally</a></p>`
       );
       const text = `${line}\n\n${url}`;
       const send = async () => {

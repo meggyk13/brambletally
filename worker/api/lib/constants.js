@@ -3,6 +3,11 @@
 export const SESSION_COOKIE = 'brambletally_session';
 export const SESSION_TTL_DAYS = 30;      // sliding: each authenticated request can extend it
 export const MAGIC_LINK_TTL_MIN = 15;
+
+// A collaborator invite email sits in someone's inbox unread far longer than a
+// sign-in link does — 15 minutes would expire before most invitees ever open
+// it. Longer-lived, so its own constant rather than reusing MAGIC_LINK_TTL_MIN.
+export const INVITE_LINK_TTL_DAYS = 7;
 export const APP_PATH = '/app';
 
 // Canonical public origin. Security-sensitive absolute URLs (the magic-link

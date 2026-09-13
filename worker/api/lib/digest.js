@@ -1,5 +1,5 @@
 import { readNotifPrefs } from './notif.js';
-import { sendEmail, emailShell } from './email.js';
+import { sendEmail, emailShell, EMAIL_LINK_COLOR } from './email.js';
 import { notifCopy } from './notify.js';
 import { appOrigin } from './constants.js';
 
@@ -78,7 +78,7 @@ export async function runWeeklyDigest(env) {
       `<p>Your week on Brambletally:</p><ul>` +
         lines.map((l) => `<li>${escapeHtml(l)}</li>`).join('') +
         (extra > 0 ? `<li>…and ${extra} more</li>` : '') +
-        `</ul><p><a href="${url}" style="color:#6B8E23">Open Brambletally</a></p>`
+        `</ul><p><a href="${url}" style="color:${EMAIL_LINK_COLOR}">Open Brambletally</a></p>`
     );
 
     const r = await sendEmail(env, {

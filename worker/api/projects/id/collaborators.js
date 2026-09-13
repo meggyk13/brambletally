@@ -3,8 +3,8 @@ import { uuid, randomToken, sha256Hex } from '../../lib/id.js';
 import { sqlNow } from '../../lib/time.js';
 import { requireProject } from '../../lib/projects.js';
 import { COLLAB_ROLES } from '../../lib/validate.js';
-import { sendMagicLink } from '../../lib/email.js';
-import { MAGIC_LINK_TTL_MIN, appOrigin } from '../../lib/constants.js';
+import { sendCollaboratorInvite } from '../../lib/email.js';
+import { INVITE_LINK_TTL_DAYS, appOrigin } from '../../lib/constants.js';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -92,13 +92,21 @@ export async function onRequestPost(context) {
       await db.prepare(
         'INSERT INTO magic_links (id, email, token_hash, expires_at) VALUES (?, ?, ?, ?)'
       )
-        .bind(uuid(), email, await sha256Hex(token), sqlNow(MAGIC_LINK_TTL_MIN * 60 * 1000))
+        .bind(uuid(), email, await sha256Hex(token), sqlNow(INVITE_LINK_TTL_DAYS * 24 * 60 * 60 * 1000))
         .run();
       // Best-effort, same as sendEmailChangedNotice in email-change.js: the
       // account and collaborator relationship are already committed above, so
       // a mail-send hiccup shouldn't fail a request that otherwise succeeded.
       const link = `${appOrigin(context.env)}/api/auth/callback?token=${token}`;
-      context.waitUntil(sendMagicLink(context.env, email, link).catch(() => {}));
+      const project = await db.prepare('SELECT title FROM projects WHERE id = ?').bind(id).first();
+      const inviterName = g.user.display_name || g.user.name || (g.user.handle ? '@' + g.user.handle : 'Someone');
+      context.waitUntil(
+        sendCollaboratorInvite(context.env, email, link, {
+          inviterName,
+          projectTitle: (project && project.title) || 'a project',
+          role: body.role,
+        }).catch(() => {})
+      );
 
       return json({
         collaborator: { user_id: newUserId, name: email.split('@')[0], email, role: body.role },
