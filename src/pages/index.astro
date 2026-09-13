@@ -254,6 +254,13 @@ const canonical = 'https://brambletally.com/';
       .shuffle-demo-edit[hidden] { display: none; }
       .shuffle-demo-prompt { margin: 0; font-family: var(--head); font-weight: 600; color: var(--accent-2); font-size: 1.05rem; }
       .shuffle-demo-title { margin: 0; color: var(--text-sub); font-size: .98rem; }
+      .shuffle-demo-title[hidden] { display: none; }
+      .shuffle-demo-category {
+        background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 9px;
+        padding: 7px 10px; font-family: var(--body); font-size: .92rem; color: var(--text);
+        cursor: pointer; align-self: flex-start;
+      }
+      .shuffle-demo-category[hidden] { display: none; }
       .shuffle-demo-steps {
         margin: 10px 0 0; padding: 0; background: none; border: none;
         font-family: var(--body); font-weight: 600; font-size: .88rem; color: var(--text-muted);
@@ -403,7 +410,7 @@ const canonical = 'https://brambletally.com/';
               <li>Research</li>
               <li>Event prep</li>
               <li>Household</li>
-              <li>Admin</li>
+              <li>Miscellaneous</li>
             </ul>
           </div>
           <div class="who-preview" aria-hidden="true">
@@ -488,6 +495,15 @@ const canonical = 'https://brambletally.com/';
               </div>
               <p class="shuffle-demo-prompt" id="shuffleDemoPrompt">What should this become?</p>
               <p class="shuffle-demo-title" id="shuffleDemoTitle">&ldquo;Order more elastic before the trim run&rdquo;</p>
+              <select class="shuffle-demo-category" id="shuffleDemoCategory" hidden>
+                <option value="">+ category</option>
+                <option>Making</option>
+                <option>Research</option>
+                <option>Event prep</option>
+                <option>Household</option>
+                <option>Miscellaneous</option>
+                <option value="__new">&#65291; New category&hellip;</option>
+              </select>
               <button class="shuffle-demo-steps" id="shuffleDemoSteps" type="button" hidden>Steps</button>
               <div class="shuffle-demo-steplist" id="shuffleDemoStepList" hidden></div>
               <div class="shuffle-demo-actions">
@@ -654,7 +670,7 @@ const canonical = 'https://brambletally.com/';
           },
           {
             kicker: 'Repaint the shed', prompt: 'No category yet.',
-            title: 'Making, Household, or one of your own.',
+            categoryPicker: true,
             project: true, primary: 'Save',
             steps: [
               { title: 'Buy exterior paint', done: false },
@@ -668,6 +684,7 @@ const canonical = 'https://brambletally.com/';
         var edit = document.getElementById('shuffleDemoEdit');
         var prompt = document.getElementById('shuffleDemoPrompt');
         var title = document.getElementById('shuffleDemoTitle');
+        var category = document.getElementById('shuffleDemoCategory');
         var stepsBtn = document.getElementById('shuffleDemoSteps');
         var stepList = document.getElementById('shuffleDemoStepList');
         var primaryBtn = document.getElementById('shuffleDemoPrimary');
@@ -700,7 +717,10 @@ const canonical = 'https://brambletally.com/';
           var c = cards[i];
           kicker.textContent = c.kicker;
           prompt.textContent = c.prompt;
-          title.textContent = c.title;
+          title.textContent = c.title || '';
+          title.hidden = !!c.categoryPicker;
+          category.hidden = !c.categoryPicker;
+          category.value = '';
           primaryBtn.textContent = c.primary;
           edit.hidden = !c.project;
           stepsBtn.hidden = !c.project;

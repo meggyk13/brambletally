@@ -688,6 +688,12 @@ Decided 2026-09-08: the app is no longer SCA-specific, so `A&S` and `Office`
 
 No schema, no API shape change. Ship this as its own commit first.
 
+**Amended 2026-09-13:** `Admin` didn't land — still read as office jargon.
+Replaced with `Miscellaneous` in `DEFAULTS`, the landing `.kinds` list, and
+the homepage Shuffle demo's category picker (see [[shuffle-mainline-editing]]
+for the demo). Same "lazy-seed only" scope as above — no rename for anyone
+already seeded.
+
 ### B. Per-user timezone
 
 Due dates and the Sunday digest are effectively `America/Los_Angeles` today
