@@ -241,12 +241,26 @@ const canonical = 'https://brambletally.com/';
         transition: opacity .18s ease, transform .18s ease;
       }
       .shuffle-demo-card.is-changing { opacity: 0; transform: translateY(4px); }
+      .shuffle-demo-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
       .shuffle-demo-kicker {
         font-family: 'IBM Plex Mono', ui-monospace, monospace; text-transform: uppercase;
         letter-spacing: .12em; font-size: .7rem; color: var(--text-muted);
       }
+      .shuffle-demo-edit {
+        font-family: var(--body); font-weight: 600; font-size: .78rem; color: var(--text-muted);
+        background: none; border: 1px solid var(--border); border-radius: 999px;
+        padding: 3px 11px; cursor: pointer; flex-shrink: 0; transition: color .2s, border-color .2s;
+      }
+      .shuffle-demo-edit:hover { color: var(--accent); border-color: var(--accent); }
+      .shuffle-demo-edit[hidden] { display: none; }
       .shuffle-demo-prompt { margin: 0; font-family: var(--head); font-weight: 600; color: var(--accent-2); font-size: 1.05rem; }
       .shuffle-demo-title { margin: 0; color: var(--text-sub); font-size: .98rem; }
+      .shuffle-demo-steps {
+        margin: 2px 0 0; font-family: 'IBM Plex Mono', ui-monospace, monospace;
+        font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted);
+      }
+      .shuffle-demo-steps[hidden] { display: none; }
+      .shuffle-demo-steps::before { content: '▸ '; }
       .shuffle-demo-skip {
         margin-top: 14px; display: inline-flex; align-items: center; gap: 6px;
         background: none; border: 1px solid var(--border-strong); border-radius: 999px;
@@ -445,9 +459,13 @@ const canonical = 'https://brambletally.com/';
           <div class="shuffle-demo">
             <div class="shuffle-demo-label">Try Shuffle</div>
             <div class="shuffle-demo-card" id="shuffleDemoCard">
-              <div class="shuffle-demo-kicker" id="shuffleDemoKicker">Captured</div>
+              <div class="shuffle-demo-head">
+                <div class="shuffle-demo-kicker" id="shuffleDemoKicker">Captured</div>
+                <button class="shuffle-demo-edit" id="shuffleDemoEdit" type="button" hidden>Edit&hellip;</button>
+              </div>
               <p class="shuffle-demo-prompt" id="shuffleDemoPrompt">What should this become?</p>
               <p class="shuffle-demo-title" id="shuffleDemoTitle">&ldquo;Order more elastic before the trim run&rdquo;</p>
+              <p class="shuffle-demo-steps" id="shuffleDemoSteps" hidden>Steps</p>
             </div>
             <button class="shuffle-demo-skip" id="shuffleDemoSkip" type="button">
               Skip
@@ -586,16 +604,18 @@ const canonical = 'https://brambletally.com/';
 
       (function () {
         var cards = [
-          { kicker: 'Captured', prompt: 'What should this become?', title: '“Order more elastic before the trim run”' },
-          { kicker: 'Solstice feast garb', prompt: 'No deadline set.', title: 'Add one, or leave it open-ended.' },
-          { kicker: 'Herbal tincture research', prompt: 'What’s the first step?', title: 'Break it into something you can start today.' },
-          { kicker: 'Repaint the shed', prompt: 'No category yet.', title: 'Making, Household, or one of your own.' }
+          { kicker: 'Captured', prompt: 'What should this become?', title: '“Order more elastic before the trim run”', project: false },
+          { kicker: 'Solstice feast garb', prompt: 'No deadline set.', title: 'Add one, or leave it open-ended.', project: true },
+          { kicker: 'Herbal tincture research', prompt: 'What’s the first step?', title: 'Break it into something you can start today.', project: true },
+          { kicker: 'Repaint the shed', prompt: 'No category yet.', title: 'Making, Household, or one of your own.', project: true }
         ];
         var i = 0;
         var card = document.getElementById('shuffleDemoCard');
         var kicker = document.getElementById('shuffleDemoKicker');
+        var edit = document.getElementById('shuffleDemoEdit');
         var prompt = document.getElementById('shuffleDemoPrompt');
         var title = document.getElementById('shuffleDemoTitle');
+        var steps = document.getElementById('shuffleDemoSteps');
         var btn = document.getElementById('shuffleDemoSkip');
         if (!card || !btn) return;
         function render() {
@@ -603,6 +623,8 @@ const canonical = 'https://brambletally.com/';
           kicker.textContent = c.kicker;
           prompt.textContent = c.prompt;
           title.textContent = c.title;
+          edit.hidden = !c.project;
+          steps.hidden = !c.project;
         }
         btn.addEventListener('click', function () {
           card.classList.add('is-changing');
