@@ -42,8 +42,12 @@ export async function onRequestGet(context) {
     const id = uuid();
     // DO NOTHING + re-select: if the same new address signed in twice at once,
     // whichever INSERT lands first wins and both requests resolve to that id.
+    // The conflict target must repeat idx_users_email's partial WHERE
+    // (0016_anonymous_users.sql) — SQLite won't match a plain ON CONFLICT(email)
+    // against a partial unique index otherwise.
     await env.DB.prepare(
-      'INSERT INTO users (id, email, name) VALUES (?, ?, ?) ON CONFLICT(email) DO NOTHING'
+      `INSERT INTO users (id, email, name) VALUES (?, ?, ?)
+       ON CONFLICT(email) WHERE email IS NOT NULL DO NOTHING`
     )
       .bind(id, link.email, link.email.split('@')[0])
       .run();
