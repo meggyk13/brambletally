@@ -8,6 +8,14 @@ import { MAGIC_LINK_TTL_MIN, appOrigin } from '../../lib/constants.js';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+// Inviting a brand-new address creates a real account and sends a real
+// email to it with no consent from whoever holds that address — unlike
+// every other mail-sending route in the app, this one had no cap at all
+// (docs/plan.md "Data-integrity hardening pass 2", A2). Same rolling-24h
+// count pattern as REQUEST_DAILY_CAP/REPORT_DAILY_CAP (lib/board.js), just
+// scoped to this route instead of the board.
+const INVITE_DAILY_CAP = 5;
+
 // GET — current collaborators plus outstanding email invites.
 export async function onRequestGet(context) {
   const { id } = context.params;
@@ -54,6 +62,16 @@ export async function onRequestPost(context) {
       // their first login) so the GET below's "still pending" filter — and
       // resolvePendingInvites on old, actually-still-pending rows — keep
       // working unchanged.
+      const recent = await db.prepare(
+        `SELECT COUNT(*) AS n FROM pending_invites
+          WHERE invited_by = ? AND created_at > datetime('now', '-1 day')`
+      )
+        .bind(g.user.id)
+        .first();
+      if ((recent.n || 0) >= INVITE_DAILY_CAP) {
+        return error(429, "You've invited a lot of new people today. Try again tomorrow.");
+      }
+
       const newUserId = uuid();
       await db.batch([
         db.prepare('INSERT INTO users (id, email, name) VALUES (?, ?, ?)').bind(

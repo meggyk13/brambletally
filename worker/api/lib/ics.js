@@ -10,18 +10,35 @@ const icsText = (s) =>
     .replace(/,/g, '\\,')
     .replace(/\r?\n/g, '\\n');
 
-// Fold lines to <=75 octets per RFC 5545 (continuations start with a space).
+// Fold lines to <=75 octets per RFC 5545 (continuations start with a
+// space). Measured in UTF-8 bytes, not JS string length (UTF-16 code
+// units) — a note/project title with multi-byte characters (emoji,
+// accented letters, CJK) could otherwise produce a folded line whose byte
+// length exceeds the limit even though its character count didn't. RFC
+// 5545 §3.1 also requires never splitting a multi-octet character across
+// a fold boundary, hence backing the cut point off continuation bytes.
+const foldEncoder = new TextEncoder();
+const foldDecoder = new TextDecoder();
+
+function byteBoundary(bytes, from, maxLen) {
+  let end = Math.min(from + maxLen, bytes.length);
+  while (end > from && (bytes[end] & 0xc0) === 0x80) end--;
+  return end;
+}
+
 function fold(line) {
-  if (line.length <= 75) return line;
+  const bytes = foldEncoder.encode(line);
+  if (bytes.length <= 75) return line;
   const parts = [];
-  let rest = line;
-  parts.push(rest.slice(0, 75));
-  rest = rest.slice(75);
-  while (rest.length > 74) {
-    parts.push(' ' + rest.slice(0, 74));
-    rest = rest.slice(74);
+  let end = byteBoundary(bytes, 0, 75);
+  parts.push(foldDecoder.decode(bytes.slice(0, end)));
+  let start = end;
+  while (bytes.length - start > 74) {
+    end = byteBoundary(bytes, start, 74);
+    parts.push(' ' + foldDecoder.decode(bytes.slice(start, end)));
+    start = end;
   }
-  if (rest.length) parts.push(' ' + rest);
+  if (start < bytes.length) parts.push(' ' + foldDecoder.decode(bytes.slice(start)));
   return parts.join('\r\n');
 }
 

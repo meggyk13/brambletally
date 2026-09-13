@@ -1612,6 +1612,242 @@ without dropping the "hide disabled actors' own content" behavior.
   a D1 response-size error. Not full pagination — not worth that complexity
   at a "years away, if ever" scale — but bounded and observable.
 
+## Planned: Data-integrity hardening pass 2 — abuse surfaces + frontend (spec'd 2026-09-13)
+
+Follow-up to the pass above, once it was live on prod. That pass covered
+`worker/api/**` almost entirely; this one covers what it didn't: the
+frontend (`public/app.js`, ~6,930 lines; `public/app.css`) got no review at
+all, and a few backend surfaces (rate-limiting/bot-protection coverage,
+top-level sessions/tasks/calendar routes, deeper admin routes) only a light
+pass. Two parallel audits plus one direct check (Supporter-tier gate
+enforcement) below. Nothing here is fixed yet.
+
+### A. High — real abuse/cost vectors, no product-decision ambiguity
+
+**A1. Contributor-request creation has no bot-check at all — fixed
+2026-09-13**, contradicting
+the app's own documented design. `worker/api/lib/board.js:12-14`'s comment
+says a Turnstile challenge should guard a new account's first few board
+writes — explicitly "**requests + reports**" — and `reports/index.js:64-73`
+correctly implements that (checks `boardActionCount < TURNSTILE_UNTIL_ACTIONS`,
+then verifies the token). `board/listingId/requests.js` (POST, "ask to
+contribute") never imports or calls `verifyTurnstile`, and never even reads
+`boardActionCount`. Scenario: a scripted brand-new account can spam
+contributor requests at listing owners up to `REQUEST_DAILY_CAP` (10/day)
+indefinitely, with no CAPTCHA ever required — the soft daily counter is the
+only defense that exists, not the documented challenge. Confidence: high.
+
+**Fixed:** `board/listingId/requests.js` now runs the identical
+`boardActionCount < TURNSTILE_UNTIL_ACTIONS` → `verifyTurnstile` gate as
+`reports.js`. Frontend: `openRequestModal`/`API.requestContribute` now mount
+the same `mountTurnstileWidget` helper the report modal uses, conditional on
+`state.me.board_new`, matching that modal's pattern exactly. Verified the
+new code path runs cleanly end-to-end against a seeded local D1 (fresh
+0-action account, request succeeds through the new gate) — local dev's
+`TURNSTILE_SECRET_KEY` is intentionally blank (same as every Turnstile route
+here until the secret is provisioned), so an actual rejection can't be
+observed locally; this mirrors `reports.js`'s already-proven-in-production
+implementation exactly, which is the strongest available confidence short
+of a live secret.
+
+**A2. Unlimited invite-by-email — real emails, real account creation, no
+cap — fixed 2026-09-13.** `worker/api/projects/id/collaborators.js:43-88` (POST, invite by
+email) has no rate limit and no Turnstile. Any signed-in user who owns any
+project (trivial to create) can invite arbitrary addresses; each new one
+gets a real `users` row, a `magic_links` row, and an actual "you've been
+invited" email (`sendMagicLink`, line 83) — with no consent from the
+address owner and no throttle anywhere in the path, unlike every other
+mail-sending or account-creating endpoint in the app. Scenario: loop over a
+list of email addresses, inviting each to a throwaway project — unlimited
+volume, at Brambletally's sending cost and Resend deliverability
+reputation, and each target now has an unsolicited account. Confidence:
+high — this is the worst finding in this pass, both in blast radius (any
+signed-in user, zero extra privilege needed) and cost (real external email
+sends).
+
+**Fixed:** a 5/day rolling-24h cap (`INVITE_DAILY_CAP`,
+`worker/api/projects/id/collaborators.js`), same count-query pattern as
+`REQUEST_DAILY_CAP`/`REPORT_DAILY_CAP`, scoped to the calling user across
+every project they own — counts `pending_invites` rows, which only get
+created on the new-account branch, so it can't be dodged by spreading
+invites across many projects. Deliberately does NOT gate re-inviting an
+existing account (no email sent on that path, nothing to cap).
+Verified against a seeded local D1: invites 1-5 to distinct new addresses
+succeeded, invite 6 returned `429`, and re-inviting an already-created
+address (existing account, no new email) still succeeded while over the
+cap.
+
+**A3. Reopening a listing bypasses the Supporter listing cap — fixed
+2026-09-13.** `activeListingCap` (`lib/board.js:31`) — free: 1 open listing,
+Supporter: 3 — is enforced only at listing *creation* (`board/index.js:94-108`).
+`board/listingId.js` PATCH (`status` transition) never re-checks it.
+Scenario: free user opens listing A, closes it, opens listing B (cap check
+passes — A is closed, count is 0), then `PATCH A {status:'open'}` — no cap
+check on this call — now has 2 open listings against a cap of 1, repeatable
+without limit for any number of listings they own. This is the concrete
+answer to a question this pass set out to check: a downgraded/free user
+isn't just passively grandfathered over the cap, they can actively keep
+re-opening past it forever. Confidence: high.
+
+**Fixed:** the PATCH handler now re-checks `activeListingCap` whenever
+`status` transitions *into* `'open'` from something else, scoped by the
+project's **current** `owner_id` (not `l.created_by` — the two can diverge
+after a transfer, and it's the current owner whose cap this counts against).
+Verified against a seeded local D1: reopening listing A while listing B was
+already open correctly returned `403` for a free account, and correctly
+succeeded for the same scenario once the account was a Supporter (cap 3).
+
+### B. Medium
+
+**B1. Email-change and account-claim requests can mail-bomb an address the
+caller doesn't control — fixed 2026-09-13.** `settings/email.js` and
+`auth/claim.js` each retire the caller's own prior pending request before
+inserting a new one (one live token *per calling user*), but nothing stops
+the same user from immediately calling again to re-mail the same target
+address — no per-user daily cap analogous to
+`REQUEST_DAILY_CAP`/`REPORT_DAILY_CAP` exists on either path. Scenario:
+repeatedly POST `{email: "victim@example.com"}` to either endpoint in a
+loop; each call sends a fresh real confirm/magic-link email to an address
+the caller doesn't own. Confidence: high.
+
+**Fixed:** a 5/day rolling-24h cap on each route (`EMAIL_CHANGE_DAILY_CAP`
+in `settings/email.js`, `CLAIM_DAILY_CAP` in `auth/claim.js`), same
+count-query pattern as `REQUEST_DAILY_CAP`. Verified against a seeded local
+D1: 5 requests succeeded on each route, the 6th returned `429`.
+
+**B2. "Load more" can duplicate results on a fast double-click — fixed
+2026-09-13**, in all four places that paginate this way: board listings,
+board/feed activity, interest discovery, and the followers/following list
+(`app.js` — board listings ~2806-2836, activity ~2879-2910, interests
+~2029-2069, followers/following ~2088-2138). Each `loadMore(btn)` only
+removed/disabled the button *after* the request resolved, and only advanced
+`cursor` at that same point — so a double-click (or fast double-tap) fired
+two requests with the identical stale cursor, and both responses appended
+their page to the list. Scenario: double-click "Load more" on the Board
+tab — the next batch of listings renders twice. Confidence: high.
+
+**Fixed:** all four now disable the button synchronously on click, before
+the `await`, and re-enable it on failure (previously a failed "load more"
+silently did nothing and left the button clickable, which was fine; now it
+correctly un-disables so a transient failure can be retried, rather than
+trading the double-click bug for a permanently-stuck button). Verified
+against a real authenticated browser session (Board Listings and Activity
+tabs both load and paginate correctly, no console errors).
+
+**B3. The unread-notification badge clears even when marking-read
+fails — fixed 2026-09-13.** `app.js:3477-3486`'s own comment says "leave the
+badge; it'll clear next load" inside the `catch` — but `state.me.unread_count
+= 0` and the bell-dot removal ran unconditionally after the try/catch, not
+only on success. Scenario: open the notification panel on a flaky
+connection — the mark-read request throws and is swallowed, but the badge
+disappears anyway even though the server still has those notifications
+marked unread; the mismatch surfaces confusingly later (another device or a
+reload still showing the old count). Confidence: high — the code
+contradicted its own comment.
+
+**Fixed:** the badge-clear and bell-dot removal moved inside the `try`,
+right after the confirmed-successful `API.markNotificationsRead()` call —
+they now only run when the server actually confirmed. Verified against a
+real authenticated browser session: opening the notification panel with two
+seeded unread notifications correctly displayed both and cleared the badge
+after a successful mark-read call.
+
+### C. Low
+
+**C1. Board comments have zero rate limiting — fixed 2026-09-13** — not
+even the soft daily counter contributor-requests has. `board/listingId/comments.js`
+(POST) has no Turnstile (likely fine — `lib/board.js`'s comment only names
+"requests + reports," not comments) but also no daily cap of any kind.
+Scenario: one account posts comments in a tight loop with no server-side
+limit, flooding a listing's thread and generating unlimited `notify()`
+calls to the owner/parent-comment author. Confidence: medium.
+
+**Fixed:** a 50/day rolling-24h cap (`COMMENT_DAILY_CAP`, `lib/board.js`) —
+set higher than `REQUEST_DAILY_CAP`/`REPORT_DAILY_CAP` since normal
+commenting is far more frequent than filing requests/reports; this is a
+flood backstop, not an everyday limit. Verified against a seeded local D1:
+comment #50 (today) succeeded, #51 returned `429`.
+
+**C2. The ICS calendar feed's line-folding measures the wrong unit — fixed
+2026-09-13.** `worker/api/lib/ics.js`'s `fold()` measured JS string
+`.length` (UTF-16 code units) against the RFC 5545 75-*octet* limit the
+file's own comment promised. A `note`/`project_title` with multi-byte
+characters (emoji, accented letters, CJK) could produce a folded line whose
+byte length exceeded 75 even though its character count didn't — most
+calendar clients tolerate it, so this was cosmetic, but a real spec
+violation on a feed shared across every calendar app a user subscribes
+with. Confidence: medium.
+
+**Fixed:** `fold()` now encodes to UTF-8 bytes first and folds on byte
+count, backing the cut point off any continuation byte per RFC 5545 §3.1's
+"never split a multi-octet character" rule. Verified with a standalone
+script: a note of 40 emoji (160 UTF-8 bytes, ~120 JS-length units) and a
+note of mixed accented/CJK text both produced calendars where every
+physical line is ≤75 octets, and reconstructing each field from its folded
+continuation lines round-trips byte-for-byte identical to the original —
+no line-splitting corruption at a fold boundary.
+
+**C3. Shuffle's Skip/"Not applicable"/resolve buttons have no busy-state
+guard — fixed 2026-09-13**, unlike everything in B2 this is a narrower
+window (needs a fast double-click) but the same missing-disable pattern: a
+rapid double-click fired two skip/dismiss calls plus two redraws
+concurrently, and because both responses render into the same slot, the two
+in-flight draws could resolve out of order — the first (now-stale) card
+could overwrite the second, correct one. Confidence: medium.
+
+**Fixed:** `shuffleFooter`'s Skip and "Not applicable" buttons now share a
+closure-scoped busy flag — whichever fires first blocks the other until it
+resolves (re-opened on failure so a transient error can be retried); the
+inbox-capture Delete button got the same guard. Scoped to exactly the
+buttons the finding named, not every kind-specific control in
+`renderShuffleCard` (category chips, date pickers, etc.) — those go through
+separate, slower interaction patterns (a select/date input, not a bare
+button) and weren't part of this finding. Verified against a real
+authenticated browser session: an inbox-capture card rendered with
+→Project/→Step in…/Delete/Skip, and clicking Skip correctly snoozed the
+item and redrew to the empty state with no console errors.
+
+### Confirmed clean — no action needed
+
+- **Frontend XSS sweep**: every user-generated field traced through its
+  render site; all go through `esc()`/the `h()` template helper or
+  `.textContent` assignment. `innerHTML` appears only 4 times in the whole
+  file, all with trusted/static content. No stored-XSS vector found.
+- `worker/api/sessions.js`/`sessions/id.js` (read-only, correctly scoped to
+  the caller), `worker/api/tasks.js` (correctly excludes removed
+  collaborators' tasks and container steps), `worker/api/calendar/token.js`
+  (correctly scoped, no stale-token fallback), `admin/users/handle/sanction.js`
+  (can't lock out all admins), `admin/interests/merge.js` (batch ordering
+  correct) — all reviewed fresh, nothing found.
+- **Supporter-tier gates** described in `docs/plan.md`/`docs/social-plan.md`
+  (themes, project emblems, accent colour, avatar upload, photo count) —
+  checked directly (not by either agent): none of these are bypassable
+  because none of them are *built*. No schema columns, no write endpoints —
+  `avatar_url` exists on `users` but is never written by any route. This
+  isn't a hardening gap, just unbuilt scope; noted so it isn't mistaken for
+  a client-side-only-enforced gate (which would have been a real bug).
+
+### Open before building
+
+- **Rate-limit values aren't picked yet.** A2/B1/C1 each need a cap.
+  Proposing to mirror the existing `REQUEST_DAILY_CAP`/`REPORT_DAILY_CAP`
+  pattern (rolling-24h count query, no new table) at first for consistency,
+  but A2 and B1 both send real email to addresses the caller doesn't
+  necessarily control — arguably deserve a tighter cap (e.g. 5/day) than
+  the existing 10/day used for in-app-only actions like contributor
+  requests. Your call on the exact numbers.
+- **A1 needs frontend wiring, not just a backend check.** The "ask to
+  contribute" form has no Turnstile widget today; making A1's fix real means
+  reusing whatever pattern the report-filing UI already uses to render one
+  conditionally when `board_new` is true. Backend-only would just move the
+  gap from "no check" to "check exists but the client never sends a token,"
+  so this one's scope is bigger than the others.
+
+### Suggested build order
+
+A2 (worst cost/blast-radius) → A1 (needs the frontend piece, so pairs with
+the above) → A3 → B1 → C1 → B2/B3/C3 (all frontend, one pass) → C2.
+
 ### Open before building
 
 - **A1's fix shape is a real product decision, not just an implementation

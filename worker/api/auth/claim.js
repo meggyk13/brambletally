@@ -6,6 +6,12 @@ import { MAGIC_LINK_TTL_MIN, appOrigin } from '../lib/constants.js';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+// This sends a real email to an address the caller doesn't necessarily
+// control — nothing previously stopped repeatedly re-targeting the same (or
+// a different) address (docs/plan.md "Data-integrity hardening pass 2", B1).
+// Same rolling-24h count pattern as REQUEST_DAILY_CAP/REPORT_DAILY_CAP.
+const CLAIM_DAILY_CAP = 5;
+
 // POST /api/auth/claim — { email }. "Save your project" (docs/plan.md part
 // C): mails a sign-in link that, when clicked, either turns this anonymous
 // account into a real one at that address or — if the address already has an
@@ -21,6 +27,16 @@ export async function onRequestPost(context) {
   const body = await readJson(request);
   const email = String((body && body.email) || '').trim().toLowerCase();
   if (!EMAIL_RE.test(email)) return error(400, 'Enter a valid email address');
+
+  const recent = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM magic_links
+      WHERE claim_user_id = ? AND created_at > datetime('now', '-1 day')`
+  )
+    .bind(me.id)
+    .first();
+  if ((recent.n || 0) >= CLAIM_DAILY_CAP) {
+    return error(429, "You've requested a lot of claim links today. Try again tomorrow.");
+  }
 
   const token = randomToken(32);
   await env.DB.prepare(

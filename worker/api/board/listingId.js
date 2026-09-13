@@ -7,6 +7,7 @@ import {
   HEADLINE_MAX,
   HELP_WANTED_MAX,
   LISTING_STATUSES,
+  activeListingCap,
   fetchUpcomingSteps,
   requireBoardOk,
   shapeOwner,
@@ -128,7 +129,7 @@ export async function onRequestPatch(context) {
   const { listingId } = context.params;
 
   const listing = await context.env.DB.prepare(
-    `SELECT l.id, l.project_id, p.owner_id FROM project_listings l
+    `SELECT l.id, l.project_id, l.status, p.owner_id FROM project_listings l
        JOIN projects p ON p.id = l.project_id WHERE l.id = ?`
   )
     .bind(listingId)
@@ -154,6 +155,36 @@ export async function onRequestPatch(context) {
     fields.status = body.status;
   }
   if (Object.keys(fields).length === 0) return error(400, 'Nothing to update');
+
+  // activeListingCap is otherwise only checked at creation (board/index.js) —
+  // reopening a closed/archived listing is the other way an account's open
+  // count can grow, and it went unchecked (docs/plan.md "Data-integrity
+  // hardening pass 2", A3). Scoped to the project's CURRENT owner, not
+  // l.created_by — the two can diverge after an ownership transfer, and it's
+  // the current owner whose cap this listing counts against.
+  if (fields.status === 'open' && listing.status !== 'open') {
+    const owner =
+      me.id === listing.owner_id
+        ? me
+        : await context.env.DB.prepare('SELECT plan FROM users WHERE id = ?')
+            .bind(listing.owner_id)
+            .first();
+    const openCount = await context.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM project_listings l JOIN projects p ON p.id = l.project_id
+        WHERE p.owner_id = ? AND l.status = 'open' AND l.id != ?`
+    )
+      .bind(listing.owner_id, listingId)
+      .first();
+    const cap = activeListingCap(owner);
+    if ((openCount.n || 0) >= cap) {
+      return error(
+        403,
+        cap === 1
+          ? 'Free accounts can have one active listing. Close the other one first, or become a Supporter for up to three.'
+          : `Already at the limit of ${cap} active listings.`
+      );
+    }
+  }
 
   const cols = Object.keys(fields);
   await context.env.DB.prepare(

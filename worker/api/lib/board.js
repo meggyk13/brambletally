@@ -7,6 +7,10 @@ export const COMMENT_MAX = 2000;
 export const REQUEST_MSG_MAX = 1000;
 export const REQUEST_DAILY_CAP = 10; // contributor requests per user per rolling 24h
 export const REPORT_DAILY_CAP = 10; // reports per user per rolling 24h
+export const COMMENT_DAILY_CAP = 50; // listing comments per user per rolling 24h — no
+  // cap existed at all previously (docs/plan.md "Data-integrity hardening
+  // pass 2", C1); set high since normal use posts far more comments than
+  // requests/reports, this is a flood backstop, not a soft everyday limit.
 export const LISTING_STATUSES = ['open', 'closed', 'archived'];
 
 // A Turnstile challenge guards a caller's first few board writes (requests +

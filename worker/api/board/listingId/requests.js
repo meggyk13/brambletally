@@ -3,12 +3,24 @@ import { uuid } from '../../lib/id.js';
 import { projectRole } from '../../lib/projects.js';
 import { blockedBetween } from '../../lib/blocks.js';
 import { trimOrNull } from '../../lib/validate.js';
-import { REQUEST_MSG_MAX, REQUEST_DAILY_CAP, loadListing, requireBoardOk } from '../../lib/board.js';
+import { verifyTurnstile } from '../../lib/turnstile.js';
+import {
+  REQUEST_MSG_MAX,
+  REQUEST_DAILY_CAP,
+  TURNSTILE_UNTIL_ACTIONS,
+  boardActionCount,
+  loadListing,
+  requireBoardOk,
+} from '../../lib/board.js';
 import { notify } from '../../lib/notify.js';
 
-// POST /api/board/:listingId/requests — { message? }. Ask to contribute.
-// Reuses a prior declined/withdrawn row (back to 'pending'); a live pending or
-// an accepted row is a 409. Soft daily cap across all listings.
+// POST /api/board/:listingId/requests — { message?, turnstileToken? }. Ask to
+// contribute. Reuses a prior declined/withdrawn row (back to 'pending'); a
+// live pending or an accepted row is a 409. Soft daily cap across all
+// listings, plus a Turnstile challenge for a caller's first few board
+// actions — same gate reports/index.js already applies; this route was
+// missing it despite lib/board.js's own comment naming "requests + reports"
+// (docs/plan.md "Data-integrity hardening pass 2", A1).
 export async function onRequestPost(context) {
   const me = context.data.user;
   if (!me) return error(401, 'Not signed in');
@@ -28,6 +40,16 @@ export async function onRequestPost(context) {
 
   const body = await readJson(context.request);
   const message = trimOrNull(body && body.message, REQUEST_MSG_MAX);
+
+  const actions = await boardActionCount(context.env, me.id);
+  if (actions < TURNSTILE_UNTIL_ACTIONS) {
+    const ts = await verifyTurnstile(
+      context.env,
+      body && body.turnstileToken,
+      context.request.headers.get('CF-Connecting-IP')
+    );
+    if (!ts.ok) return error(400, 'Please complete the challenge and try again.', { turnstile: true });
+  }
 
   const existing = await context.env.DB.prepare(
     'SELECT id, status FROM contributor_requests WHERE listing_id = ? AND requester_id = ?'

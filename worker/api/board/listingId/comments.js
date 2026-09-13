@@ -2,7 +2,7 @@ import { json, error, readJson } from '../../lib/http.js';
 import { uuid } from '../../lib/id.js';
 import { blockedBetween } from '../../lib/blocks.js';
 import { trimOrNull } from '../../lib/validate.js';
-import { COMMENT_MAX, loadListing, requireBoardOk } from '../../lib/board.js';
+import { COMMENT_MAX, COMMENT_DAILY_CAP, loadListing, requireBoardOk } from '../../lib/board.js';
 import { notify } from '../../lib/notify.js';
 
 const excerpt = (s) => (s.length > 80 ? s.slice(0, 79) + '…' : s);
@@ -22,6 +22,16 @@ export async function onRequestPost(context) {
   if (listing.status === 'archived') return error(409, 'This listing is archived');
   if (listing.owner_id !== me.id && (await blockedBetween(context.env, me.id, listing.owner_id)))
     return error(404, 'Listing not found');
+
+  const recent = await context.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM listing_comments
+      WHERE user_id = ? AND created_at > datetime('now', '-1 day')`
+  )
+    .bind(me.id)
+    .first();
+  if ((recent.n || 0) >= COMMENT_DAILY_CAP) {
+    return error(429, "You've posted a lot of comments today. Try again tomorrow.");
+  }
 
   const body = await readJson(context.request);
   const text = trimOrNull(body && body.body, COMMENT_MAX);

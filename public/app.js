@@ -273,8 +273,11 @@ const API = {
     api(`/api/board/${encodeURIComponent(id)}/comments/${cid}`, { method: 'PATCH', body: { body } }),
   deleteListingComment: (id, cid) =>
     api(`/api/board/${encodeURIComponent(id)}/comments/${cid}`, { method: 'DELETE' }),
-  requestContribute: (id, message) =>
-    api(`/api/board/${encodeURIComponent(id)}/requests`, { method: 'POST', body: { message } }),
+  requestContribute: (id, message, turnstileToken) =>
+    api(`/api/board/${encodeURIComponent(id)}/requests`, {
+      method: 'POST',
+      body: { message, turnstileToken },
+    }),
   decideRequest: (id, rid, status) =>
     api(`/api/board/${encodeURIComponent(id)}/requests/${rid}`, { method: 'PATCH', body: { status } }),
   withdrawRequest: (id, rid) =>
@@ -2031,11 +2034,13 @@ async function renderDiscover(app) {
   let listWrap;
 
   const loadMore = async (moreBtn) => {
+    if (moreBtn) moreBtn.disabled = true;
     let r;
     try {
       r = await guard(() => API.discover(state.discoverSlug, cursor));
     } catch {
       if (first) body.replaceChildren(h('<div class="empty">Interest not found.</div>'));
+      else if (moreBtn) moreBtn.disabled = false;
       return;
     }
     if (first) {
@@ -2090,11 +2095,13 @@ async function renderFollowList(app) {
   let listWrap;
 
   const loadMore = async (moreBtn) => {
+    if (moreBtn) moreBtn.disabled = true;
     let r;
     try {
       r = await guard(() => API.followsList(handle, rel, cursor));
     } catch {
       if (first) body.replaceChildren(h('<div class="empty">Not found.</div>'));
+      else if (moreBtn) moreBtn.disabled = false;
       return;
     }
     if (first) {
@@ -2804,11 +2811,13 @@ async function renderBoardListings(main) {
   let wrap;
 
   const loadMore = async (btn) => {
+    if (btn) btn.disabled = true;
     let r;
     try {
       r = await guard(() => API.board(cursor));
     } catch {
       if (first) main.replaceChildren(h('<div class="empty">Could not load the board.</div>'));
+      else if (btn) btn.disabled = false;
       return;
     }
     if (first) {
@@ -2877,11 +2886,13 @@ async function renderBoardActivity(main) {
   let first = true;
 
   const loadMore = async (btn) => {
+    if (btn) btn.disabled = true;
     let r;
     try {
       r = await guard(() => API.feed(state.feedFilter, cursor));
     } catch {
       if (first) list.replaceChildren(h('<div class="empty">Could not load activity.</div>'));
+      else if (btn) btn.disabled = false;
       return;
     }
     if (first) {
@@ -2974,6 +2985,7 @@ function openListingForm(projectId, existing, onDone) {
 }
 
 function openRequestModal(listingId, onDone) {
+  const needsTs = !!(state.me && state.me.board_new);
   const overlay = h(`
     <div class="modal-overlay open">
       <div class="modal">
@@ -2983,6 +2995,7 @@ function openRequestModal(listingId, onDone) {
           <label class="sp-label">Message to the owner <span class="bt-count">optional</span></label>
           <textarea class="sp-input bt-textarea" name="message" maxlength="1000" rows="4"
             placeholder="How you'd like to help, relevant experience…"></textarea>
+          ${needsTs ? '<div id="bt-rq-ts" style="margin:8px 0"></div>' : ''}
           <div style="display:flex;gap:8px;margin-top:10px">
             <button type="submit" class="btn-sm btn-sm-sage">Send request</button>
             <button type="button" class="btn-sm btn-sm-ghost" data-cancel>Cancel</button>
@@ -2994,11 +3007,12 @@ function openRequestModal(listingId, onDone) {
   const close = () => overlay.remove();
   on(overlay, '.modal-close, [data-cancel]', 'click', close);
   overlay.addEventListener('click', (e) => e.target === overlay && close());
+  const getToken = needsTs ? mountTurnstileWidget(overlay.querySelector('#bt-rq-ts')) : () => '';
   on(overlay, '#bt-rq', 'submit', async (e) => {
     e.preventDefault();
     const msg = new FormData(e.target).get('message').trim();
     try {
-      await API.requestContribute(listingId, msg || null);
+      await API.requestContribute(listingId, msg || null, getToken());
       close();
       toast('Request sent');
       onDone && onDone();
@@ -3473,16 +3487,18 @@ function openNotifPanel(anchorBtn) {
         listEl.appendChild(row);
       });
     }
-    // Opening the panel clears the unread state.
+    // Opening the panel clears the unread state — only once the server
+    // actually confirms it; otherwise the badge would disappear locally
+    // while the server still has those notifications marked unread.
     if (state.me && state.me.unread_count) {
       try {
         await API.markNotificationsRead();
+        state.me.unread_count = 0;
+        const dot = anchorBtn.querySelector('.bt-bell-dot');
+        if (dot) dot.remove();
       } catch {
         /* leave the badge; it'll clear next load */
       }
-      state.me.unread_count = 0;
-      const dot = anchorBtn.querySelector('.bt-bell-dot');
-      if (dot) dot.remove();
     }
   })();
 }
@@ -5829,11 +5845,20 @@ const SHUFFLE_PROMPT = {
 function shuffleFooter(boxKey, onResolved, primaryButtons, { dismiss = true } = {}) {
   const row = h('<div class="shuffle-actions"></div>');
   primaryButtons.forEach((btn) => row.appendChild(btn));
+  // A fast double-click (skip, or skip+dismiss together) fired two in-flight
+  // requests plus two redraws that could resolve out of order, the second
+  // (correct) draw sometimes overwritten by the stale first one. Neither
+  // button can fire once either has, until the card is replaced or the call
+  // fails.
+  let busy = false;
   const skip = h('<button type="button" class="btn-sm btn-sm-ghost">Skip</button>');
   skip.addEventListener('click', async () => {
+    if (busy) return;
+    busy = true;
     try {
       await guard(() => API.shuffleSkip(boxKey));
     } catch {
+      busy = false;
       return;
     }
     onResolved();
@@ -5842,9 +5867,12 @@ function shuffleFooter(boxKey, onResolved, primaryButtons, { dismiss = true } = 
   if (dismiss) {
     const na = h('<button type="button" class="btn-sm btn-sm-ghost">Not applicable</button>');
     na.addEventListener('click', async () => {
+      if (busy) return;
+      busy = true;
       try {
         await guard(() => API.shuffleDismiss(boxKey));
       } catch {
+        busy = false;
         return;
       }
       onResolved();
@@ -5893,10 +5921,14 @@ function renderShuffleCard(card, onResolved) {
         onResolved();
       });
     });
+    let delBusy = false;
     del.addEventListener('click', async () => {
+      if (delBusy) return;
+      delBusy = true;
       try {
         await guard(() => API.deleteInbox(inboxItem.id));
       } catch {
+        delBusy = false;
         return;
       }
       onResolved();

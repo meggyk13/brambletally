@@ -6,6 +6,12 @@ import { MAGIC_LINK_TTL_MIN, appOrigin } from '../lib/constants.js';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+// This sends a real email to an address the caller doesn't necessarily
+// control — nothing previously stopped repeatedly re-targeting the same (or
+// a different) address (docs/plan.md "Data-integrity hardening pass 2", B1).
+// Same rolling-24h count pattern as REQUEST_DAILY_CAP/REPORT_DAILY_CAP.
+const EMAIL_CHANGE_DAILY_CAP = 5;
+
 // POST /api/settings/email — { email }. Starts an email change: a confirm link
 // is mailed to the NEW address, and nothing on the account moves until that
 // link is used (worker/api/auth/email-change.js). Any earlier pending request
@@ -25,6 +31,16 @@ export async function onRequestPost(context) {
     .bind(email)
     .first();
   if (taken) return error(409, 'That address is already in use');
+
+  const recent = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM email_change_requests
+      WHERE user_id = ? AND created_at > datetime('now', '-1 day')`
+  )
+    .bind(me.id)
+    .first();
+  if ((recent.n || 0) >= EMAIL_CHANGE_DAILY_CAP) {
+    return error(429, "You've requested a lot of email changes today. Try again tomorrow.");
+  }
 
   const token = randomToken(32);
   await env.DB.batch([
