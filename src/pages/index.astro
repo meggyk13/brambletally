@@ -120,11 +120,12 @@ const canonical = 'https://brambletally.com/';
         text-transform: uppercase; letter-spacing: .18em; font-size: .8rem;
         color: var(--text-muted); margin-bottom: .75rem;
       }
-      .hero-ornament { color: var(--accent); font-size: 1.3rem; margin-bottom: 1rem; opacity: 0.5; }
+      .hero-ornament { display: block; color: var(--accent); opacity: 0.6; margin-bottom: 1rem; }
       .hero .lede {
         font-size: clamp(1.1rem, 2.2vw, 1.32rem);
         color: var(--text-sub); margin-bottom: 1.75rem;
       }
+      .hero-note { color: var(--text-muted); font-size: .92rem; margin-top: .9rem; }
 
       /* ── CTAs ────────────────────────────────────────────── */
       .cta {
@@ -142,8 +143,8 @@ const canonical = 'https://brambletally.com/';
       }
       .cta.ghost:hover { color: var(--accent); border-color: var(--accent); transform: none; }
 
-      /* ── Bramble divider ─────────────────────────────────── */
-      .vine { display: block; margin: 0 auto; width: 180px; height: 28px; }
+      /* ── Tally-mark divider ──────────────────────────────── */
+      .tally-divider { display: block; margin: 0 auto; width: 26px; height: 26px; color: var(--accent); opacity: 0.4; }
 
       /* ── Sections ────────────────────────────────────────── */
       section { padding: clamp(36px, 6vw, 64px) 0; }
@@ -218,24 +219,22 @@ const canonical = 'https://brambletally.com/';
       <div class="hero prose">
         <h1>brambletally.</h1>
         <div class="tagline">a keeping-book for makers</div>
-        <div class="hero-ornament" aria-hidden="true">&#10087;</div>
+        <svg class="hero-ornament" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3.2 4.7 2.9 19.5"/><path d="M9.7 4.4 10.1 19.6"/><path d="M14.6 4.8 14.3 19.3"/><path d="M20.1 4.5 19.8 19.6"/><path d="M2.3 19.8 21 4.3"/>
+        </svg>
         <p class="lede">
           Track the projects you're actually working on. Steps, supplies,
           deadlines, and somewhere to write down where you left off.
         </p>
         <a class="cta" href="/app">Get started</a>
         <a class="cta ghost" href="#how">How it works</a>
+        <div class="hero-note">No account needed to start.</div>
       </div>
     </div>
 
     <main class="wrap">
-      <svg class="vine" viewBox="0 0 200 28" aria-hidden="true">
-        <path d="M 0 14 Q 50 6, 100 14 T 200 14" fill="none" stroke="var(--border-strong)" stroke-width="0.75" opacity="0.5"/>
-        <circle cx="100" cy="10" r="3.2" fill="var(--accent)" opacity="0.65"/>
-        <circle cx="93" cy="14" r="2.5" fill="var(--accent)" opacity="0.45"/>
-        <circle cx="107" cy="14" r="2.5" fill="var(--accent)" opacity="0.45"/>
-        <path d="M 60 13 Q 56 7, 51 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
-        <path d="M 140 13 Q 144 7, 149 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+      <svg class="tally-divider" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3.2 4.7 2.9 19.5"/><path d="M9.7 4.4 10.1 19.6"/><path d="M14.6 4.8 14.3 19.3"/><path d="M20.1 4.5 19.8 19.6"/><path d="M2.3 19.8 21 4.3"/>
       </svg>
 
       <section id="who">
@@ -256,13 +255,8 @@ const canonical = 'https://brambletally.com/';
         </ul>
       </section>
 
-      <svg class="vine" viewBox="0 0 200 28" aria-hidden="true">
-        <path d="M 0 14 Q 55 20, 100 14 T 200 14" fill="none" stroke="var(--border-strong)" stroke-width="0.75" opacity="0.5"/>
-        <circle cx="96" cy="10" r="3" fill="var(--accent)" opacity="0.6"/>
-        <circle cx="103" cy="13" r="2.6" fill="var(--accent)" opacity="0.45"/>
-        <circle cx="90" cy="14.5" r="2.3" fill="var(--accent)" opacity="0.4"/>
-        <path d="M 55 15 Q 51 10, 47 14" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
-        <path d="M 148 13 Q 153 8, 157 13" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+      <svg class="tally-divider" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3.2 4.7 2.9 19.5"/><path d="M9.7 4.4 10.1 19.6"/><path d="M14.6 4.8 14.3 19.3"/><path d="M20.1 4.5 19.8 19.6"/><path d="M2.3 19.8 21 4.3"/>
       </svg>
 
       <section id="how">
@@ -271,8 +265,8 @@ const canonical = 'https://brambletally.com/';
         </div>
         <div class="features">
           <div class="feature">
-            <div class="label">Inbox</div>
-            <p>Something pops into your head, throw it in. Sort it into a project later.</p>
+            <div class="label">Shuffle</div>
+            <p>Toss in whatever comes to mind. Shuffle hands you one thing at a time, not a whole list to dig through.</p>
           </div>
           <div class="feature">
             <div class="label">Steps</div>
@@ -289,33 +283,24 @@ const canonical = 'https://brambletally.com/';
         </div>
       </section>
 
-      <svg class="vine" viewBox="0 0 200 28" aria-hidden="true">
-        <path d="M 0 14 Q 50 6, 100 14 T 200 14" fill="none" stroke="var(--border-strong)" stroke-width="0.75" opacity="0.5"/>
-        <circle cx="102" cy="10.5" r="3.1" fill="var(--accent)" opacity="0.65"/>
-        <circle cx="95" cy="14" r="2.4" fill="var(--accent)" opacity="0.45"/>
-        <circle cx="109" cy="13.5" r="2.6" fill="var(--accent)" opacity="0.45"/>
-        <path d="M 63 13 Q 59 7, 54 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
-        <path d="M 142 14 Q 146 8, 151 13" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+      <svg class="tally-divider" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3.2 4.7 2.9 19.5"/><path d="M9.7 4.4 10.1 19.6"/><path d="M14.6 4.8 14.3 19.3"/><path d="M20.1 4.5 19.8 19.6"/><path d="M2.3 19.8 21 4.3"/>
       </svg>
 
       <section id="share">
         <div class="prose">
           <h2>Bring people in</h2>
           <p class="intro">
-            Someone helping with a project? Add them. They can view or edit,
-            and they see the same steps and timeline you do. If a project
-            changes hands, pass it along.
+            Someone helping with a project? Invite them by email. No account
+            needed on their end — it's waiting when they sign in. They can
+            view or edit, and they see the same steps and timeline you do. If
+            a project changes hands, pass it along.
           </p>
         </div>
       </section>
 
-      <svg class="vine" viewBox="0 0 200 28" aria-hidden="true">
-        <path d="M 0 14 Q 48 20, 100 14 T 200 14" fill="none" stroke="var(--border-strong)" stroke-width="0.75" opacity="0.5"/>
-        <circle cx="98" cy="10" r="2.8" fill="var(--accent)" opacity="0.6"/>
-        <circle cx="105" cy="13" r="2.5" fill="var(--accent)" opacity="0.45"/>
-        <circle cx="92" cy="14" r="2.3" fill="var(--accent)" opacity="0.4"/>
-        <path d="M 57 15 Q 53 9, 48 14" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
-        <path d="M 145 13 Q 150 7, 154 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+      <svg class="tally-divider" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3.2 4.7 2.9 19.5"/><path d="M9.7 4.4 10.1 19.6"/><path d="M14.6 4.8 14.3 19.3"/><path d="M20.1 4.5 19.8 19.6"/><path d="M2.3 19.8 21 4.3"/>
       </svg>
 
       <section id="look">
@@ -329,18 +314,14 @@ const canonical = 'https://brambletally.com/';
           <span class="sw"><span class="chip" style="background:#e9ece4"><i style="background:#2f6b6b"></i><i style="background:#54763a"></i></span>Fen<br /><small>misty marsh</small></span>
         </div>
         <div class="prose">
-          <p>Sign in with an email link. No password. Works on your phone.</p>
+          <p>Start without signing in. Claim your projects later with an
+          email link. No password. Works on your phone.</p>
         </div>
       </section>
 
       <div class="closing">
-        <svg class="vine" viewBox="0 0 200 28" aria-hidden="true">
-          <path d="M 0 14 Q 50 6, 100 14 T 200 14" fill="none" stroke="var(--border-strong)" stroke-width="0.75" opacity="0.5"/>
-          <circle cx="100" cy="10" r="3.2" fill="var(--accent)" opacity="0.65"/>
-          <circle cx="93" cy="14" r="2.5" fill="var(--accent)" opacity="0.45"/>
-          <circle cx="107" cy="14" r="2.5" fill="var(--accent)" opacity="0.45"/>
-          <path d="M 60 13 Q 56 7, 51 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
-          <path d="M 140 13 Q 144 7, 149 12" fill="none" stroke="var(--accent-2)" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+        <svg class="tally-divider" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3.2 4.7 2.9 19.5"/><path d="M9.7 4.4 10.1 19.6"/><path d="M14.6 4.8 14.3 19.3"/><path d="M20.1 4.5 19.8 19.6"/><path d="M2.3 19.8 21 4.3"/>
         </svg>
         <a class="cta" href="/app" style="margin-top:20px">Get started</a>
         <div class="note">Free. No catch.</div>
