@@ -310,9 +310,24 @@ const API = {
     ),
   resolveReport: (id, body) =>
     api('/api/admin/reports/' + encodeURIComponent(id), { method: 'PATCH', body }),
-  adminListings: (cursor) =>
-    api('/api/admin/listings' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  adminListings: (cursor, status, q) =>
+    api(
+      '/api/admin/listings?' +
+        [
+          cursor ? 'cursor=' + encodeURIComponent(cursor) : '',
+          status ? 'status=' + encodeURIComponent(status) : '',
+          q ? 'q=' + encodeURIComponent(q) : '',
+        ]
+          .filter(Boolean)
+          .join('&')
+    ),
+  adminStats: () => api('/api/admin/stats'),
+  adminAudit: (cursor) =>
+    api('/api/admin/audit' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
   adminAnonymous: () => api('/api/admin/anonymous'),
+  adminDeleteAnonymous: (id) => api('/api/admin/anonymous/' + encodeURIComponent(id), { method: 'DELETE' }),
+  adminPurgeAnonymous: (olderThanDays) =>
+    api('/api/admin/anonymous/purge', { method: 'POST', body: { olderThanDays } }),
   adminUser: (handle) => api('/api/admin/users/' + encodeURIComponent(handle)),
   sanctionUser: (handle, body) =>
     api('/api/admin/users/' + encodeURIComponent(handle) + '/sanction', { method: 'POST', body }),
@@ -2214,11 +2229,13 @@ async function renderBlocked(app) {
 
 // ── Admin panel ─────────────────────────────────────────────────────────
 const ADMIN_TABS = [
+  ['overview', 'Overview'],
   ['reports', 'Reports'],
   ['users', 'Users'],
   ['listings', 'Listings'],
   ['tags', 'Tags'],
   ['anonymous', 'Anonymous'],
+  ['audit', 'Audit'],
 ];
 
 async function renderAdmin(app) {
@@ -2228,7 +2245,7 @@ async function renderAdmin(app) {
     render();
     return;
   }
-  if (!ADMIN_TABS.some(([t]) => t === state.adminTab)) state.adminTab = 'reports';
+  if (!ADMIN_TABS.some(([t]) => t === state.adminTab)) state.adminTab = 'overview';
   const el = h(`
     <div class="settings-screen">
       <div class="settings-body">
@@ -2257,38 +2274,142 @@ async function renderAdmin(app) {
   app.appendChild(el);
 
   const host = el.querySelector('#bt-adm-panel');
-  if (state.adminTab === 'reports') adminReportsSection(host);
+  if (state.adminTab === 'overview') adminOverviewSection(host);
+  else if (state.adminTab === 'reports') adminReportsSection(host);
   else if (state.adminTab === 'users') adminUsersSection(host);
   else if (state.adminTab === 'listings') adminListingsSection(host);
   else if (state.adminTab === 'anonymous') adminAnonymousSection(host);
+  else if (state.adminTab === 'audit') adminAuditSection(host);
   else adminTagsSection(host);
+}
+
+// ── Admin: overview ──────────────────────────────────────────────────────
+async function adminOverviewSection(host) {
+  host.replaceChildren(h('<div class="empty">Loading…</div>'));
+  let r;
+  try {
+    r = await guard(() => API.adminStats());
+  } catch {
+    return;
+  }
+  const s = r.stats;
+  const tile = (n, label) => `
+    <div class="bt-adm-stat">
+      <div class="bt-adm-stat-n">${n}</div>
+      <div class="bt-adm-stat-l">${esc(label)}</div>
+    </div>`;
+  host.replaceChildren(
+    h(`
+    <div>
+      <div class="bt-adm-stats">
+        ${tile(s.reports_open, 'Open reports')}
+        ${tile(s.signups_7d, 'Signups, 7d')}
+        ${tile(s.mod_actions_7d, 'Mod actions, 7d')}
+        ${tile(s.users_total, 'Total users')}
+        ${tile(s.users_anonymous, 'Unclaimed accounts')}
+        ${tile(s.users_supporter, 'Supporters')}
+        ${tile(s.listings_open, 'Listings open')}
+        ${tile(s.listings_closed, 'Listings closed')}
+        ${tile(s.listings_archived, 'Listings archived')}
+        ${tile(s.users_board_blocked, 'Board-blocked')}
+        ${tile(s.users_disabled, 'Disabled accounts')}
+        ${tile(s.users_admin, 'Admins')}
+      </div>
+    </div>
+  `)
+  );
 }
 
 // ── Admin: anonymous (unclaimed) accounts ───────────────────────────────
 async function adminAnonymousSection(host) {
-  host.replaceChildren(h('<div class="empty">Loading…</div>'));
-  let r;
-  try {
-    r = await guard(() => API.adminAnonymous());
-  } catch {
-    return;
-  }
-  host.replaceChildren();
-  if (!r.users.length) {
-    host.appendChild(h('<div class="empty">No unclaimed accounts.</div>'));
-    return;
-  }
-  r.users.forEach((u) => {
-    host.appendChild(
-      h(`
-      <div class="sp-row">
-        <div class="sp-row-left"><div>${esc(u.project_titles || '(no project)')}<div class="sp-row-sub">started ${esc(
-          timeAgo(u.created_at)
-        )}</div></div></div>
+  host.replaceChildren(
+    h(`
+    <div>
+      <div class="sp-row-sub" style="padding:0 20px 10px">
+        Never claimed an email. Purging removes their account and any solo
+        project with it — this cannot be undone.
       </div>
-    `)
+      <div class="bt-adm-actions" style="padding:0 20px 12px">
+        <input class="sp-input" id="bt-an-days" type="number" min="1" value="30" style="width:70px" />
+        <button class="btn-sm btn-sm-ghost" id="bt-an-purge">Purge older than N days</button>
+      </div>
+      <div id="bt-an-list"><div class="empty">Loading…</div></div>
+    </div>
+  `)
+  );
+  const listEl = host.querySelector('#bt-an-list');
+  const load = async () => {
+    let r;
+    try {
+      r = await guard(() => API.adminAnonymous());
+    } catch {
+      return;
+    }
+    listEl.replaceChildren();
+    if (!r.users.length) {
+      listEl.appendChild(h('<div class="empty">No unclaimed accounts.</div>'));
+      return;
+    }
+    r.users.forEach((u) => {
+      const row = h(`
+        <div class="sp-row">
+          <div class="sp-row-left"><div>${esc(u.project_titles || '(no project)')}<div class="sp-row-sub">started ${esc(
+            timeAgo(u.created_at)
+          )}</div></div></div>
+          <div class="bt-adm-actions">
+            <button class="btn-sm btn-danger" data-del>Delete</button>
+          </div>
+        </div>
+      `);
+      row.querySelector('[data-del]').addEventListener('click', async () => {
+        if (
+          !(await btConfirm(
+            `Delete this unclaimed account${u.project_titles ? ` and “${u.project_titles}”` : ''}?`,
+            { danger: true, ok: 'Delete' }
+          ))
+        )
+          return;
+        try {
+          await API.adminDeleteAnonymous(u.id);
+        } catch (ex) {
+          toast(ex.message || 'Could not delete');
+          return;
+        }
+        toast('Deleted');
+        load();
+      });
+      listEl.appendChild(row);
+    });
+  };
+
+  host.querySelector('#bt-an-purge').addEventListener('click', async () => {
+    const days = Number(host.querySelector('#bt-an-days').value);
+    if (!Number.isFinite(days) || days < 1) {
+      toast('Enter a number of days');
+      return;
+    }
+    if (
+      !(await btConfirm(`Purge every unclaimed account older than ${days} days?`, {
+        danger: true,
+        ok: 'Purge',
+      }))
+    )
+      return;
+    let r;
+    try {
+      r = await guard(() => API.adminPurgeAnonymous(days));
+    } catch {
+      return;
+    }
+    toast(
+      `Purged ${r.purged}${r.skipped ? `, skipped ${r.skipped}` : ''}${
+        r.remaining ? ' — more remain, run again' : ''
+      }`
     );
+    load();
   });
+
+  load();
 }
 
 // ── Admin: reports queue ────────────────────────────────────────────────
@@ -2562,21 +2683,40 @@ function adminUserCard(d, reload) {
 }
 
 // ── Admin: listings ────────────────────────────────────────────────────
-async function adminListingsSection(host) {
-  host.replaceChildren(h('<div class="empty">Loading…</div>'));
-  let r;
-  try {
-    r = await guard(() => API.adminListings());
-  } catch {
-    return;
-  }
-  host.replaceChildren();
-  if (!r.listings.length) {
-    host.appendChild(h('<div class="empty">No listings.</div>'));
-    return;
-  }
-  const reload = () => adminListingsSection(host);
-  r.listings.forEach((l) => {
+const LISTING_STATUS_FILTERS = [
+  ['', 'All'],
+  ['open', 'Open'],
+  ['closed', 'Closed'],
+  ['archived', 'Archived'],
+];
+
+function adminListingsSection(host) {
+  host.replaceChildren(
+    h(`
+    <div>
+      <div class="bt-seg" id="bt-al-status" style="margin-bottom:12px">
+        ${LISTING_STATUS_FILTERS.map(
+          ([v, l]) =>
+            `<button type="button" data-als="${v}" class="bt-seg-btn${
+              (state.adminListingStatus || '') === v ? ' is-sel' : ''
+            }">${l}</button>`
+        ).join('')}
+      </div>
+      <div class="sp-field">
+        <input class="sp-input" id="bt-al-q" autocomplete="off" placeholder="Search headline, project, or owner…" value="${esc(
+          state.adminListingQ || ''
+        )}" />
+      </div>
+      <div id="bt-al-list"><div class="empty">Loading…</div></div>
+    </div>
+  `)
+  );
+  const listEl = host.querySelector('#bt-al-list');
+  const qInput = host.querySelector('#bt-al-q');
+  let cursor = null;
+  let first = true;
+
+  const listingRow = (l) => {
     const row = h(`
       <div class="sp-row">
         <div class="sp-row-left"><div>${esc(l.headline)}<div class="sp-row-sub">${esc(
@@ -2601,10 +2741,58 @@ async function adminListingsSection(host) {
         return;
       }
       toast('Listing deleted');
-      reload();
+      load();
     });
-    host.appendChild(row);
+    return row;
+  };
+
+  const load = async (moreBtn) => {
+    if (moreBtn) moreBtn.disabled = true;
+    if (!moreBtn) {
+      cursor = null;
+      first = true;
+    }
+    let r;
+    try {
+      r = await guard(() =>
+        API.adminListings(cursor, state.adminListingStatus, state.adminListingQ)
+      );
+    } catch {
+      if (moreBtn) moreBtn.disabled = false;
+      return;
+    }
+    if (first) {
+      listEl.replaceChildren();
+      first = false;
+    }
+    if (moreBtn) moreBtn.remove();
+    if (!r.listings.length && !listEl.children.length) {
+      listEl.appendChild(h('<div class="empty">No listings match.</div>'));
+    }
+    r.listings.forEach((l) => listEl.appendChild(listingRow(l)));
+    cursor = r.next_cursor;
+    if (cursor) {
+      const b = h('<button class="btn-sm btn-sm-ghost bt-loadmore">Load more</button>');
+      b.addEventListener('click', () => load(b));
+      listEl.appendChild(b);
+    }
+  };
+
+  on(host, '#bt-al-status [data-als]', 'click', (e) => {
+    state.adminListingStatus = e.currentTarget.dataset.als;
+    host
+      .querySelectorAll('#bt-al-status [data-als]')
+      .forEach((b) => b.classList.toggle('is-sel', b.dataset.als === state.adminListingStatus));
+    load();
   });
+  let timer;
+  qInput.addEventListener('input', () => {
+    state.adminListingQ = qInput.value.trim();
+    clearTimeout(timer);
+    timer = setTimeout(() => load(), 250);
+  });
+
+  load();
 }
 
 // ── Admin: interest-tag tool ─────────────────────────────────────────────
@@ -2736,6 +2924,66 @@ function adminTagsSection(app) {
     timer = setTimeout(load, 200);
   });
   load();
+}
+
+// ── Admin: audit log ─────────────────────────────────────────────────────
+const AUDIT_VERBS = {
+  board_block: 'board-blocked',
+  board_unblock: 'lifted the board block on',
+  disable: 'disabled',
+  enable: 're-enabled',
+  content_removed: 'removed content from',
+  grant_supporter: 'granted Supporter to',
+  revoke_supporter: 'revoked Supporter from',
+};
+
+function adminAuditSection(host) {
+  host.replaceChildren(h('<div id="bt-audit-list"><div class="empty">Loading…</div></div>'));
+  const listEl = host.querySelector('#bt-audit-list');
+  let cursor = null;
+  let first = true;
+
+  const loadMore = async (moreBtn) => {
+    if (moreBtn) moreBtn.disabled = true;
+    let r;
+    try {
+      r = await guard(() => API.adminAudit(cursor));
+    } catch {
+      if (moreBtn) moreBtn.disabled = false;
+      return;
+    }
+    if (first) {
+      listEl.replaceChildren();
+      first = false;
+    }
+    if (moreBtn) moreBtn.remove();
+    if (!r.entries.length && !listEl.children.length) {
+      listEl.appendChild(h('<div class="empty">No moderation actions yet.</div>'));
+    }
+    r.entries.forEach((m) => {
+      listEl.appendChild(
+        h(`
+        <div class="sp-row">
+          <div class="sp-row-left">
+            <div>${esc(ownerName(m.admin))} ${esc(AUDIT_VERBS[m.action] || m.action)} ${esc(
+              ownerName(m.target)
+            )}<div class="sp-row-sub">${esc(timeAgo(m.created_at))}${
+              m.note ? ' — ' + esc(m.note) : ''
+            }</div></div>
+          </div>
+        </div>
+      `)
+      );
+    });
+    cursor = r.next_cursor;
+    if (cursor) {
+      const b = h('<button class="btn-sm btn-sm-ghost bt-loadmore">Load more</button>');
+      b.addEventListener('click', () => loadMore(b));
+      listEl.appendChild(b);
+    }
+  };
+
+  loadMore(null);
 }
 
 // ── Board ───────────────────────────────────────────────────────────────

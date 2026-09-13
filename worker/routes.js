@@ -68,7 +68,11 @@ import * as adminInterest from './api/admin/interests/slug.js';
 import * as adminReports from './api/admin/reports/index.js';
 import * as adminReport from './api/admin/reports/reportId.js';
 import * as adminListings from './api/admin/listings.js';
+import * as adminStats from './api/admin/stats.js';
+import * as adminAudit from './api/admin/audit.js';
 import * as adminAnonymous from './api/admin/anonymous.js';
+import * as adminAnonymousPurge from './api/admin/anonymous/purge.js';
+import * as adminAnonymousId from './api/admin/anonymous/id.js';
 import * as adminUser from './api/admin/users/handle.js';
 import * as adminUserSanction from './api/admin/users/handle/sanction.js';
 import * as adminUserPlan from './api/admin/users/handle/plan.js';
@@ -151,7 +155,12 @@ export const routes = [
   ['/api/admin/reports', adminReports],
   ['/api/admin/reports/:reportId', adminReport],
   ['/api/admin/listings', adminListings],
+  ['/api/admin/stats', adminStats],
+  ['/api/admin/audit', adminAudit],
   ['/api/admin/anonymous', adminAnonymous],
+  // literal 'purge' must precede '/api/admin/anonymous/:id' — first match wins
+  ['/api/admin/anonymous/purge', adminAnonymousPurge],
+  ['/api/admin/anonymous/:id', adminAnonymousId],
   ['/api/admin/users/:handle', adminUser],
   ['/api/admin/users/:handle/sanction', adminUserSanction],
   ['/api/admin/users/:handle/plan', adminUserPlan],

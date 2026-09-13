@@ -2278,6 +2278,22 @@ textarea{resize:vertical;min-height:60px}
 #bt-app #bt-bl-body .sp-row .sp-row-left, #bt-app #bt-adm-list .sp-row .sp-row-left { min-width: 0; }
 #bt-app #bt-prof-block { color: var(--danger); }
 
+/* ── Admin: overview stat tiles + audit/listing loadmore ─────────────────── */
+#bt-app .bt-adm-stats {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px; padding: 0 20px 12px;
+}
+#bt-app .bt-adm-stat {
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 14px;
+  background: var(--card);
+}
+#bt-app .bt-adm-stat-n {
+  font-family: var(--font-head); font-size: var(--fs-2xl); font-weight: 700;
+  color: var(--accent-2); line-height: 1.1; font-feature-settings: "tnum";
+}
+#bt-app .bt-adm-stat-l { font-size: var(--fs-sm); color: var(--text-muted); margin-top: 4px; }
+#bt-app .bt-loadmore { display: block; margin: 12px auto 0; }
+
 /* ── Following (Social Phase 2) ──────────────────────────────────────────── */
 #bt-app .bt-prof-actions { display: flex; gap: 8px; margin: 12px 20px 4px; flex-wrap: wrap; }
 #bt-app .bt-prof-actions .btn-sm { display: inline-flex; align-items: center; gap: 6px; }

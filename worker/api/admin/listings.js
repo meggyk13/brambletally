@@ -2,17 +2,37 @@ import { json } from '../lib/http.js';
 import { requireAdmin } from '../lib/admin.js';
 
 const PAGE = 50;
+const STATUSES = new Set(['open', 'closed', 'archived']);
 
-// GET /api/admin/listings?cursor=  — every listing, any status, newest first.
+// GET /api/admin/listings?cursor=&status=&q=  — every listing, newest first.
+// `status` narrows to one of project_listings' CHECK values (default: all).
+// `q` matches headline, project title, or owner handle/display name.
 // Takedown reuses the owner-or-admin DELETE /api/board/:listingId.
 export async function onRequestGet(context) {
   const g = requireAdmin(context);
   if (g.fail) return g.fail;
 
-  const offset = Math.max(
-    0,
-    parseInt(new URL(context.request.url).searchParams.get('cursor') || '0', 10) || 0
-  );
+  const params = new URL(context.request.url).searchParams;
+  const offset = Math.max(0, parseInt(params.get('cursor') || '0', 10) || 0);
+  const status = params.get('status');
+  const statusFilter = STATUSES.has(status) ? status : null;
+  const q = (params.get('q') || '').trim().toLowerCase();
+
+  const conds = [];
+  const binds = [];
+  if (statusFilter) {
+    conds.push('l.status = ?');
+    binds.push(statusFilter);
+  }
+  if (q) {
+    conds.push(
+      `(lower(l.headline) LIKE ? OR lower(p.title) LIKE ?
+        OR lower(COALESCE(u.handle, '')) LIKE ? OR lower(COALESCE(u.display_name, '')) LIKE ?)`
+    );
+    const like = `%${q}%`;
+    binds.push(like, like, like, like);
+  }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
   const { results } = await context.env.DB.prepare(
     `SELECT l.id, l.headline, l.status, l.created_at, l.updated_at,
@@ -23,10 +43,11 @@ export async function onRequestGet(context) {
        FROM project_listings l
        JOIN projects p ON p.id = l.project_id
        JOIN users u ON u.id = p.owner_id
+       ${where}
       ORDER BY l.updated_at DESC
       LIMIT ? OFFSET ?`
   )
-    .bind(PAGE + 1, offset)
+    .bind(...binds, PAGE + 1, offset)
     .all();
 
   const hasMore = results.length > PAGE;

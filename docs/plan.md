@@ -1165,6 +1165,47 @@ waiting for that person to sign themselves up.
 - **No purge job yet** — deferred per 2026-09-12 decision; revisit if this
   list gets long enough to matter. Nothing here depends on retention, so
   adding a clear-out cron later is additive.
+- **Purge added 2026-09-13** — a human-driven admin action, not a cron: a
+  per-row **Delete** and a **Purge older than N days** bulk action on the
+  Anonymous tab. `DELETE /api/admin/anonymous/:id` re-checks `email IS NULL`
+  server-side (a stale client list can't be used to delete a real account) and
+  refuses (409) if the account owns a project with other collaborators.
+  `POST /api/admin/anonymous/purge { olderThanDays }` does the same per row,
+  capped at 200 accounts per call (returns `remaining: true` if more are left —
+  re-run to continue), skipping instead of failing on any row that fails the
+  same collaborator check. Both reuse `cascadeDeleteUserStatements` /
+  `hasSharedOwnedProjects`, pulled out of `DELETE /api/account` into
+  `worker/api/lib/userDelete.js` so the no-cascade `users(id)` reassignment
+  (deleted-user placeholder, migration 0018) isn't duplicated a third time.
+
+### F. Overview dashboard, cross-admin audit log, listings search (2026-09-13)
+
+Three more additions to the admin panel, browser-verified against
+`wrangler dev` with seeded local D1 data (a Supporter grant to check the
+audit feed; two seeded listings — one open, one closed — to check the
+Listings filter/search).
+
+- **Overview tab** (now the panel's default landing tab, ahead of Reports):
+  `GET /api/admin/stats` returns one row of counts — open reports, signups in
+  the last 7 days, mod actions in the last 7 days, total/anonymous/supporter/
+  admin users, listings by status, board-blocked and disabled counts.
+  `worker/api/admin/stats.js` excludes the `deleted-user` placeholder
+  (migration 0018) from every `users` count via `id != ?1` so it doesn't skew
+  the numbers by one. Frontend renders a `.bt-adm-stats` tile grid.
+- **Audit tab**: `GET /api/admin/audit?cursor=` — every `moderation_actions`
+  row, any admin, any target, newest first, paginated 50/page. Same table the
+  Users tab's per-user history already reads, just unscoped — "what has any
+  admin done recently" instead of "what's happened to this one account."
+  Frontend uses the same Load-more-button pattern as `renderDiscover` /
+  `renderFollowList` (button disabled during fetch, removed before appending
+  the new page, to avoid the double-click-duplicates-a-page bug fixed in the
+  hardening pass).
+- **Listings search/filter**: `GET /api/admin/listings` gained `status`
+  (open/closed/archived) and `q` (matches headline, project title, or owner
+  handle/display name via `lower(...) LIKE`) query params. The frontend tab
+  also gained the pagination it was quietly missing — `next_cursor` was
+  already returned by the endpoint but nothing called "load more" before
+  this pass.
 
 ### F. First-project setup tally (the claim trigger)
 
