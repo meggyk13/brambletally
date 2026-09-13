@@ -1206,6 +1206,18 @@ Listings filter/search).
   also gained the pagination it was quietly missing — `next_cursor` was
   already returned by the endpoint but nothing called "load more" before
   this pass.
+- **Users tab became a browsable list (2026-09-13 follow-up)** — it used to
+  be handle-lookup-only (type an exact handle, nothing without one), which
+  meant it never actually showed anyone until you searched. New
+  `GET /api/admin/users?cursor=&filter=&q=` lists every account (deleted-user
+  placeholder excluded) newest first, with `filter` in
+  admin/supporter/board_blocked/disabled and `q` matching handle, display
+  name, name, or email. Detail and sanction actions stay handle-keyed
+  (`GET`/`POST .../users/:handle`, unchanged) — a row with no handle set yet
+  (pre-handle signups) shows in the list but isn't clickable into detail,
+  same as every other handle-keyed admin surface. Frontend: filter chips +
+  search + Load-more list, click a row to open the existing detail card with
+  a "Back to list" button that restores the filtered/searched view.
 
 ### F. First-project setup tally (the claim trigger)
 

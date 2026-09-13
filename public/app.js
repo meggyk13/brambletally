@@ -328,6 +328,17 @@ const API = {
   adminDeleteAnonymous: (id) => api('/api/admin/anonymous/' + encodeURIComponent(id), { method: 'DELETE' }),
   adminPurgeAnonymous: (olderThanDays) =>
     api('/api/admin/anonymous/purge', { method: 'POST', body: { olderThanDays } }),
+  adminUsersList: (cursor, filter, q) =>
+    api(
+      '/api/admin/users?' +
+        [
+          cursor ? 'cursor=' + encodeURIComponent(cursor) : '',
+          filter ? 'filter=' + encodeURIComponent(filter) : '',
+          q ? 'q=' + encodeURIComponent(q) : '',
+        ]
+          .filter(Boolean)
+          .join('&')
+    ),
   adminUser: (handle) => api('/api/admin/users/' + encodeURIComponent(handle)),
   sanctionUser: (handle, body) =>
     api('/api/admin/users/' + encodeURIComponent(handle) + '/sanction', { method: 'POST', body }),
@@ -2581,39 +2592,130 @@ async function setPlanFromAdmin(handle, plan, reload) {
 }
 
 // ── Admin: users ───────────────────────────────────────────────────────
+const ADMIN_USER_FILTERS = [
+  ['', 'All'],
+  ['admin', 'Admins'],
+  ['supporter', 'Supporters'],
+  ['board_blocked', 'Board-blocked'],
+  ['disabled', 'Disabled'],
+];
+
+function adminUserListRow(u, onOpen) {
+  const name = u.display_name || u.name || (u.handle ? '@' + u.handle : '(no handle)');
+  const tags = [];
+  if (u.is_admin) tags.push(['Admin', 'bt-admin-tag']);
+  if (u.plan === 'supporter') tags.push(['Supporter', 'bt-au-tag']);
+  if (u.board_blocked_at) tags.push(['Board-blocked', 'bt-au-tag is-warn']);
+  if (u.disabled_at) tags.push(['Disabled', 'bt-au-tag is-danger']);
+  const row = h(`
+    <div class="sp-row${u.handle ? ' bt-au-row-clickable' : ''}">
+      <div class="sp-row-left">
+        <div>${esc(name)}${tags.map(([t, cls]) => ` <span class="${cls}">${esc(t)}</span>`).join('')}
+          <div class="sp-row-sub">${u.handle ? '@' + esc(u.handle) + ' · ' : ''}${esc(
+            u.email || 'no email'
+          )} · joined ${esc(fmtDate((u.created_at || '').slice(0, 10)))}</div>
+        </div>
+      </div>
+    </div>
+  `);
+  if (u.handle) row.addEventListener('click', () => onOpen(u.handle));
+  return row;
+}
+
 function adminUsersSection(host) {
   host.replaceChildren(
     h(`
     <div>
-      <div class="sp-field">
-        <input class="sp-input" id="bt-au-q" autocomplete="off" placeholder="Look up by @handle" />
+      <div class="bt-seg" id="bt-au-filter" style="margin-bottom:12px">
+        ${ADMIN_USER_FILTERS.map(
+          ([v, l]) =>
+            `<button type="button" data-auf="${v}" class="bt-seg-btn${
+              (state.adminUserFilter || '') === v ? ' is-sel' : ''
+            }">${l}</button>`
+        ).join('')}
       </div>
-      <div id="bt-au-detail"></div>
+      <div class="sp-field">
+        <input class="sp-input" id="bt-au-q" autocomplete="off" placeholder="Search handle, name, or email…" value="${esc(
+          state.adminUserQ || ''
+        )}" />
+      </div>
+      <div id="bt-au-body"><div class="empty">Loading…</div></div>
     </div>
   `)
   );
-  const q = host.querySelector('#bt-au-q');
-  const detail = host.querySelector('#bt-au-detail');
-  const lookup = async () => {
-    const handle = q.value.trim().replace(/^@/, '');
-    if (handle.length < 2) {
-      detail.replaceChildren();
-      return;
-    }
+  const body = host.querySelector('#bt-au-body');
+  const qInput = host.querySelector('#bt-au-q');
+  let cursor = null;
+  let first = true;
+  let listEl;
+
+  const showDetail = async (handle) => {
+    body.replaceChildren(h('<div class="empty">Loading…</div>'));
     let d;
     try {
       d = await guard(() => API.adminUser(handle));
     } catch (ex) {
-      detail.replaceChildren(h(`<div class="empty">${esc(ex.message || 'Not found')}</div>`));
+      body.replaceChildren(h(`<div class="empty">${esc(ex.message || 'Not found')}</div>`));
       return;
     }
-    detail.replaceChildren(adminUserCard(d, lookup));
+    body.replaceChildren();
+    const back = h(
+      `<button class="btn-sm btn-sm-ghost" style="margin-bottom:12px">${icon('back', 16)} Back to list</button>`
+    );
+    back.addEventListener('click', () => loadList());
+    body.appendChild(back);
+    body.appendChild(adminUserCard(d, () => showDetail(handle)));
   };
-  let timer;
-  q.addEventListener('input', () => {
-    clearTimeout(timer);
-    timer = setTimeout(lookup, 300);
+
+  const loadList = async (moreBtn) => {
+    if (moreBtn) moreBtn.disabled = true;
+    if (!moreBtn) {
+      cursor = null;
+      first = true;
+      body.replaceChildren(h('<div class="empty">Loading…</div>'));
+    }
+    let r;
+    try {
+      r = await guard(() =>
+        API.adminUsersList(cursor, state.adminUserFilter, state.adminUserQ)
+      );
+    } catch {
+      if (moreBtn) moreBtn.disabled = false;
+      return;
+    }
+    if (first) {
+      body.replaceChildren(h('<div id="bt-au-list"></div>'));
+      listEl = body.querySelector('#bt-au-list');
+      first = false;
+    }
+    if (moreBtn) moreBtn.remove();
+    if (!r.users.length && !listEl.children.length) {
+      listEl.appendChild(h('<div class="empty">No users match.</div>'));
+    }
+    r.users.forEach((u) => listEl.appendChild(adminUserListRow(u, showDetail)));
+    cursor = r.next_cursor;
+    if (cursor) {
+      const b = h('<button class="btn-sm btn-sm-ghost bt-loadmore">Load more</button>');
+      b.addEventListener('click', () => loadList(b));
+      listEl.appendChild(b);
+    }
+  };
+
+  on(host, '#bt-au-filter [data-auf]', 'click', (e) => {
+    state.adminUserFilter = e.currentTarget.dataset.auf;
+    host
+      .querySelectorAll('#bt-au-filter [data-auf]')
+      .forEach((b) => b.classList.toggle('is-sel', b.dataset.auf === state.adminUserFilter));
+    loadList();
   });
+  let timer;
+  qInput.addEventListener('input', () => {
+    state.adminUserQ = qInput.value.trim();
+    clearTimeout(timer);
+    timer = setTimeout(() => loadList(), 250);
+  });
+
+  loadList();
 }
 
 function adminUserCard(d, reload) {

@@ -697,6 +697,7 @@ DELETE /api/admin/anonymous/:id        purge one unclaimed account (2026-09-13)
 POST   /api/admin/anonymous/purge      { olderThanDays } -> bulk purge, up to 200/call (2026-09-13)
 GET    /api/admin/stats                overview counts for the Overview tab (2026-09-13)
 GET    /api/admin/audit                ?cursor= -> every moderation_actions row, any admin/target (2026-09-13)
+GET    /api/admin/users                ?cursor=&filter=&q= -> browsable/filterable user list (2026-09-13)
 GET    /api/admin/users/:handle        user detail + moderation history
 POST   /api/admin/users/:handle/sanction   { action: 'board_block'|'board_unblock'|'disable'|'enable', note?, reportId? }
 POST   /api/admin/users/:handle/plan   { plan: 'free'|'supporter', note? } — manual grant/revoke (2026-09-12)
