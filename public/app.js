@@ -6244,9 +6244,28 @@ function sessionRow(sess, bundle, refresh) {
 
 // ── Focus session ─────────────────────────────────────────────────────────
 const DURATIONS = [10, 25, 45, 60];
-const RING = 326.7; // 2πr for r=52
 
 let focusTimer = null;
+
+// The candle — replaces the old progress ring (docs/design.md 3b-1). The wax
+// rect reads --burn (0→1) via a CSS scaleY, anchored to its own bottom edge;
+// CANDLE_WAX_HEIGHT is that rect's unscaled height, in the same SVG user
+// units the running() tick uses to slide the wick+flame group down in
+// lockstep, so the flame always sits right at the wax's (shrinking) top.
+const CANDLE_WAX_HEIGHT = 80;
+function candleSvg() {
+  return `
+    <svg class="focus-candle" viewBox="0 0 100 150" aria-hidden="true">
+      <ellipse class="focus-candle-base" cx="50" cy="136" rx="27" ry="6"/>
+      <path class="focus-candle-drip" d="M27 133c3 2.5 4 5 3 8M73 133c-3 2.5-4 5-3 8"/>
+      <rect class="focus-candle-wax" id="fs-wax" x="36" y="50" width="28" height="80" rx="3"/>
+      <g id="fs-wick-flame">
+        <path class="focus-candle-wick" d="M50 50L50 43"/>
+        <path class="focus-candle-flame" d="M50 32.5c2.8 2 2.8 5.1 0 6.9-2.8-1.8-2.8-4.9 0-6.9z"/>
+      </g>
+    </svg>
+  `;
+}
 
 function mmss(ms) {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -6349,13 +6368,8 @@ function openFocusSession(bundle, opts = {}) {
         <div class="focus-body focus-body-timer">
           <div class="focus-timer-project">${esc(sess.projectTitle)}</div>
           <div class="focus-timer-step">${step ? esc(step.title) : 'Working on the project'}</div>
-          <div class="focus-ring-wrap">
-            <svg class="focus-ring" viewBox="0 0 120 120">
-              <circle class="focus-ring-track" cx="60" cy="60" r="52"></circle>
-              <circle class="focus-ring-fill" id="fs-ring" cx="60" cy="60" r="52" stroke-dashoffset="0"></circle>
-            </svg>
-            <div class="focus-timer-display" id="fs-clock">${mmss(totalMs)}</div>
-          </div>
+          <div class="focus-candle-wrap">${candleSvg()}</div>
+          <div class="focus-timer-display" id="fs-clock">${mmss(totalMs)}</div>
           <div class="focus-timer-nudge">Head down. You've got this.</div>
           <button class="focus-done-early-btn" id="fs-done">I'm done</button>
         </div>
@@ -6370,11 +6384,19 @@ function openFocusSession(bundle, opts = {}) {
     });
 
     const clock = screen.querySelector('#fs-clock');
-    const ring = screen.querySelector('#fs-ring');
+    const wax = screen.querySelector('#fs-wax');
+    const wickFlame = screen.querySelector('#fs-wick-flame');
     const tick = () => {
       const remaining = endsAt - Date.now();
       clock.textContent = mmss(remaining);
-      ring.setAttribute('stroke-dashoffset', String(RING * Math.min(1, 1 - remaining / totalMs)));
+      // --burn (0→1) is the spec'd hook (docs/design.md 3b-1); the wax rect
+      // reads it via a CSS scaleY. The wick+flame group can't ride the same
+      // CSS transform without unit ambiguity between SVG user-units and px,
+      // so its position is set directly here, in lockstep with the same
+      // burn value — both driven by this one tick, nothing new to wind up.
+      const burn = Math.min(1, 1 - remaining / totalMs);
+      wax.style.setProperty('--burn', burn);
+      wickFlame.setAttribute('transform', `translate(0,${(burn * CANDLE_WAX_HEIGHT).toFixed(2)})`);
       if (remaining <= 0) {
         clearInterval(focusTimer);
         focusTimer = null;

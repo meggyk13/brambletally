@@ -43,8 +43,15 @@ tab to a plain button. Cover hues/emblems (3b-5c) are still blocked on a
 schema migration + the icon commission, so every band/tile/left-edge is a
 flat `--accent-2` fallback for now. Not shipped: the tally's own "cut"
 draw-in animation (deferred, needs prior-render state the render layer
-doesn't carry yet), and 3b-1/2/3/4 (the candle, empty states, paper texture,
-flourish dividers) — all still open. A real mark is still later work.
+doesn't carry yet).
+
+**3b-1, the candle, is also built (2026-09-12).** Replaces the focus
+screen's progress ring; wax height reads `--burn` off the same tick that used
+to drive the ring, no new timer. The spec's paused/snuffed flame state has no
+trigger yet — the focus timer has no pause/resume feature at all today, and
+building one wasn't part of this — so only lit (running) and finished
+(existing `leaf`, untouched) are wired up. 3b-2/3/4 (empty states, paper
+texture, flourish dividers) are still open. A real mark is still later work.
 
 ## Direction
 
@@ -798,30 +805,40 @@ same bug, same fix, worth doing in the same pass.
   behind it. Now `support@brambletally.com` (mailto link); the user still
   needs to set that inbox up.
 
-### 3b-1 The candle
+### 3b-1 The candle — built 2026-09-12
 
 The highest-value drawn thing in the app, and the reason to do 3b at all.
 
-Today the running focus screen is an SVG progress ring plus digits
-(`app.js:6094`). It is the one screen a person looks at for twenty-five
-minutes with nothing else to do, and the only screen where a picture is
-unambiguously the right answer. The `candle` icon already exists
-(`app.js:267`) but nothing renders it at size.
+The running focus screen's SVG progress ring + overlaid digits are gone.
+**Shipped**: `candleSvg()` in `app.js` — a woodcut candle (base, wax rect,
+wick, flame) that **replaces the ring**; the digits moved below it (were
+overlaid on the ring), still `--font-mono`-styled with `tnum` (unchanged from
+before). Wax height reads `--burn` (0→1) via a CSS `scaleY`, anchored to the
+wax's own bottom edge so it shrinks downward believably; the same tick that
+already ran the ring now sets `--burn` and slides the wick+flame group down
+by the matching amount, in lockstep — no new timer, no new interval. Ink in
+`--accent-2`, flame in `--gold`, plain outline — no hatching, kept to the
+same "silhouette first" simplicity as the existing `candle`/`leaf` icons.
+Verified live: at `--burn` 0 the wax is full height; at 0.5, visibly half,
+wick/flame repositioned exactly at the new top; at 1, it gutters out to just
+the base and a nub, and the transition to the finish screen's existing
+`leaf` (untouched by this work) still fires normally.
 
-- A woodcut candle **replaces the ring** — a candle is already a progress
-  indicator, so keeping both is redundant. The digits stay, below it, in
-  `--font-mono` with `tnum`.
-- Wax height binds to a CSS custom property (`--burn`, 0→1) driven by the
-  existing tick. No new timer.
-- **Flame states:** lit while running; snuffed with a small smoke curl on
-  pause; on finish, the existing `leaf`.
-- Ink in `--accent-2`, flame in `--gold`, `currentColor` where it can be.
-  Woodcut-simple — outline and hatching, no gradients.
-- **`prefers-reduced-motion`: no flicker.** Static flame, wax still drops.
-  The wax is information; the flicker is decoration.
+**Paused flame state not built — there's no pause feature to trigger it.**
+The spec assumed lit/snuffed-with-smoke/leaf as three flame states, but the
+focus timer has no pause/resume today (only "I'm done" to end early) — this
+was confirmed with the user before building rather than inventing a pause
+feature that wasn't asked for. The `smoke` icon (icon-spec.md Batch 1) exists
+and is exactly what a paused flame would use if/when pause/resume becomes a
+real feature; nothing here blocks that.
 
-If the candle turns out to be a bad idea in the making, this is the cheap
-place to find out — everything else in 3b stands on its own.
+**`prefers-reduced-motion` handled by construction, not a special case.** The
+flame's flicker keyframe animation lives entirely inside
+`@media (prefers-reduced-motion: no-preference)` — under reduced motion nothing
+declares the animation at all, so the flame is static by default rather than
+needing an override to cancel it. The wax burn-down and wick/flame position
+are plain attribute/property writes from the tick, not animations, so they're
+unaffected either way — the wax still drops, exactly as spec'd.
 
 ### 3b-2 Empty states
 
@@ -1205,13 +1222,14 @@ section above.
   (deliberately deferred — a cascade change across ~226 rules, real
   regression risk, no cheap way to verify short of screenshotting every
   theme) and 3a-6's two stale-copy bugs (auth screen, landing footer).
-- **3b — the drawn things.** **The card is built (3b-5a/5b, 2026-09-12)** —
-  the tally replacing the progress bar everywhere, and the hero/compact-row
-  hierarchy (which also dropped the old status-tab filter — see 3b-5b).
-  **Still open**: the focus-screen candle (replaces the ring), empty-state
-  illustrations, paper texture ported from the landing page, flourish
-  dividers, and covers + emblems (3b-5c, blocked on a schema migration + the
-  icon commission).
+- **3b — the drawn things.** **The card and the candle are built (3b-1,
+  3b-5a/5b, 2026-09-12)** — the tally replacing the progress bar everywhere,
+  the hero/compact-row hierarchy (which also dropped the old status-tab
+  filter — see 3b-5b), and the focus-screen candle replacing the ring
+  (paused/snuffed has no trigger yet — no pause feature exists). **Still
+  open**: empty-state illustrations, paper texture ported from the landing
+  page, flourish dividers, and covers + emblems (3b-5c, blocked on a schema
+  migration + the icon commission).
 
 ## Open decisions
 
