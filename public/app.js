@@ -7057,7 +7057,12 @@ function flashNice() {
 }
 
 // ── Weekly review ──────────────────────────────────────────────────────────
-const STALE_DAYS = 14;
+// "Stale" means something different depending on why a project isn't
+// active: Paused implies "stepping away briefly" (a month is the checkpoint);
+// Someday is untouched by definition (a quarter is the checkpoint) — a
+// 14-day threshold there would fire on nearly every Someday project
+// immediately and defeat the badge.
+const STALE_DAYS_BY_STATUS = { Active: 14, 'Waiting For': 14, Paused: 30, Someday: 90 };
 
 function daysSince(s) {
   return Math.floor((Date.now() - parseTs(s).getTime()) / 86400000);
@@ -7069,14 +7074,17 @@ function daysSince(s) {
 // untouched can stack with either.
 function auditBadges(p) {
   const badges = [];
-  if (p.step_count === 0) {
+  // A Someday project is an unplanned idea by definition — "no steps yet"
+  // would be noise there, not signal.
+  if (p.status !== 'Someday' && p.step_count === 0) {
     badges.push({ key: 'no_steps', label: 'No steps yet' });
   } else if (p.step_count > 0 && p.step_done === p.step_count) {
     badges.push({ key: 'looks_done', label: 'Looks done' });
   }
   if (p.updated_at) {
     const days = daysSince(p.updated_at);
-    if (days > STALE_DAYS) badges.push({ key: 'untouched', label: `Untouched ${days}d` });
+    const threshold = STALE_DAYS_BY_STATUS[p.status] ?? 14;
+    if (days > threshold) badges.push({ key: 'untouched', label: `Untouched ${days}d` });
   }
   return badges;
 }
@@ -7093,7 +7101,7 @@ async function renderReview(main) {
   const wrap = h('<div></div>');
   wrap.appendChild(
     h(
-      '<p style="color:var(--text-muted);font-size:16px;margin-bottom:16px">Everything Active or Waiting For, with its open steps. A pass for your weekly review.</p>'
+      '<p style="color:var(--text-muted);font-size:16px;margin-bottom:16px">Everything Active or Waiting For, with its open steps — plus Someday and Paused projects worth a second look.</p>'
     )
   );
   if (data.done_this_week) {
@@ -7106,26 +7114,30 @@ async function renderReview(main) {
     );
   }
 
-  const section = (title, projects) => {
+  const section = (title, projects, opts = {}) => {
+    const { compact = false } = opts;
     const s = h(`<div style="margin-bottom:22px"><div class="section-header"><span class="section-label">${icon(STATUS_ICON[title], 14)}${title} <span class="section-count">${projects.length}</span></span></div></div>`);
     if (!projects.length) {
       s.appendChild(h('<div class="empty-section">Nothing here.</div>'));
       return s;
     }
     projects.forEach((p) => {
-      const allOpen = p.open_steps || [];
-      const titleById = new Map(allOpen.map((st) => [st.id, st.title]));
-      const leaves = withoutContainers(allOpen);
-      const stepsHtml = leaves.length
-        ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">${leaves
-            .map((st) => {
-              const parentTitle = st.parent_step_id ? titleById.get(st.parent_step_id) : undefined;
-              return `<div class="check-sub">• ${crumb(st.title, parentTitle)}${
-                st.due_date ? ` — due ${esc(fmtDate(st.due_date))}` : ''
-              }${st.estimate_minutes ? ` · ~${esc(fmtDuration(st.estimate_minutes))}` : ''}</div>`;
-            })
-            .join('')}</div>`
-        : '<div class="check-sub" style="margin-top:8px;color:var(--text-faint)">No open steps</div>';
+      let stepsHtml = '';
+      if (!compact) {
+        const allOpen = p.open_steps || [];
+        const titleById = new Map(allOpen.map((st) => [st.id, st.title]));
+        const leaves = withoutContainers(allOpen);
+        stepsHtml = leaves.length
+          ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">${leaves
+              .map((st) => {
+                const parentTitle = st.parent_step_id ? titleById.get(st.parent_step_id) : undefined;
+                return `<div class="check-sub">• ${crumb(st.title, parentTitle)}${
+                  st.due_date ? ` — due ${esc(fmtDate(st.due_date))}` : ''
+                }${st.estimate_minutes ? ` · ~${esc(fmtDuration(st.estimate_minutes))}` : ''}</div>`;
+              })
+              .join('')}</div>`
+          : '<div class="check-sub" style="margin-top:8px;color:var(--text-faint)">No open steps</div>';
+      }
       const badges = auditBadges(p);
       const badgesHtml = badges.length
         ? `<div class="bt-audit-badges">${badges
@@ -7151,6 +7163,8 @@ async function renderReview(main) {
 
   wrap.appendChild(section('Active', data.active || []));
   wrap.appendChild(section('Waiting For', data.waiting || []));
+  wrap.appendChild(section('Paused', data.paused || [], { compact: true }));
+  wrap.appendChild(section('Someday', data.someday || [], { compact: true }));
   main.replaceChildren(wrap);
 }
 

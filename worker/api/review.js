@@ -7,7 +7,8 @@ const NOT_CONTAINER =
   's.id NOT IN (SELECT parent_step_id FROM project_steps WHERE parent_step_id IS NOT NULL)';
 
 // GET /api/review — the weekly-review payload: every project the user is on
-// with status Active or Waiting For, each with its incomplete steps.
+// with status Active, Waiting For, Paused, or Someday, each with its
+// incomplete steps.
 export async function onRequestGet(context) {
   const user = context.data.user;
   if (!user) return error(401, 'Not signed in');
@@ -21,7 +22,7 @@ export async function onRequestGet(context) {
               WHERE s.project_id = p.id AND s.completed = 1 AND ${NOT_CONTAINER}) AS step_done
        FROM projects p
        JOIN project_collaborators pc ON pc.project_id = p.id AND pc.user_id = ?
-      WHERE p.status IN ('Active', 'Waiting For') AND p.archived_at IS NULL
+      WHERE p.status IN ('Active', 'Waiting For', 'Someday', 'Paused') AND p.archived_at IS NULL
       ORDER BY p.status, p.updated_at DESC`
   ).bind(user.id).all()).results;
 
@@ -54,6 +55,8 @@ export async function onRequestGet(context) {
   return json({
     active: projects.filter((p) => p.status === 'Active'),
     waiting: projects.filter((p) => p.status === 'Waiting For'),
+    paused: projects.filter((p) => p.status === 'Paused'),
+    someday: projects.filter((p) => p.status === 'Someday'),
     done_this_week: doneRow?.n ?? 0,
   });
 }

@@ -2280,3 +2280,101 @@ status itself).
    (delete all its steps; complete all its steps but leave status Active;
    backdate `updated_at` past 14 days) and confirm the right badge — and only
    that badge — shows.
+   **Built and pushed 2026-09-13** (`68a14bd`).
+
+## Planned: Review — fold in Someday/Paused (spec'd 2026-09-13)
+
+The "Not in this pass" item from the audit-badges spec above. Someday and
+Paused are currently dead ends: nothing in the app ever surfaces them again
+once a project is set to one of those statuses, so the only way to reconsider
+one is to remember it exists and go look. That's exactly the kind of gap an
+audit tool should close — but it's a different question than Active/Waiting's
+"what are my open steps," so it gets different treatment, not just two more
+copies of the existing section.
+
+### The question is different, so the card is different
+
+Active/Waiting sections answer "what do I do next on this." A Someday/Paused
+section should answer "does this still deserve a spot, or should it move" —
+steps don't matter for that judgment, staleness does. So the new sections use
+a **compact card**: title, status pill, category/deadline, audit badges — no
+step list. Clicking still opens the project like any other card; changing its
+status happens there (existing inline status editor), same as today.
+
+### Per-status badge tuning
+
+`auditBadges(p)` (`app.js:7070`) gains status-awareness instead of one fixed
+rule for everyone:
+
+- **No steps yet** — suppressed for `Someday`. A someday project *is* an
+  unplanned idea by definition; flagging that as a gap is noise, not signal.
+  Still shown for `Paused` (a project paused before it was ever broken down
+  is a real thing to notice) and unchanged for Active/Waiting.
+- **Looks done** — unchanged, applies to every status including Someday (if
+  it turns out fully stepped-and-done, that's worth surfacing regardless of
+  why it's not marked Done).
+- **Untouched Nd** — the threshold becomes per-status, since "stale" means
+  something different depending on why a project isn't active:
+  - Active / Waiting For: **14 days** (unchanged).
+  - Paused: **30 days** — paused implies "stepping away briefly"; a month
+    with nothing is the point to ask "still coming back to this?"
+  - Someday: **90 days** — being untouched is the *normal* state for an
+    idea shelf; a quarter is the checkpoint for "still want this, or drop
+    it?" A 14-day threshold here would fire on nearly every Someday project
+    immediately, which defeats the badge.
+  **Confidence: medium** on all three numbers — same as the original 14-day
+  pick, easy to retune once there's real usage.
+
+### A. Backend — `worker/api/review.js`
+
+- Widen the `WHERE` clause: `p.status IN ('Active', 'Waiting For', 'Someday', 'Paused')`.
+  Everything else about the query (the `step_count`/`step_done`/`updated_at`
+  columns just added, the open-steps fetch, the `done_this_week` count) is
+  already status-agnostic — no other change needed there.
+- Response gains two more buckets alongside `active`/`waiting`:
+  ```js
+  someday: projects.filter((p) => p.status === 'Someday'),
+  paused: projects.filter((p) => p.status === 'Paused'),
+  ```
+- No effect on Next or Home: `renderNext`'s `'due'`/`'quick'` branches and
+  `renderHome`'s due-band read `data.active`/`data.waiting` by name and
+  simply won't see the two new keys.
+
+### B. Frontend — `renderReview` (`app.js:7084`)
+
+- `auditBadges(p)` takes the per-status rules above (a `STALE_DAYS_BY_STATUS`
+  map keyed by `p.status`, default 14; skip the no-steps check when
+  `p.status === 'Someday'`).
+- `section(title, projects, opts)` gains an options param, `{ compact }`:
+  when `compact` is true, skip building `stepsHtml` entirely (no
+  `open_steps`/`withoutContainers` work) and omit it from the card template.
+  Everything else in the card (title, status pill, meta line, badges, the
+  click-to-open handler) is identical between the two modes, so this is a
+  branch inside the existing closure, not a second function.
+- Intro copy updates: "Everything Active or Waiting For, with its open
+  steps — plus Someday and Paused projects worth a second look."
+- Section order: Active, Waiting For (unchanged, full cards), then **Paused**,
+  then **Someday** (both compact) — closer-to-live work first, the idea shelf
+  last.
+- No collapsing, no per-section quick actions in this pass — same restraint
+  as the badges themselves; opening the project is still how you act on what
+  the section tells you.
+
+### Not in this pass
+
+- Collapsing the Paused/Someday sections by default, if they turn out to get
+  long enough to push past a comfortable scroll.
+- A dedicated "reconsider" action (promote to Active, archive, mark Done)
+  right on the compact card instead of round-tripping through the project.
+
+### Build order
+
+1. `review.js`: widen the status filter, split the response into four
+   buckets.
+2. `app.js`: `STALE_DAYS_BY_STATUS` + the no-steps suppression in
+   `auditBadges`; `compact` option on `section()`; two new `section()` calls;
+   updated intro copy.
+3. Verify against `wrangler dev`: a Someday project with no steps shows no
+   badge; a Paused project with no steps shows "No steps yet"; backdate one
+   of each past its own threshold (30d Paused, 90d Someday) and confirm the
+   "Untouched" badge fires at the right point, not at 14 days.
