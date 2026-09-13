@@ -1229,7 +1229,7 @@ function renderSettings(app) {
             ? `<div class="sp-section">
           <div class="sp-label">Admin</div>
           <div class="sp-row">
-            <div class="sp-row-left"><div>Interest tags<div class="sp-row-sub">Rename, merge, or delete tags across all profiles.</div></div></div>
+            <div class="sp-row-left"><div>Admin panel<div class="sp-row-sub">Overview, reports, users, listings, tags, and the audit log.</div></div></div>
             <button class="btn-sm btn-sm-ghost" id="bt-set-admin">Open</button>
           </div>
         </div>`
