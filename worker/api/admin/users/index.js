@@ -25,7 +25,7 @@ export async function onRequestGet(context) {
 
   const conds = ['id != ?'];
   const binds = [DELETED_USER_ID];
-  if (FILTERS[filter]) conds.push(FILTERS[filter]);
+  if (Object.prototype.hasOwnProperty.call(FILTERS, filter)) conds.push(FILTERS[filter]);
   if (q) {
     conds.push(
       `(lower(COALESCE(handle, '')) LIKE ? OR lower(COALESCE(display_name, '')) LIKE ?
@@ -40,7 +40,7 @@ export async function onRequestGet(context) {
             board_blocked_at, disabled_at, created_at
        FROM users
       WHERE ${conds.join(' AND ')}
-      ORDER BY created_at DESC
+      ORDER BY created_at DESC, id DESC
       LIMIT ? OFFSET ?`
   )
     .bind(...binds, PAGE + 1, offset)

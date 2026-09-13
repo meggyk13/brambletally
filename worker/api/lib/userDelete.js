@@ -44,6 +44,13 @@ export function cascadeDeleteUserStatements(env, userId) {
       DELETED_USER_ID,
       userId
     ),
+    // target_user_id is ON DELETE CASCADE (schema.sql) — reassign it too, or
+    // the DELETE below silently wipes the moderation_actions row (and with it
+    // the audit-log record of any sanction this user was ever the target of).
+    env.DB.prepare('UPDATE moderation_actions SET target_user_id = ? WHERE target_user_id = ?').bind(
+      DELETED_USER_ID,
+      userId
+    ),
     env.DB.prepare('UPDATE reports SET resolved_by = ? WHERE resolved_by = ?').bind(
       DELETED_USER_ID,
       userId

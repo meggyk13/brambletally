@@ -31,7 +31,7 @@ export async function onRequestGet(context) {
             (SELECT GROUP_CONCAT(p.title, ', ') FROM projects p WHERE p.owner_id = u.id) AS project_titles
        FROM users u
       WHERE ${conds.join(' AND ')}
-      ORDER BY u.created_at DESC
+      ORDER BY u.created_at DESC, u.id DESC
       LIMIT ? OFFSET ?`
   )
     .bind(...binds, PAGE + 1, offset)

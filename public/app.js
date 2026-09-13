@@ -2971,6 +2971,7 @@ function adminListingsSection(host) {
     if (!moreBtn) {
       cursor = null;
       first = true;
+      listEl.replaceChildren(h('<div class="empty">Loading…</div>'));
     }
     let r;
     try {

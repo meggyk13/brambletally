@@ -29,18 +29,27 @@ export async function onRequestPost(context) {
     .bind(`-${days} days`, MAX_PER_CALL)
     .all();
 
+  const BATCH_CHUNK_USERS = 20; // keep each D1 batch call well under any statement-count limit
+
   let purged = 0;
   let skipped = 0;
-  const statements = [];
+  let pending = [];
   for (const row of results) {
     if (await hasSharedOwnedProjects(env, row.id)) {
       skipped++;
       continue;
     }
-    statements.push(...cascadeDeleteUserStatements(env, row.id));
+    pending.push(...cascadeDeleteUserStatements(env, row.id));
     purged++;
+    if (pending.length >= BATCH_CHUNK_USERS * 10) {
+      await env.DB.batch(pending);
+      pending = [];
+    }
   }
-  if (statements.length) await env.DB.batch(statements);
+  if (pending.length) await env.DB.batch(pending);
 
-  return json({ purged, skipped, remaining: results.length === MAX_PER_CALL });
+  // Re-running only helps if this call actually purged something — if every
+  // candidate in a full page was skipped (all own a shared project), the next
+  // call would fetch the exact same rows and make the same zero progress.
+  return json({ purged, skipped, remaining: purged > 0 && results.length === MAX_PER_CALL });
 }

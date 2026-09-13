@@ -23,7 +23,8 @@ export async function onRequestGet(context) {
 
   const params = new URL(context.request.url).searchParams;
   const offset = Math.max(0, parseInt(params.get('cursor') || '0', 10) || 0);
-  const actions = GROUPS[params.get('group')];
+  const group = params.get('group');
+  const actions = Object.prototype.hasOwnProperty.call(GROUPS, group) ? GROUPS[group] : null;
 
   const where = actions ? `WHERE m.action IN (${actions.map(() => '?').join(',')})` : '';
   const binds = actions ? [...actions, PAGE + 1, offset] : [PAGE + 1, offset];
@@ -36,7 +37,7 @@ export async function onRequestGet(context) {
        LEFT JOIN users a ON a.id = m.admin_id
        LEFT JOIN users t ON t.id = m.target_user_id
        ${where}
-      ORDER BY m.created_at DESC
+      ORDER BY m.created_at DESC, m.id DESC
       LIMIT ? OFFSET ?`
   )
     .bind(...binds)
