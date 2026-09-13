@@ -2074,6 +2074,11 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .bt-review-stat {
   color: var(--accent); font-size:var(--fs-sm); font-weight: 600; margin: -8px 0 16px;
 }
+#bt-app .bt-audit-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+#bt-app .bt-audit-badge {
+  border: 1px solid var(--border-strong); border-radius: 99px; padding: 2px 10px;
+  font-size:var(--fs-xs); font-weight: 600; color: var(--text-muted);
+}
 
 /* In-app confirm / prompt */
 .modal-overlay.bt-ask { align-items: center; justify-content: center; padding: 24px; }

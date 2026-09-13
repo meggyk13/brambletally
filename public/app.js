@@ -7057,6 +7057,30 @@ function flashNice() {
 }
 
 // ── Weekly review ──────────────────────────────────────────────────────────
+const STALE_DAYS = 14;
+
+function daysSince(s) {
+  return Math.floor((Date.now() - parseTs(s).getTime()) / 86400000);
+}
+
+// Audit signals for the Review pass — same gap vocabulary Shuffle surfaces
+// one-at-a-time (worker/api/lib/shuffle.js), computed here for a full listing
+// instead of a weighted draw. no_steps/looks_done are mutually exclusive;
+// untouched can stack with either.
+function auditBadges(p) {
+  const badges = [];
+  if (p.step_count === 0) {
+    badges.push({ key: 'no_steps', label: 'No steps yet' });
+  } else if (p.step_count > 0 && p.step_done === p.step_count) {
+    badges.push({ key: 'looks_done', label: 'Looks done' });
+  }
+  if (p.updated_at) {
+    const days = daysSince(p.updated_at);
+    if (days > STALE_DAYS) badges.push({ key: 'untouched', label: `Untouched ${days}d` });
+  }
+  return badges;
+}
+
 async function renderReview(main) {
   main.replaceChildren(h('<div class="empty">Loading…</div>'));
   let data;
@@ -7102,6 +7126,12 @@ async function renderReview(main) {
             })
             .join('')}</div>`
         : '<div class="check-sub" style="margin-top:8px;color:var(--text-faint)">No open steps</div>';
+      const badges = auditBadges(p);
+      const badgesHtml = badges.length
+        ? `<div class="bt-audit-badges">${badges
+            .map((b) => `<span class="bt-audit-badge">${esc(b.label)}</span>`)
+            .join('')}</div>`
+        : '';
       const card = h(`
         <div class="card" role="button" tabindex="0" style="cursor:pointer">
           <div class="card-top"><h3 class="card-title">${esc(p.title)}</h3>
@@ -7109,6 +7139,7 @@ async function renderReview(main) {
           <div class="card-meta">${esc(p.category || UNCATEGORIZED)}${
             p.deadline ? ` · due ${esc(fmtDate(p.deadline))}` : ''
           }</div>
+          ${badgesHtml}
           ${stepsHtml}
         </div>
       `);

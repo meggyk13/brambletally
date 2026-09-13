@@ -14,7 +14,11 @@ export async function onRequestGet(context) {
 
   const db = context.env.DB;
   const projects = (await db.prepare(
-    `SELECT p.id, p.title, p.category, p.status, p.deadline, pc.role
+    `SELECT p.id, p.title, p.category, p.status, p.deadline, p.updated_at, pc.role,
+            (SELECT COUNT(*) FROM project_steps s
+              WHERE s.project_id = p.id AND ${NOT_CONTAINER}) AS step_count,
+            (SELECT COUNT(*) FROM project_steps s
+              WHERE s.project_id = p.id AND s.completed = 1 AND ${NOT_CONTAINER}) AS step_done
        FROM projects p
        JOIN project_collaborators pc ON pc.project_id = p.id AND pc.user_id = ?
       WHERE p.status IN ('Active', 'Waiting For') AND p.archived_at IS NULL

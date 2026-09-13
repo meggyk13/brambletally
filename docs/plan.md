@@ -2176,3 +2176,107 @@ the likely shape of that work — but it's a separate spec, not committed here.
    `renderHome`.
 4. Verify: Quick tasks' cap-chip state and My tasks' assignee list both still
    work identically, just reached via Next's switcher instead of Home's.
+   **Built and pushed 2026-09-13** (`9b3164f`).
+
+## Planned: Review audit rework (spec'd 2026-09-13)
+
+Follow-on from the Next consolidation above. Review's job, once Next absorbed
+the task-execution views, is the thing Next structurally can't do: flag
+projects that need a second look, not just list their open steps. Today's
+Review (`renderReview`, `app.js:7060`; `GET /api/review`, `worker/api/review.js`)
+is a full Active/Waiting-For listing with steps inline — useful, but it reads
+identically whether a project is humming along or has been silently stuck for
+a month. Three signals close that gap, reusing vocabulary that already exists
+in `worker/api/lib/shuffle.js`'s `fetchCandidates` (built for Shuffle's
+one-at-a-time gap-surfacing) rather than inventing a second staleness
+definition:
+
+- **No steps** — the project has never had a leaf step (mirrors Shuffle's
+  `project_no_steps`).
+- **Looks done** — it has leaf steps and every one is complete, but the
+  project's own status is still Active/Waiting For, not Done (mirrors
+  `project_looks_done`).
+- **Untouched Nd** — `updated_at` is more than 14 days old (a coarser cutoff
+  than Shuffle's staleness curve, which climbs back to max weight over a
+  week — Review runs on a slower, periodic cadence, not a constant nudge).
+  **Confidence: medium** on the 14-day number; easy to retune once there's
+  real usage.
+
+`no_steps` and `looks_done` are mutually exclusive (one needs zero leaf
+steps, the other needs at least one); `untouched` can stack with either.
+
+### A. Backend — `worker/api/review.js`
+
+The projects query (`onRequestGet`, lines 16-22) is missing exactly the two
+things needed here: `updated_at`, and leaf-step totals. Add:
+
+- `p.updated_at` to the `SELECT` list.
+- Two correlated subqueries copied from the identical pattern in
+  `worker/api/projects/index.js:20-25` (`step_count`, `step_done`), using the
+  `NOT_CONTAINER` const `review.js` already defines at line 6-7 — no new
+  constant needed, and unlike that file's version these are **not** filtered
+  to open steps, since `looks_done`/`no_steps` need the all-time leaf total:
+
+```sql
+SELECT p.id, p.title, p.category, p.status, p.deadline, p.updated_at, pc.role,
+       (SELECT COUNT(*) FROM project_steps s
+         WHERE s.project_id = p.id AND ${NOT_CONTAINER}) AS step_count,
+       (SELECT COUNT(*) FROM project_steps s
+         WHERE s.project_id = p.id AND s.completed = 1 AND ${NOT_CONTAINER}) AS step_done
+  FROM projects p
+  JOIN project_collaborators pc ON pc.project_id = p.id AND pc.user_id = ?
+ WHERE p.status IN ('Active', 'Waiting For') AND p.archived_at IS NULL
+ ORDER BY p.status, p.updated_at DESC
+```
+
+No new endpoint, no schema change — `open_steps` and `done_this_week` stay
+exactly as they are.
+
+### B. Frontend — `renderReview` (`app.js:7060`)
+
+- New helper `auditBadges(p)` → array of `{ key, label }`:
+  - `step_count === 0` → `{ key: 'no_steps', label: 'No steps yet' }`
+  - `step_count > 0 && step_done === step_count` → `{ key: 'looks_done', label: 'Looks done' }`
+  - `daysSince(p.updated_at) > 14` → `{ key: 'untouched', label: `Untouched ${n}d` }`
+    (a small `daysSince(iso)` helper, same `julianday`-free JS-side math the
+    rest of the frontend already uses for date display).
+- In the `section()` closure's card markup (lines 7105-7114), render the
+  badge row between `card-meta` and `stepsHtml` when `auditBadges(p).length`
+  — reuse the pill visual language `statusPill` already establishes, but a
+  distinct muted/outlined style so it doesn't compete with the status pill's
+  color for attention (new `.bt-audit-badge` class, not a `statusPill`
+  variant).
+- No click behavior on the badge itself for v1 — the card is already a
+  button that opens the project; fixing the flagged issue (mark Done, add a
+  step) happens there. A direct "Mark done" action on the `looks_done` badge
+  is a plausible fast-follow, not in this pass.
+
+### C. CSS
+
+`.bt-audit-badges` (flex row, small gap) / `.bt-audit-badge` (outlined pill,
+`--text-muted` border and text — calmer than `statusPill`'s filled color, so
+a card can carry both without the badge reading as more urgent than the
+status itself).
+
+### Not in this pass
+
+- **Someday/Paused inclusion.** Review currently scopes to Active + Waiting
+  For only; Someday and Paused projects are dead ends nothing ever revisits.
+  Folding them into Review (a third section, or a "needs a decision" group)
+  is a real fit for an audit tool, but it's a bigger layout change than three
+  badges and hasn't been locked in — flagging as the next candidate, not
+  building it here.
+- **Per-badge quick actions** (mark Done from the badge, jump straight to
+  adding a step) — the badges are informational for v1; see B above.
+
+### Build order
+
+1. `review.js`: add `updated_at`, `step_count`, `step_done` to the projects
+   query.
+2. `app.js`: `daysSince()` + `auditBadges()` helpers; badge row in
+   `renderReview`'s card template.
+3. CSS: `.bt-audit-badges` / `.bt-audit-badge`.
+4. Verify against `wrangler dev`: force one project into each badge state
+   (delete all its steps; complete all its steps but leave status Active;
+   backdate `updated_at` past 14 days) and confirm the right badge — and only
+   that badge — shows.
