@@ -1485,6 +1485,7 @@ textarea{resize:vertical;min-height:60px}
 .bt-tos-check{display:flex !important;gap:10px;align-items:flex-start;font-size:15px !important;font-weight:400 !important;
   color:var(--text-sub) !important;text-transform:none !important;letter-spacing:0 !important;line-height:1.45;margin-bottom:18px;cursor:pointer}
 .bt-tos-check input{margin-top:2px;width:18px;height:18px;flex-shrink:0;accent-color:var(--accent)}
+.bt-auth-divider{text-align:center;color:var(--text-muted);font-size:var(--fs-sm);text-transform:uppercase;letter-spacing:.08em;margin:24px 0}
 .bt-signed{max-width:380px;margin:0 auto;padding:48px 24px;text-align:center}
 .bt-signed .who{font-size:var(--fs-base);color:var(--text-muted);margin:16px 0 24px}
 
@@ -1984,6 +1985,17 @@ textarea{resize:vertical;min-height:60px}
 }
 .bt-popover-item:hover { background: var(--elevated); }
 .bt-popover-item.is-sel { color: var(--accent); font-weight: 600; }
+.bt-popover-item.is-done { color: var(--text-muted); cursor: default; }
+.bt-popover-item.is-done:hover { background: none; }
+.bt-setup-check { display: inline-block; width: 16px; flex-shrink: 0; color: var(--accent-2); font-weight: 700; }
+.bt-popover-sep { height: 1px; background: var(--border); margin: 6px 2px; }
+
+/* First-project setup tally — sits in the project detail-topbar, anonymous accounts only */
+#bt-app .bt-setup-tally {
+  display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
+  padding: 4px 0; cursor: pointer; font: inherit;
+}
+#bt-app .bt-setup-tally .bt-tally-label { font-size:var(--fs-sm); }
 
 /* Inline status / category pickers in the project header (H) */
 #bt-app .bt-meta-select {
@@ -2338,6 +2350,7 @@ textarea{resize:vertical;min-height:60px}
 
 /* ── Planned focus time ─────────────────────────────────────────────────── */
 .modal-overlay .bt-dur-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 20px 4px; }
+.modal-overlay .bt-cat-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 20px 14px; }
 .modal-overlay .bt-chip.is-sel {
   background: var(--accent-2); color: var(--on-accent); border-color: var(--accent-2);
 }

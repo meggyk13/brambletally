@@ -1009,7 +1009,48 @@ estimate + delete in one place) but is no longer the primary tap target.
 - Revisit the email-frequency **default** (`weekly` → maybe `immediate` for
   some types) once there's real usage data against Resend's daily cap.
 
-## Planned: Guided onboarding + zero-friction account creation (spec'd 2026-09-12)
+## Guided onboarding + zero-friction account creation (spec'd 2026-09-12)
+
+**A, B, C, and F are built** (2026-09-13) — anonymous "Start your first
+project" through the claim-by-email flow and the setup tally, browser-verified
+against `wrangler dev`, not yet committed/deployed. **D (invite-creates-account)
+and E (admin visibility) are still just spec'd.** Notes on what shipped:
+
+- **B:** `users.email` nullable (migration `0016_anonymous_users.sql`, a table
+  rebuild — SQLite can't drop `UNIQUE NOT NULL` in place), new
+  `POST /api/auth/anonymous` (Turnstile-gated, same as request-link). The
+  handle-prompt gate (the "second gate" noted below) is now fixed server-side
+  in `worker/api/auth/me.js` — `needs_handle: !user.handle && !!user.email` —
+  rather than patched client-side as originally sketched.
+- **C:** `magic_links.claim_user_id` (migration `0017_claim_account.sql`, plain
+  `ALTER TABLE`, nullable FK). New `POST /api/auth/claim` (no Turnstile — only
+  reachable from an authenticated anonymous session). `callback.js` branches
+  three ways: normal signup/login (unchanged), in-place claim (`UPDATE users
+  SET email=...` on the anon row), and merge-into-existing-account.
+  - **Real gotcha hit while building this:** D1 enforces foreign keys at
+    *runtime* (a live `env.DB` query from the Worker), even though a
+    `wrangler d1 execute` migration file does not — confirmed empirically,
+    contradicts the general "D1 doesn't enforce FKs" assumption this repo's
+    migrations were written under. The merge path's final `DELETE FROM users`
+    therefore has to reassign or null out *every* `REFERENCES users(id)`
+    column the anonymous account could hold, not just
+    `projects.owner_id`/`project_collaborators` — `project_listings.created_by`
+    (board listing), `pending_invites.invited_by` (invited a collaborator),
+    `contributor_requests.decided_by`, `ownership_transfer_log.from_user_id`/
+    `to_user_id`, and `magic_links.claim_user_id` (the very link being
+    consumed). All in one `env.DB.batch()` for atomicity — see
+    `mergeAnonymousInto` in `worker/api/auth/callback.js`.
+- **F:** Setup tally sits in `detail-topbar` as a `tallySvg`/`tallyLabel`
+  badge; tapping it opens a popover (checklist + "Save your project" button —
+  chosen over a literal two-separate-controls read of the spec text, since a
+  compact topbar slot needs one tap target on mobile). Unchecked items jump to
+  their control (steps tab + focus quick-add; focus the category `<select>`;
+  click `.detail-desc` into edit mode; open the Edit modal focused on
+  deadline). `computeSetupItems()` is recomputed fresh wherever it's read
+  (badge, popover, the "first step" toast gate) rather than cached in a
+  closure — `refreshDetail()` (steps panel actions) only rebuilds `#bt-panel`,
+  not the header the badge lives in, so a stale closure under-reports progress
+  after adding a step from the popover's own "Add a step" jump.
 
 Today a visitor has to sign in (magic link → check email → click) before
 touching anything. Goal: **"Start your first project"** takes them straight

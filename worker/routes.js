@@ -4,6 +4,8 @@
 // plus literal segments, so order doesn't matter.
 
 import * as authRequestLink from './api/auth/request-link.js';
+import * as authAnonymous from './api/auth/anonymous.js';
+import * as authClaim from './api/auth/claim.js';
 import * as authCallback from './api/auth/callback.js';
 import * as authEmailChange from './api/auth/email-change.js';
 import * as authLogout from './api/auth/logout.js';
@@ -78,6 +80,8 @@ import * as account from './api/account.js';
 
 export const routes = [
   ['/api/auth/request-link', authRequestLink],
+  ['/api/auth/anonymous', authAnonymous],
+  ['/api/auth/claim', authClaim],
   ['/api/auth/callback', authCallback],
   ['/api/auth/email-change', authEmailChange],
   ['/api/auth/logout', authLogout],

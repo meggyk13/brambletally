@@ -8,7 +8,7 @@ PRAGMA foreign_keys = ON;
 
 CREATE TABLE users (
   id              TEXT PRIMARY KEY,        -- uuid
-  email           TEXT UNIQUE NOT NULL,
+  email           TEXT,                    -- NULL = anonymous account (migration 0016); UNIQUE via the partial index below
   name            TEXT,                    -- legacy display fallback; superseded by display_name / handle
   avatar_url      TEXT,
   plan            TEXT NOT NULL DEFAULT 'free',  -- 'free' | 'supporter' (see worker/api/lib/plan.js)
@@ -24,6 +24,7 @@ CREATE TABLE users (
   timezone        TEXT,                    -- IANA name (migration 0013); NULL falls back to DEFAULT_TZ
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
 CREATE UNIQUE INDEX idx_users_handle ON users(handle) WHERE handle IS NOT NULL;
 CREATE UNIQUE INDEX idx_users_calendar_token ON users(calendar_token) WHERE calendar_token IS NOT NULL;
 
@@ -199,6 +200,9 @@ CREATE TABLE magic_links (
   token_hash    TEXT NOT NULL,           -- sha256 of the token sent via email
   expires_at    TEXT NOT NULL,
   used_at       TEXT,
+  claim_user_id TEXT REFERENCES users(id), -- set only on a "save your project"
+                                           -- claim request (migration 0017);
+                                           -- NULL for ordinary login/signup links
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_magic_links_email ON magic_links(email);

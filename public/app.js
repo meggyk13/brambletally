@@ -84,6 +84,26 @@ function tallyLabel(done, total, suffix) {
   }</span></span>`;
 }
 
+// First-project setup tally (docs/plan.md part F) — five items, 20% each,
+// only while the account is anonymous (email IS NULL). Title is auto-checked
+// so it never starts at 0%. Zero backend change: everything it tracks is
+// already on the project bundle. Recomputed fresh wherever it's read (the
+// topbar badge, the popover, the "first step" toast check) rather than cached
+// in a closure, since step/category/description/deadline edits refresh the
+// project bundle through more than one code path.
+function computeSetupItems(b, canEdit) {
+  if (!canEdit || state.me.user.email) return null;
+  const p = b.project;
+  const leaves = b.steps.filter((s) => !b.steps.some((o) => o.parent_step_id === s.id));
+  return [
+    { key: 'title', label: 'Title', done: true },
+    { key: 'step', label: 'Add a step', done: leaves.length > 0 },
+    { key: 'category', label: 'Choose a category', done: !!p.category },
+    { key: 'description', label: 'Add a description', done: !!p.description },
+    { key: 'deadline', label: 'Set a deadline', done: !!p.deadline },
+  ];
+}
+
 // Stepped "time needed" slider. Index 0 = no estimate; 1..7 map to these
 // minute values. Must match STEP_ESTIMATES in worker/api/lib/validate.js.
 const STEP_ESTIMATES = [5, 15, 30, 60, 120, 240, 480];
@@ -164,6 +184,9 @@ const API = {
   logout: () => api('/api/auth/logout', { method: 'POST' }),
   requestLink: (email, turnstileToken) =>
     api('/api/auth/request-link', { method: 'POST', body: { email, turnstileToken } }),
+  startAnonymous: (turnstileToken) =>
+    api('/api/auth/anonymous', { method: 'POST', body: { turnstileToken } }),
+  claim: (email) => api('/api/auth/claim', { method: 'POST', body: { email } }),
 
   listProjects: (opts = {}) => api('/api/projects' + (opts.archived ? '?archived=1' : '')),
   createProject: (b) => api('/api/projects', { method: 'POST', body: b }),
@@ -491,6 +514,59 @@ function btPrompt(message, value = '') {
     input.focus();
     input.select();
   });
+}
+
+// "Save your project" (docs/plan.md part C) — the claim-email prompt an
+// anonymous account reaches from the setup tally. Mails a sign-in link that
+// either turns this account into a real one at that address, or folds this
+// session's project into an existing account at that address.
+function openClaimForm() {
+  const overlay = h(`
+    <div class="modal-overlay open bt-ask">
+      <div class="modal">
+        <p class="bt-ask-msg">Save your project — we'll email you a link to sign back in any time.</p>
+        <div class="msg err" id="bt-claim-err" hidden></div>
+        <input class="sp-input" type="email" id="bt-claim-in" placeholder="you@example.com" />
+        <div class="bt-ask-actions">
+          <button class="btn-sm btn-sm-sage" data-ok>Send link</button>
+          <button class="btn-sm btn-sm-ghost" data-no>Cancel</button>
+        </div>
+      </div>
+    </div>
+  `);
+  const input = overlay.querySelector('#bt-claim-in');
+  const err = overlay.querySelector('#bt-claim-err');
+  const okBtn = overlay.querySelector('[data-ok]');
+  const close = () => overlay.remove();
+  const submit = async () => {
+    const email = input.value.trim();
+    if (!email) return;
+    err.hidden = true;
+    okBtn.disabled = true;
+    okBtn.textContent = 'Sending…';
+    try {
+      await API.claim(email);
+      close();
+      toast(`Check ${email} for a sign-in link.`);
+    } catch (ex) {
+      err.textContent = ex.message || 'Could not send that just now.';
+      err.hidden = false;
+      okBtn.disabled = false;
+      okBtn.textContent = 'Send link';
+    }
+  };
+  on(overlay, '[data-ok]', 'click', submit);
+  on(overlay, '[data-no]', 'click', close);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+    if (e.key === 'Escape') close();
+  });
+  overlay.addEventListener('click', (e) => e.target === overlay && close());
+  document.body.appendChild(overlay);
+  input.focus();
 }
 
 async function guard(fn) {
@@ -3387,15 +3463,25 @@ function renderAuth() {
       <div class="wordmark">brambletally<span>.</span></div>
       <div class="tagline">a keeping-book for makers</div>
       <p class="sub">A place to track sewing, research, event prep, and the rest of what takes a while. Steps, supplies, a timeline, a focus timer, and projects you share with others.</p>
+
+      <div id="bt-ts"></div>
+      <div class="msg err" id="bt-anon-err" hidden></div>
+      <label class="bt-tos-check">
+        <input type="checkbox" id="bt-anon-agree" />
+        <span>I agree to the <a href="/legal/terms" target="_blank" rel="noopener">Terms</a></span>
+      </label>
+      <button class="btn-primary" id="bt-anon-start" disabled>Start your first project</button>
+
+      <p class="bt-auth-divider">or</p>
+
       <h1>Sign in</h1>
-      <p class="sub">Enter your email and we'll send a one-time link. No password.</p>
+      <p class="sub">Already have a project going? Enter your email and we'll send a one-time link. No password.</p>
       ${invalid ? '<div class="msg err">That link was invalid or expired. Request a new one.</div>' : ''}
       <div class="msg ok" id="bt-auth-ok" hidden></div>
       <div class="msg err" id="bt-auth-err" hidden></div>
       <form id="bt-auth-form">
         <label for="bt-email">Email</label>
         <input type="email" id="bt-email" autocomplete="email" required placeholder="you@example.com" />
-        <div id="bt-ts"></div>
         <button type="submit" class="btn-primary" id="bt-auth-submit">Send link</button>
       </form>
       <a class="back" href="/">← brambletally.com</a>
@@ -3404,6 +3490,35 @@ function renderAuth() {
   );
   mountTurnstile();
   document.getElementById('bt-auth-form').addEventListener('submit', onRequestLink);
+  document.getElementById('bt-anon-agree').addEventListener('change', (e) => {
+    document.getElementById('bt-anon-start').disabled = !e.target.checked;
+  });
+  document.getElementById('bt-anon-start').addEventListener('click', onStartAnonymous);
+}
+
+async function onStartAnonymous() {
+  const btn = document.getElementById('bt-anon-start');
+  const err = document.getElementById('bt-anon-err');
+  err.hidden = true;
+  const token = window.turnstile && tsWidgetId != null ? window.turnstile.getResponse(tsWidgetId) : '';
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  try {
+    await API.startAnonymous(token);
+  } catch (ex) {
+    err.textContent = ex.message || 'Could not start your project just now.';
+    err.hidden = false;
+    btn.disabled = false;
+    btn.textContent = 'Start your first project';
+    if (window.turnstile && tsWidgetId != null) window.turnstile.reset(tsWidgetId);
+    return;
+  }
+  // The session cookie is set; boot() re-renders the whole page (replacing
+  // this button), so any further failure reports via toast, not the (now
+  // detached) err element above.
+  await boot();
+  if (state.user) openProjectForm(null);
+  else toast('Could not start your project just now.');
 }
 
 function mountTurnstile() {
@@ -4083,15 +4198,9 @@ async function openProjectForm(existing, opts = {}) {
   await loadCategories();
   const cats = state.categories.map((c) => c.name);
   if (p.category && !cats.includes(p.category)) cats.unshift(p.category);
+  let selectedCategory = p.category || null;
 
-  const overlay = h(`
-    <div class="modal-overlay open">
-      <div class="modal">
-        <div class="modal-header"><span class="modal-title">${existing ? 'Edit project' : 'New project'}</span>
-          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
-        <form id="bt-pform">
-          <label class="sp-label">Title</label>
-          <input class="sp-input" name="title" required value="${esc(p.title || '')}" />
+  const editFields = `
           <label class="sp-label">Category <button type="button" class="sp-inline-link" id="bt-managecats">manage</button></label>
           <select class="sp-select" name="category">
             <option value="" ${!p.category ? 'selected' : ''}>(none)</option>
@@ -4114,7 +4223,30 @@ async function openProjectForm(existing, opts = {}) {
           <label class="sp-label">Project notes</label>
           <textarea class="sp-input" name="pickup_note" rows="3" placeholder="Where you left off, links, reminders…">${esc(
             p.pickup_note || ''
-          )}</textarea>
+          )}</textarea>`;
+
+  const createFields = `
+          <label class="sp-label">Category</label>
+          <div class="bt-cat-chips">
+            ${cats
+              .map(
+                (c) =>
+                  `<button type="button" class="bt-chip${
+                    selectedCategory === c ? ' is-sel' : ''
+                  }" data-cat="${esc(c)}">${esc(c)}</button>`
+              )
+              .join('')}
+          </div>`;
+
+  const overlay = h(`
+    <div class="modal-overlay open">
+      <div class="modal">
+        <div class="modal-header"><span class="modal-title">${existing ? 'Edit project' : 'New project'}</span>
+          <button class="modal-close" aria-label="Close">${icon('close')}</button></div>
+        <form id="bt-pform">
+          <label class="sp-label">Title</label>
+          <input class="sp-input" name="title" required value="${esc(p.title || '')}" />
+          ${existing ? editFields : createFields}
           <div style="display:flex;gap:8px;margin-top:14px">
             <button type="submit" class="btn-sm btn-sm-sage">${existing ? 'Save' : 'Create'}</button>
             <button type="button" class="btn-sm btn-sm-ghost" data-cancel>Cancel</button>
@@ -4177,52 +4309,62 @@ async function openProjectForm(existing, opts = {}) {
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) close();
   });
-  const catSel = overlay.querySelector('select[name=category]');
-  const newCat = overlay.querySelector('input[name=newcat]');
-  catSel.addEventListener('change', () => {
-    newCat.hidden = catSel.value !== '__new';
-    if (!newCat.hidden) newCat.focus();
-  });
-  on(overlay, '#bt-managecats', 'click', () =>
-    openManageCategories(() => {
-      const keep = catSel.value;
-      catSel.innerHTML =
-        `<option value="">(none)</option>` +
-        state.categories.map((c) => `<option>${esc(c.name)}</option>`).join('') +
-        `<option value="__new">＋ New category…</option>`;
-      catSel.value = state.categories.some((c) => c.name === keep) ? keep : '';
-    })
-  );
+  if (existing) {
+    const catSel = overlay.querySelector('select[name=category]');
+    const newCat = overlay.querySelector('input[name=newcat]');
+    catSel.addEventListener('change', () => {
+      newCat.hidden = catSel.value !== '__new';
+      if (!newCat.hidden) newCat.focus();
+    });
+    on(overlay, '#bt-managecats', 'click', () =>
+      openManageCategories(() => {
+        const keep = catSel.value;
+        catSel.innerHTML =
+          `<option value="">(none)</option>` +
+          state.categories.map((c) => `<option>${esc(c.name)}</option>`).join('') +
+          `<option value="__new">＋ New category…</option>`;
+        catSel.value = state.categories.some((c) => c.name === keep) ? keep : '';
+      })
+    );
+  } else {
+    on(overlay, '.bt-cat-chips [data-cat]', 'click', (e) => {
+      const val = e.currentTarget.dataset.cat;
+      selectedCategory = selectedCategory === val ? null : val;
+      overlay
+        .querySelectorAll('.bt-cat-chips [data-cat]')
+        .forEach((b) => b.classList.toggle('is-sel', b.dataset.cat === selectedCategory));
+    });
+  }
 
   on(overlay, '#bt-pform', 'submit', async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
 
-    let category = f.get('category') || null;
-    if (category === '__new') {
-      const name = (f.get('newcat') || '').trim();
-      if (!name) return toast('Name the new category');
-      try {
-        category = (await guard(() => API.createCategory(name))).category.name;
-      } catch {
-        return;
-      }
-    }
-
-    const body = {
-      title: f.get('title').trim(),
-      category,
-      status: f.get('status'),
-      deadline: f.get('deadline') || null,
-      description: f.get('description').trim() || null,
-      pickup_note: f.get('pickup_note').trim() || null,
-    };
     try {
       if (existing) {
+        let category = f.get('category') || null;
+        if (category === '__new') {
+          const name = (f.get('newcat') || '').trim();
+          if (!name) return toast('Name the new category');
+          try {
+            category = (await guard(() => API.createCategory(name))).category.name;
+          } catch {
+            return;
+          }
+        }
+        const body = {
+          title: f.get('title').trim(),
+          category,
+          status: f.get('status'),
+          deadline: f.get('deadline') || null,
+          description: f.get('description').trim() || null,
+          pickup_note: f.get('pickup_note').trim() || null,
+        };
         await guard(() => API.updateProject(existing.id, body));
         close();
         openProject(existing.id);
       } else {
+        const body = { title: f.get('title').trim(), category: selectedCategory };
         const { project } = await guard(() => API.createProject(body));
         if (opts.onCreate) {
           try {
@@ -4232,7 +4374,7 @@ async function openProjectForm(existing, opts = {}) {
           }
         }
         close();
-        openProject(project.id);
+        openProject(project.id, { fresh: true });
       }
     } catch {
       /* toast already shown */
@@ -4528,10 +4670,11 @@ async function openPeople(bundle) {
 }
 
 // ── Project detail ─────────────────────────────────────────────────────────
-async function openProject(id) {
+async function openProject(id, opts = {}) {
   state.view = 'project';
   state.project = null;
   state.detailTab = 'steps';
+  state._focusStepsOnLoad = !!opts.fresh;
   renderApp();
   try {
     state.project = await guard(() => API.getProject(id));
@@ -4562,6 +4705,9 @@ function renderProject(app) {
   const leaves = b.steps.filter((s) => !b.steps.some((o) => o.parent_step_id === s.id));
   const done = leaves.filter((s) => s.completed).length;
 
+  const setupItems = computeSetupItems(b, canEdit);
+  const setupDone = setupItems ? setupItems.filter((i) => i.done).length : 0;
+
   const view = h(`
     <div>
       <div class="detail-strip" data-status="${esc(p.status)}"></div>
@@ -4571,6 +4717,15 @@ function renderProject(app) {
           <button class="detail-back" id="bt-printproj">Print</button>
           <button class="detail-back" id="bt-dupproj">Duplicate</button>
           ${canEdit ? '<button class="detail-back" id="bt-editproj">Edit</button>' : ''}
+          ${
+            setupItems
+              ? `<button class="bt-setup-tally" id="bt-setup-tally" aria-label="Setup progress: ${setupDone} of 5">${tallySvg(
+                  setupDone,
+                  5,
+                  18
+                )}${tallyLabel(setupDone, 5)}</button>`
+              : ''
+          }
         </div>
         <h1 class="detail-title${canEdit ? ' bt-editable' : ''}">${esc(p.title)}</h1>
         <div class="detail-meta">
@@ -4669,6 +4824,56 @@ function renderProject(app) {
     openListingForm(p.id, null, (id) => openListing(id))
   );
   if (canEdit) on(view, '#bt-editproj', 'click', () => openProjectForm(p));
+  if (setupItems)
+    on(view, '#bt-setup-tally', 'click', (e) => {
+      // Recomputed fresh rather than reusing the closed-over `setupItems`:
+      // a step added via quick-add refreshes only the panel (refreshDetail),
+      // so that closure can be stale by the time this popover opens.
+      const items = computeSetupItems(state.project, canEdit);
+      const list = h('<div></div>');
+      items.forEach((item) => {
+        const btn = h(`
+          <button class="bt-popover-item${item.done ? ' is-done' : ''}"${item.done ? ' disabled' : ''}>
+            <span class="bt-setup-check">${item.done ? '✓' : ''}</span>${esc(item.label)}
+          </button>
+        `);
+        if (!item.done) {
+          btn.addEventListener('click', async () => {
+            pop.close();
+            if (item.key === 'step') {
+              state.detailTab = 'steps';
+              view
+                .querySelectorAll('.detail-tab')
+                .forEach((t) => t.classList.toggle('active', t.dataset.tab === 'steps'));
+              renderPanel(view.querySelector('#bt-panel'));
+              const input = view.querySelector('.bt-quickadd-input');
+              if (input) input.focus();
+            } else if (item.key === 'category') {
+              const sel = view.querySelector('.bt-cat-select');
+              if (sel) sel.focus();
+            } else if (item.key === 'description') {
+              const el = view.querySelector('.detail-desc');
+              if (el) el.click();
+            } else if (item.key === 'deadline') {
+              await openProjectForm(state.project.project);
+              const el = document.querySelector('.modal-overlay input[name=deadline]');
+              if (el) el.focus();
+            }
+          });
+        }
+        list.appendChild(btn);
+      });
+      list.appendChild(h('<div class="bt-popover-sep"></div>'));
+      const claimBtn = h(
+        '<button class="btn-sm btn-sm-sage" style="margin:8px 10px 4px">Save your project</button>'
+      );
+      claimBtn.addEventListener('click', () => {
+        pop.close();
+        openClaimForm();
+      });
+      list.appendChild(claimBtn);
+      const pop = popover(e.currentTarget, list, { align: 'right' });
+    });
   // Persist a project-field edit, then refetch the bundle and repaint.
   // refreshDetail() rebuilds only the panel, so after a step edit swaps
   // state.project these header handlers close over a stale bundle — always
@@ -4760,6 +4965,11 @@ function renderProject(app) {
 
   app.appendChild(view);
   renderPanel(view.querySelector('#bt-panel'));
+  if (state._focusStepsOnLoad) {
+    state._focusStepsOnLoad = false;
+    const input = view.querySelector('.bt-quickadd-input');
+    if (input) input.focus();
+  }
 }
 
 function renderPanel(panel) {
@@ -4783,6 +4993,21 @@ async function refreshDetail() {
   }
   const panel = document.getElementById('bt-panel');
   if (panel) renderPanel(panel);
+  refreshSetupTallyBadge();
+}
+
+// Patches the setup-tally topbar badge in place after a panel-only refresh
+// (refreshDetail rebuilds #bt-panel, not the header it lives in).
+function refreshSetupTallyBadge() {
+  const badge = document.getElementById('bt-setup-tally');
+  if (!badge) return;
+  const b = state.project;
+  const canEdit = b.project.role === 'owner' || b.project.role === 'editor';
+  const items = computeSetupItems(b, canEdit);
+  if (!items) return;
+  const setupDone = items.filter((i) => i.done).length;
+  badge.innerHTML = tallySvg(setupDone, 5, 18) + tallyLabel(setupDone, 5);
+  badge.setAttribute('aria-label', `Setup progress: ${setupDone} of 5`);
 }
 
 // "Project notes" — a freeform scratch area for the project, editable inline.
@@ -5104,6 +5329,9 @@ function quickAddRow(b, done) {
     e.preventDefault();
     const lines = input.value.split('\n').map((t) => t.trim()).filter(Boolean);
     if (!lines.length) return;
+    // Setup-tally flourish (docs/plan.md part F): the one line of celebration
+    // copy it calls for, gated to the moment this checks off "add a step".
+    const firstStepEver = !state.me.user.email && !b.steps.length;
     input.disabled = true;
     try {
       for (const line of lines) await guard(() => API.addStep(b.project.id, { title: line }));
@@ -5113,6 +5341,7 @@ function quickAddRow(b, done) {
     }
     input.value = '';
     input.disabled = false;
+    if (firstStepEver) toast('First mark made.');
     await done();
     const next = document.querySelector('.bt-quickadd-input');
     if (next) next.focus();

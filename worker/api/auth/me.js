@@ -23,7 +23,10 @@ export async function onRequestGet(context) {
 
   return json({
     user,
-    needs_handle: !user.handle,
+    // A handle is a social/sharing concept, so an anonymous (email IS NULL)
+    // account defers it to whenever they claim the account or accept an
+    // invite — no handle prompt in between.
+    needs_handle: !user.handle && !!user.email,
     needs_tos: needsTos(user),
     tos_version: TOS_VERSION,
     supporter: isSupporter(user),
