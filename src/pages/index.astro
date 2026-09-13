@@ -237,7 +237,7 @@ const canonical = 'https://brambletally.com/';
       .shuffle-demo-card {
         border: 1px solid var(--border); border-radius: 14px; background: var(--card);
         padding: 22px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.04);
-        min-height: 92px; display: flex; flex-direction: column; justify-content: center; gap: .35rem;
+        display: flex; flex-direction: column; gap: .35rem;
         transition: opacity .18s ease, transform .18s ease;
       }
       .shuffle-demo-card.is-changing { opacity: 0; transform: translateY(4px); }
@@ -261,10 +261,33 @@ const canonical = 'https://brambletally.com/';
       }
       .shuffle-demo-steps[hidden] { display: none; }
       .shuffle-demo-steps::before { content: '▸ '; }
+      .shuffle-demo-steps.open::before { content: '▾ '; }
+      .shuffle-demo-steplist { margin-top: 4px; text-align: left; }
+      .shuffle-demo-steplist[hidden] { display: none; }
+      /* Rows below are injected client-side (innerHTML), so Astro's per-component
+         scoping hash never lands on them — these rules must stay unscoped. */
+      :global(.shuffle-demo-step) {
+        display: flex; align-items: center; gap: 9px; padding: 6px 0;
+        font-family: var(--body); font-size: .92rem; color: var(--text-sub); cursor: pointer;
+      }
+      :global(.shuffle-demo-step-box) {
+        width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+        border: 1.5px solid var(--border-strong); display: flex; align-items: center; justify-content: center;
+      }
+      :global(.shuffle-demo-step-box svg) { display: none; color: var(--on-accent); }
+      :global(.shuffle-demo-step.is-done .shuffle-demo-step-box) { background: var(--accent-2); border-color: var(--accent-2); }
+      :global(.shuffle-demo-step.is-done .shuffle-demo-step-box svg) { display: block; }
+      :global(.shuffle-demo-step.is-done) { color: var(--text-muted); text-decoration: line-through; }
+      :global(.shuffle-demo-step-empty) { text-align: left; font-family: var(--body); font-size: .9rem; color: var(--text-muted); }
+      .shuffle-demo-actions { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+      .shuffle-demo-primary {
+        font-family: var(--body); font-weight: 600; font-size: .92rem; color: var(--on-accent);
+        background: var(--accent); border: none; border-radius: 9px; padding: 9px 18px; cursor: pointer;
+      }
       .shuffle-demo-skip {
-        margin-top: 14px; display: inline-flex; align-items: center; gap: 6px;
+        display: inline-flex; align-items: center; gap: 6px;
         background: none; border: 1px solid var(--border-strong); border-radius: 999px;
-        padding: 8px 18px; font-family: var(--body); font-weight: 600; font-size: .92rem;
+        padding: 8px 16px; font-family: var(--body); font-weight: 600; font-size: .92rem;
         color: var(--text-sub); cursor: pointer; transition: color .2s, border-color .2s;
       }
       .shuffle-demo-skip:hover { color: var(--accent); border-color: var(--accent); }
@@ -465,12 +488,16 @@ const canonical = 'https://brambletally.com/';
               </div>
               <p class="shuffle-demo-prompt" id="shuffleDemoPrompt">What should this become?</p>
               <p class="shuffle-demo-title" id="shuffleDemoTitle">&ldquo;Order more elastic before the trim run&rdquo;</p>
-              <p class="shuffle-demo-steps" id="shuffleDemoSteps" hidden>Steps</p>
+              <button class="shuffle-demo-steps" id="shuffleDemoSteps" type="button" hidden>Steps</button>
+              <div class="shuffle-demo-steplist" id="shuffleDemoStepList" hidden></div>
+              <div class="shuffle-demo-actions">
+                <button class="shuffle-demo-primary" id="shuffleDemoPrimary" type="button">&rarr; Project</button>
+                <button class="shuffle-demo-skip" id="shuffleDemoSkip" type="button">
+                  Skip
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+              </div>
             </div>
-            <button class="shuffle-demo-skip" id="shuffleDemoSkip" type="button">
-              Skip
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-            </button>
           </div>
         </div>
       </section>
@@ -603,11 +630,37 @@ const canonical = 'https://brambletally.com/';
       })();
 
       (function () {
+        var checkSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
         var cards = [
-          { kicker: 'Captured', prompt: 'What should this become?', title: '“Order more elastic before the trim run”', project: false },
-          { kicker: 'Solstice feast garb', prompt: 'No deadline set.', title: 'Add one, or leave it open-ended.', project: true },
-          { kicker: 'Herbal tincture research', prompt: 'What’s the first step?', title: 'Break it into something you can start today.', project: true },
-          { kicker: 'Repaint the shed', prompt: 'No category yet.', title: 'Making, Household, or one of your own.', project: true }
+          {
+            kicker: 'Captured', prompt: 'What should this become?',
+            title: '“Order more elastic before the trim run”',
+            project: false, primary: '→ Project'
+          },
+          {
+            kicker: 'Solstice feast garb', prompt: 'No deadline set.',
+            title: 'Add one, or leave it open-ended.',
+            project: true, primary: 'Save',
+            steps: [
+              { title: 'Order the wool broadcloth', done: true },
+              { title: 'Cut the bodice pieces', done: false },
+              { title: 'Fit the collar', done: false }
+            ]
+          },
+          {
+            kicker: 'Herbal tincture research', prompt: 'What’s the first step?',
+            title: 'Break it into something you can start today.',
+            project: true, primary: 'Add step', steps: []
+          },
+          {
+            kicker: 'Repaint the shed', prompt: 'No category yet.',
+            title: 'Making, Household, or one of your own.',
+            project: true, primary: 'Save',
+            steps: [
+              { title: 'Buy exterior paint', done: false },
+              { title: 'Scrape the old paint off the trim', done: false }
+            ]
+          }
         ];
         var i = 0;
         var card = document.getElementById('shuffleDemoCard');
@@ -615,25 +668,62 @@ const canonical = 'https://brambletally.com/';
         var edit = document.getElementById('shuffleDemoEdit');
         var prompt = document.getElementById('shuffleDemoPrompt');
         var title = document.getElementById('shuffleDemoTitle');
-        var steps = document.getElementById('shuffleDemoSteps');
-        var btn = document.getElementById('shuffleDemoSkip');
-        if (!card || !btn) return;
+        var stepsBtn = document.getElementById('shuffleDemoSteps');
+        var stepList = document.getElementById('shuffleDemoStepList');
+        var primaryBtn = document.getElementById('shuffleDemoPrimary');
+        var skipBtn = document.getElementById('shuffleDemoSkip');
+        if (!card || !skipBtn) return;
+
+        function renderSteps() {
+          var c = cards[i];
+          stepList.innerHTML = '';
+          if (!c.steps || !c.steps.length) {
+            var empty = document.createElement('div');
+            empty.className = 'shuffle-demo-step-empty';
+            empty.textContent = 'No steps yet — add the first one.';
+            stepList.appendChild(empty);
+            return;
+          }
+          c.steps.forEach(function (s) {
+            var row = document.createElement('div');
+            row.className = 'shuffle-demo-step' + (s.done ? ' is-done' : '');
+            row.innerHTML =
+              '<span class="shuffle-demo-step-box">' + checkSvg + '</span><span>' + s.title + '</span>';
+            row.addEventListener('click', function () {
+              s.done = !s.done;
+              row.classList.toggle('is-done', s.done);
+            });
+            stepList.appendChild(row);
+          });
+        }
         function render() {
           var c = cards[i];
           kicker.textContent = c.kicker;
           prompt.textContent = c.prompt;
           title.textContent = c.title;
+          primaryBtn.textContent = c.primary;
           edit.hidden = !c.project;
-          steps.hidden = !c.project;
+          stepsBtn.hidden = !c.project;
+          stepsBtn.classList.remove('open');
+          stepList.hidden = true;
+          renderSteps();
         }
-        btn.addEventListener('click', function () {
+        function advance() {
           card.classList.add('is-changing');
           setTimeout(function () {
             i = (i + 1) % cards.length;
             render();
             card.classList.remove('is-changing');
           }, 160);
+        }
+        stepsBtn.addEventListener('click', function () {
+          var open = stepList.hidden;
+          stepList.hidden = !open;
+          stepsBtn.classList.toggle('open', open);
         });
+        primaryBtn.addEventListener('click', advance);
+        skipBtn.addEventListener('click', advance);
+        renderSteps();
       })();
 
       (function () {
