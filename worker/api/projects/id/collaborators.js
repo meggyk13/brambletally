@@ -1,7 +1,10 @@
 import { json, error, readJson } from '../../lib/http.js';
-import { uuid } from '../../lib/id.js';
+import { uuid, randomToken, sha256Hex } from '../../lib/id.js';
+import { sqlNow } from '../../lib/time.js';
 import { requireProject } from '../../lib/projects.js';
 import { COLLAB_ROLES } from '../../lib/validate.js';
+import { sendMagicLink } from '../../lib/email.js';
+import { MAGIC_LINK_TTL_MIN, appOrigin } from '../../lib/constants.js';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -43,10 +46,45 @@ export async function onRequestPost(context) {
     if (existing) {
       targetUserId = existing.id;
     } else {
+      // No account at this address yet: create one now instead of waiting for
+      // them to sign themselves up (docs/plan.md part D). tos_accepted_at
+      // stays NULL — they still owe their own acceptance, surfaced via the
+      // invite-context lookup in /api/auth/me. accepted_at is stamped right
+      // away (the collaborator row is created in this same batch, not on
+      // their first login) so the GET below's "still pending" filter — and
+      // resolvePendingInvites on old, actually-still-pending rows — keep
+      // working unchanged.
+      const newUserId = uuid();
+      await db.batch([
+        db.prepare('INSERT INTO users (id, email, name) VALUES (?, ?, ?)').bind(
+          newUserId,
+          email,
+          email.split('@')[0]
+        ),
+        db.prepare(
+          `INSERT INTO project_collaborators (project_id, user_id, role) VALUES (?, ?, ?)`
+        ).bind(id, newUserId, body.role),
+        db.prepare(
+          `INSERT INTO pending_invites (id, project_id, email, role, invited_by, accepted_at)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        ).bind(uuid(), id, email, body.role, g.user.id, sqlNow()),
+      ]);
+
+      const token = randomToken(32);
       await db.prepare(
-        `INSERT INTO pending_invites (id, project_id, email, role, invited_by) VALUES (?, ?, ?, ?, ?)`
-      ).bind(uuid(), id, email, body.role, g.user.id).run();
-      return json({ ok: true, pending: true, email });
+        'INSERT INTO magic_links (id, email, token_hash, expires_at) VALUES (?, ?, ?, ?)'
+      )
+        .bind(uuid(), email, await sha256Hex(token), sqlNow(MAGIC_LINK_TTL_MIN * 60 * 1000))
+        .run();
+      // Best-effort, same as sendEmailChangedNotice in email-change.js: the
+      // account and collaborator relationship are already committed above, so
+      // a mail-send hiccup shouldn't fail a request that otherwise succeeded.
+      const link = `${appOrigin(context.env)}/api/auth/callback?token=${token}`;
+      context.waitUntil(sendMagicLink(context.env, email, link).catch(() => {}));
+
+      return json({
+        collaborator: { user_id: newUserId, name: email.split('@')[0], email, role: body.role },
+      });
     }
   }
   if (!targetUserId) return error(400, 'Provide userId or a valid email');

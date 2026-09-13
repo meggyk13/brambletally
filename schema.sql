@@ -262,9 +262,13 @@ CREATE TABLE project_collaborators (
 );
 CREATE INDEX idx_collab_user ON project_collaborators(user_id);
 
--- Invite by email for people who haven't signed up yet.
--- On first login with a matching email, resolve into project_collaborators
--- and mark accepted_at.
+-- Invite by email. Since migration/part D (docs/plan.md), the invitee's
+-- account and project_collaborators row are created immediately at invite
+-- time, so `accepted_at` is stamped right away too — this table is now
+-- mostly an audit record (invited_by/created_at). Old rows from before that
+-- change still resolve the original way: on first login with a matching
+-- email, worker/api/auth/callback.js's resolvePendingInvites() creates the
+-- project_collaborators row and marks accepted_at then.
 CREATE TABLE pending_invites (
   id            TEXT PRIMARY KEY,        -- uuid
   project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

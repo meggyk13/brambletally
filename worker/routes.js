@@ -67,6 +67,7 @@ import * as adminInterest from './api/admin/interests/slug.js';
 import * as adminReports from './api/admin/reports/index.js';
 import * as adminReport from './api/admin/reports/reportId.js';
 import * as adminListings from './api/admin/listings.js';
+import * as adminAnonymous from './api/admin/anonymous.js';
 import * as adminUser from './api/admin/users/handle.js';
 import * as adminUserSanction from './api/admin/users/handle/sanction.js';
 import * as adminUserPlan from './api/admin/users/handle/plan.js';
@@ -148,6 +149,7 @@ export const routes = [
   ['/api/admin/reports', adminReports],
   ['/api/admin/reports/:reportId', adminReport],
   ['/api/admin/listings', adminListings],
+  ['/api/admin/anonymous', adminAnonymous],
   ['/api/admin/users/:handle', adminUser],
   ['/api/admin/users/:handle/sanction', adminUserSanction],
   ['/api/admin/users/:handle/plan', adminUserPlan],

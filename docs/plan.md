@@ -1011,10 +1011,10 @@ estimate + delete in one place) but is no longer the primary tap target.
 
 ## Guided onboarding + zero-friction account creation (spec'd 2026-09-12)
 
-**A, B, C, and F are built** (2026-09-13) — anonymous "Start your first
-project" through the claim-by-email flow and the setup tally, browser-verified
-against `wrangler dev`, not yet committed/deployed. **D (invite-creates-account)
-and E (admin visibility) are still just spec'd.** Notes on what shipped:
+**A through F are all built** (2026-09-13) — anonymous "Start your first
+project" through claim-by-email, the setup tally, invite-creates-account, and
+admin visibility, browser-verified against `wrangler dev`. Not yet deployed.
+Notes on what shipped:
 
 - **B:** `users.email` nullable (migration `0016_anonymous_users.sql`, a table
   rebuild — SQLite can't drop `UNIQUE NOT NULL` in place), new
@@ -1051,6 +1051,21 @@ and E (admin visibility) are still just spec'd.** Notes on what shipped:
   closure — `refreshDetail()` (steps panel actions) only rebuilds `#bt-panel`,
   not the header the badge lives in, so a stale closure under-reports progress
   after adding a step from the popover's own "Add a step" jump.
+- **D:** `collaborators.js` POST's no-existing-account branch now creates the
+  `users` row, the `project_collaborators` row, and the `pending_invites`
+  audit row in one batch, then mails a sign-in link — matching the spec
+  exactly, including stamping `pending_invites.accepted_at` at insert time
+  (not left NULL) so the invite doesn't double-list under both "collaborators"
+  and "pending invites" in the People panel, and so `resolvePendingInvites` in
+  `callback.js` still only touches genuinely-still-pending rows from before
+  this change. `/api/auth/me` gained an `invite` field (project title +
+  inviter name, via the most recent non-owner `project_collaborators` row)
+  computed only while `needs_tos` is true; `renderTos()` shows "\<Name\>
+  invited you to collaborate on "\<Project\>"" when it's present.
+- **E:** New Admin tab "Anonymous" (`GET /api/admin/anonymous`, admin-gated) —
+  every `email IS NULL` user, newest first, with their project title(s)
+  (`GROUP_CONCAT`, since nothing stops an anonymous account from starting
+  more than one) and how long ago they started. No purge job, per spec.
 
 Today a visitor has to sign in (magic link → check email → click) before
 touching anything. Goal: **"Start your first project"** takes them straight

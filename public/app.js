@@ -309,6 +309,7 @@ const API = {
     api('/api/admin/reports/' + encodeURIComponent(id), { method: 'PATCH', body }),
   adminListings: (cursor) =>
     api('/api/admin/listings' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  adminAnonymous: () => api('/api/admin/anonymous'),
   adminUser: (handle) => api('/api/admin/users/' + encodeURIComponent(handle)),
   sanctionUser: (handle, body) =>
     api('/api/admin/users/' + encodeURIComponent(handle) + '/sanction', { method: 'POST', body }),
@@ -983,15 +984,20 @@ function renderHandlePrompt() {
 
 function renderTos() {
   const returning = !!(state.me && state.me.user && state.me.user.tos_accepted_at);
+  const invite = state.me && state.me.invite;
   const el = h(`
     <div class="bt-auth">
       <div class="wordmark">brambletally<span>.</span></div>
       <div class="tagline">a keeping-book for makers</div>
-      <h1>${returning ? 'Updated terms' : 'Before you start'}</h1>
+      <h1>${invite ? "You're invited" : returning ? 'Updated terms' : 'Before you start'}</h1>
       <p class="sub">${
-        returning
-          ? 'The Terms and Acceptable Use policy have changed. Have a look and accept them to keep going.'
-          : 'Brambletally has a short set of rules — mostly "be decent on the board." Please read and accept them.'
+        invite
+          ? `${esc(invite.inviter_name)} invited you to collaborate on “${esc(
+              invite.project_title
+            )}”. Accept the Terms to continue.`
+          : returning
+            ? 'The Terms and Acceptable Use policy have changed. Have a look and accept them to keep going.'
+            : 'Brambletally has a short set of rules — mostly "be decent on the board." Please read and accept them.'
       }</p>
       <div class="msg err" id="bt-tos-err" hidden></div>
       <p class="bt-tos-links">
@@ -2200,6 +2206,7 @@ const ADMIN_TABS = [
   ['users', 'Users'],
   ['listings', 'Listings'],
   ['tags', 'Tags'],
+  ['anonymous', 'Anonymous'],
 ];
 
 async function renderAdmin(app) {
@@ -2241,7 +2248,35 @@ async function renderAdmin(app) {
   if (state.adminTab === 'reports') adminReportsSection(host);
   else if (state.adminTab === 'users') adminUsersSection(host);
   else if (state.adminTab === 'listings') adminListingsSection(host);
+  else if (state.adminTab === 'anonymous') adminAnonymousSection(host);
   else adminTagsSection(host);
+}
+
+// ── Admin: anonymous (unclaimed) accounts ───────────────────────────────
+async function adminAnonymousSection(host) {
+  host.replaceChildren(h('<div class="empty">Loading…</div>'));
+  let r;
+  try {
+    r = await guard(() => API.adminAnonymous());
+  } catch {
+    return;
+  }
+  host.replaceChildren();
+  if (!r.users.length) {
+    host.appendChild(h('<div class="empty">No unclaimed accounts.</div>'));
+    return;
+  }
+  r.users.forEach((u) => {
+    host.appendChild(
+      h(`
+      <div class="sp-row">
+        <div class="sp-row-left"><div>${esc(u.project_titles || '(no project)')}<div class="sp-row-sub">started ${esc(
+          timeAgo(u.created_at)
+        )}</div></div></div>
+      </div>
+    `)
+    );
+  });
 }
 
 // ── Admin: reports queue ────────────────────────────────────────────────
