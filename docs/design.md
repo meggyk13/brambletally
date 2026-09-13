@@ -31,8 +31,20 @@ detail is in each 3a-N subsection below — this is the short version:
   screen, landing footer, both legal pages), not the original two — a sweep
   turned up more once the pattern was fixed once.
 
-**3b (the candle, the tally, the hero/compact cards, empty states, texture,
-dividers) is spec'd and entirely open.** A real mark is still later work.
+**3b is spec'd; the card (3b-5a/5b) is built, 2026-09-12.** The tally
+(`tallySvg`/`tallyLabel` in `app.js`) replaces the progress bar everywhere —
+hero, compact rows, Archived/Search's `projectCard()`, the project detail
+page. The home screen is now a hero ("In hand" — the most recently updated
+Active project) plus every other status as its own rubric section in one
+continuous list; **the old status-tab filter is gone**, a real IA change
+confirmed against the chosen mockup before building, not just a restyle.
+Category filtering stays and narrows the whole list; Archived moved from a
+tab to a plain button. Cover hues/emblems (3b-5c) are still blocked on a
+schema migration + the icon commission, so every band/tile/left-edge is a
+flat `--accent-2` fallback for now. Not shipped: the tally's own "cut"
+draw-in animation (deferred, needs prior-render state the render layer
+doesn't carry yet), and 3b-1/2/3/4 (the candle, empty states, paper texture,
+flourish dividers) — all still open. A real mark is still later work.
 
 ## Direction
 
@@ -850,7 +862,24 @@ This supersedes the earlier 3b-5, which called the card work "least certain"
 and proposed a per-status left edge. Three parts below, ordered by what blocks
 them.
 
-#### 3b-5a The tally — unblocked
+#### 3b-5a The tally — built 2026-09-12
+
+**Shipped**: `tallySvg(done, total, heightPx)` + `tallyLabel(done, total, suffix?)`
+in `app.js`, geometry/colour/jitter/cap exactly as spec'd below, wired into
+the hero, compact rows, `projectCard()` (Archived, Search), and the project
+detail page (hero-size, with the "notched" label). `.progress-bar-wrap` /
+`.progress-bar-fill` are deleted from both files, and `STATUS_ICON`'s old
+neighbour `STATUS_COLOR` alpha-hex path was already gone from 3a.
+
+**Not shipped yet — the draw-in "cut" animation.** The tally always renders
+its resting state (inked marks solid, no dasharray trick); checking a step
+off redraws the whole tally instantly rather than animating the newly-inked
+mark in. This is deliberate, not an oversight: getting the animation right
+needs the previous done-count to diff against, which the render layer
+doesn't currently carry between renders, and it's a fully separate concern
+from the geometry/data-correctness work. `prefers-reduced-motion` therefore
+needs no special-casing yet, since nothing animates — flag this file for
+follow-up work if the cut is wanted.
 
 **Replaces `.progress-bar-wrap` / `.progress-bar-fill` entirely.** Delete both.
 The app is named Brambletally and its progress indicator was a 5px hairline
@@ -912,7 +941,39 @@ moot — the tally is `--accent-2`, not the status hue. The status hue keeps the
 pill bead, the tabs and `.detail-strip`. Do 3a first anyway; it is one line to
 drop later.
 
-#### 3b-5b Hero and rows — unblocked
+#### 3b-5b Hero and rows — built 2026-09-12
+
+**One real IA change made along the way, confirmed before building:** the
+status-tab filter (Active/Waiting For/Someday/Paused/Done, one at a time) is
+gone from the home screen. The chosen mockup (`design/EnrichedCards.dc.html`)
+shows every status as its own rubric in one continuous scroll, not a filtered
+single-status view, and that's what shipped — hero, then a rubric section per
+non-empty status (`ALSO ACTIVE`, `WAITING FOR`, `SOMEDAY`, `PAUSED`, `DONE`,
+in that order, each only rendered when non-empty). The category filter stays
+and narrows the whole list, hero included. Archived moved from a tab to a
+plain button next to "+ New project" — it was never a status like the others
+and had nowhere else to go once the tab row disappeared.
+
+**Cover band/tile fallback (blocked on 3b-5c):** every project's band, tile,
+and row left-edge is a flat `--accent-2` for now — no per-project cover hue,
+no emblem, since the schema column and the icon commission are both still
+pending. This matches the documented fallback ("must look deliberate rather
+than broken") rather than trying to fake variety ahead of the real feature.
+
+**Hero's next-open-step data comes from the existing `/api/review` payload**
+(`review.active`, already fetched by `renderHome` for the due-today band) —
+no new endpoint. `withoutContainers(...)​[0]` on that project's `open_steps`
+gives the next leaf step; its checkbox posts `completed: true` directly, its
+"Focus 25m" button opens the project then starts a focus session preset to
+that step (same pattern the existing "Next focus" banner uses).
+
+**Verified live** across three themes (Bramble, Vellum, dark mode) and at a
+375px mobile width: hero anatomy, the compact-row grouping, the Waiting-For
+dashed-border/no-tally treatment, an empty-category message, the Archived
+link, and the tally live-updating once a step's completion round-trips
+through a real re-render. Old call sites (`projectCard()` for Archived and
+Search, the project detail page) all still work — they got the tally instead
+of the deleted progress bar, nothing else about them changed.
 
 Today every project renders as an identical card, so the home screen is a wall
 of equal-weight rectangles with nothing to look at first. Two tiers.
@@ -1144,12 +1205,13 @@ section above.
   (deliberately deferred — a cascade change across ~226 rules, real
   regression risk, no cheap way to verify short of screenshotting every
   theme) and 3a-6's two stale-copy bugs (auth screen, landing footer).
-- **3b — the drawn things.** The focus-screen candle (replaces the ring),
-  empty-state illustrations, paper texture ported from the landing page,
-  flourish dividers, and **the card** — the tally replacing the progress bar,
-  the hero/compact hierarchy, and covers + emblems (3b-5, direction chosen
-  2026-09-12). The tally and the hierarchy need neither a schema change nor the
-  icon commission, so they can land ahead of the rest of 3b.
+- **3b — the drawn things.** **The card is built (3b-5a/5b, 2026-09-12)** —
+  the tally replacing the progress bar everywhere, and the hero/compact-row
+  hierarchy (which also dropped the old status-tab filter — see 3b-5b).
+  **Still open**: the focus-screen candle (replaces the ring), empty-state
+  illustrations, paper texture ported from the landing page, flourish
+  dividers, and covers + emblems (3b-5c, blocked on a schema migration + the
+  icon commission).
 
 ## Open decisions
 

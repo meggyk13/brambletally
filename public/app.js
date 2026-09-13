@@ -27,6 +27,63 @@ function statusPill(status) {
   return `<span class="status-pill" data-status="${esc(status)}"><span class="status-dot"></span>${esc(status)}</span>`;
 }
 
+// ── The tally — replaces the progress bar everywhere (docs/design.md 3b-5a).
+// A notched-stick tally mark: groups of 5, four uprights then a closing
+// diagonal, hand-cut jitter, capped at 20 marks (4 groups) past which the
+// numeral carries the true count. Static for now — the draw-in "cut"
+// animation on check-off is deferred; every render draws the resting state.
+const TALLY_JITTER = [0.5, -0.4, 0.6, -0.3, 0.2];
+function tallySvg(done, total, heightPx) {
+  if (!total) return '';
+  const capped = Math.min(total, 20);
+  const drawnDone = Math.min(done, capped);
+  const numFullGroups = Math.floor(capped / 5);
+  const remainder = capped % 5;
+  const totalGroups = numFullGroups + (remainder > 0 ? 1 : 0);
+  const width = totalGroups * 40 - 14;
+
+  let markIdx = 0;
+  let uprightIdx = 0;
+  const parts = [];
+  for (let g = 0; g < totalGroups; g++) {
+    const baseX = g * 40;
+    const isFullGroup = g < numFullGroups;
+    const marksInGroup = isFullGroup ? 4 : remainder;
+    for (let i = 0; i < marksInGroup; i++) {
+      const inked = markIdx < drawnDone;
+      const jitter = TALLY_JITTER[uprightIdx % TALLY_JITTER.length];
+      const x = (baseX + i * 7 + jitter).toFixed(2);
+      parts.push(`<path d="M${x} 4L${x} 20" class="${inked ? 'is-inked' : 'is-ghost'}"/>`);
+      markIdx++;
+      uprightIdx++;
+    }
+    if (isFullGroup) {
+      const inked = markIdx < drawnDone;
+      parts.push(
+        `<path d="M${(baseX - 2).toFixed(2)} 20.5L${(baseX + 23).toFixed(2)} 3.5" class="${
+          inked ? 'is-inked' : 'is-ghost'
+        }"/>`
+      );
+      markIdx++;
+    }
+  }
+  return `<svg class="bt-tally" width="${width}" height="${heightPx}" viewBox="0 0 ${width} 24" fill="none" stroke-linecap="round" stroke-width="2.2" aria-hidden="true">${parts.join(
+    ''
+  )}</svg>`;
+}
+// The "N/M" (+ optional suffix) label that runs alongside the tally. The
+// numerator is always --accent-2 (the ink colour); the rest joins it once
+// every drawn mark is inked (capped at 20, same rule as the drawing) rather
+// than staying muted forever on a >20-step project.
+function tallyLabel(done, total, suffix) {
+  const capped = Math.min(total, 20);
+  const drawnDone = Math.min(done, capped);
+  const allInked = total > 0 && drawnDone >= capped;
+  return `<span class="bt-tally-label${allInked ? ' is-complete' : ''}">${done}<span class="bt-tally-of">/${total}${
+    suffix ? ' ' + esc(suffix) : ''
+  }</span></span>`;
+}
+
 // Stepped "time needed" slider. Index 0 = no estimate; 1..7 map to these
 // minute values. Must match STEP_ESTIMATES in worker/api/lib/validate.js.
 const STEP_ESTIMATES = [5, 15, 30, 60, 120, 240, 480];
@@ -692,7 +749,6 @@ const state = {
   discoverSlug: null, // interest slug shown by renderDiscover
   projects: [],
   categories: [], // [{id, name, sort_order}]
-  filterStatus: 'Active',
   filterCategory: 'all', // 'all' | 'none' | a category name
   homeMode: 'projects', // 'projects' | 'quick' | 'mine'
   quickCap: 30, // minutes ceiling for the Quick tasks list; Infinity = all
@@ -3572,9 +3628,6 @@ async function renderHome(main) {
   }
   state.projects = projects;
 
-  const counts = {};
-  STATUSES.forEach((s) => (counts[s] = projects.filter((p) => p.status === s).length));
-
   const wrap = h('<div></div>');
 
   // Overdue / due-today steps across Active + Waiting For projects.
@@ -3660,30 +3713,6 @@ async function renderHome(main) {
     return;
   }
 
-  const statusTabs = h(`<div class="tabs" style="margin-bottom:8px"></div>`);
-  STATUSES.forEach((s) => {
-    const b = h(
-      `<button class="tab${state.filterStatus === s ? ' active' : ''}" data-status="${s}">${icon(
-        STATUS_ICON[s],
-        14
-      )}${s}${counts[s] ? `<span class="tab-count">${counts[s]}</span>` : ''}</button>`
-    );
-    b.addEventListener('click', () => {
-      state.filterStatus = s;
-      renderApp();
-    });
-    statusTabs.appendChild(b);
-  });
-  const archTab = h(
-    `<button class="tab" style="--tab-color:var(--text-muted)">Archived</button>`
-  );
-  archTab.addEventListener('click', () => {
-    state.view = 'archived';
-    renderApp();
-  });
-  statusTabs.appendChild(archTab);
-  wrap.appendChild(statusTabs);
-
   const catFilters = [['all', 'All']];
   state.categories.forEach((c) => catFilters.push([c.name, c.name]));
   if (projects.some((p) => !p.category)) catFilters.push(['none', UNCATEGORIZED]);
@@ -3705,21 +3734,30 @@ async function renderHome(main) {
     wrap.appendChild(catRow);
   }
 
-  const bar = h(`<div class="newbar"><button class="btn-sm btn-sm-sage" id="bt-new">+ New project</button></div>`);
+  const bar = h(`
+    <div class="newbar">
+      <button class="btn-sm btn-sm-sage" id="bt-new">${icon('plus', 14)} New project</button>
+      <button class="btn-sm btn-sm-ghost" id="bt-archived-link">Archived</button>
+    </div>
+  `);
   on(bar, '#bt-new', 'click', () => openProjectForm(null));
+  on(bar, '#bt-archived-link', 'click', () => {
+    state.view = 'archived';
+    renderApp();
+  });
   wrap.appendChild(bar);
 
-  let list = projects.filter((p) => p.status === state.filterStatus);
+  let list = projects;
   if (state.filterCategory === 'none') list = list.filter((p) => !p.category);
   else if (state.filterCategory !== 'all') list = list.filter((p) => p.category === state.filterCategory);
 
   if (!list.length) {
     const msg = !projects.length
       ? 'No projects yet. Start one, or capture a thought in the Inbox first.'
-      : `Nothing ${esc(state.filterStatus)}${
+      : `Nothing ${
           state.filterCategory !== 'all' && state.filterCategory !== 'none'
-            ? ' in ' + esc(state.filterCategory)
-            : ''
+            ? 'in ' + esc(state.filterCategory)
+            : 'here'
         }.`;
     const empty = h(`<div class="empty">${!projects.length ? emptyVine() : ''}${msg}</div>`);
     if (!projects.length) {
@@ -3729,9 +3767,32 @@ async function renderHome(main) {
     }
     wrap.appendChild(empty);
   } else {
-    const grid = h('<div class="cards-grid"></div>');
-    list.forEach((p) => grid.appendChild(projectCard(p)));
-    wrap.appendChild(grid);
+    // Hero — "In hand": the most recently updated Active project. The list is
+    // already ORDER BY updated_at DESC from the API, so the first Active
+    // project in filter order is exactly that (docs/design.md 3b-5b).
+    const hero = list.find((p) => p.status === 'Active') || null;
+    const heroReview = hero ? (review.active || []).find((pr) => pr.id === hero.id) : null;
+    const heroNextStep = heroReview ? withoutContainers(heroReview.open_steps || [])[0] : null;
+    if (hero) wrap.appendChild(heroCard(hero, heroNextStep));
+
+    const rest = list.filter((p) => p !== hero);
+    [
+      ['Active', 'ALSO ACTIVE'],
+      ['Waiting For', 'WAITING FOR'],
+      ['Someday', 'SOMEDAY'],
+      ['Paused', 'PAUSED'],
+      ['Done', 'DONE'],
+    ].forEach(([status, label]) => {
+      const inGroup = rest.filter((p) => p.status === status);
+      if (!inGroup.length) return;
+      const section = h(
+        `<div class="home-rubric-section"><div class="home-rubric">${label} <span class="home-rubric-count">${inGroup.length}</span></div></div>`
+      );
+      const rows = h('<div class="proj-rows"></div>');
+      inGroup.forEach((p) => rows.appendChild(compactRow(p)));
+      section.appendChild(rows);
+      wrap.appendChild(section);
+    });
   }
 
   main.replaceChildren(wrap);
@@ -3867,11 +3928,109 @@ async function renderMyTasks(wrap) {
   wrap.appendChild(list);
 }
 
+// The home screen's hero card — "In hand" (docs/design.md 3b-5b). No cover
+// hue/emblem yet (3b-5c is blocked on a schema migration + the icon
+// commission), so the band and tile fall back to a flat --accent-2, which
+// has to read as deliberate rather than broken until covers land for real.
+function heroCard(p, nextStep) {
+  const total = p.step_count || 0;
+  const done = p.step_done || 0;
+  const estLeft = p.open_estimate_minutes || 0;
+  const bandMeta = [p.deadline ? 'due ' + fmtDate(p.deadline) : '', estLeft ? '~' + fmtDuration(estLeft) + ' left' : '']
+    .filter(Boolean)
+    .join(' · ');
+  const card = h(`
+    <div class="hero-section">
+      <div class="hero-rubric">IN HAND</div>
+      <div class="hero-card">
+        <div class="hero-cover">
+          <div class="hero-tile"></div>
+          <div class="hero-cover-meta">
+            <div class="hero-cover-cat">${esc((p.category || UNCATEGORIZED).toUpperCase())}</div>
+            ${bandMeta ? `<div class="hero-cover-line">${esc(bandMeta)}</div>` : ''}
+          </div>
+        </div>
+        <div class="hero-body">
+          <h2 class="hero-title">${esc(p.title)}</h2>
+          ${
+            total
+              ? `<div class="bt-tally-wrap">${tallySvg(done, total, 32)}${tallyLabel(done, total, 'notched')}</div>`
+              : ''
+          }
+          ${p.pickup_note ? `<div class="hero-note">${esc(p.pickup_note)}</div>` : ''}
+          ${
+            nextStep
+              ? `<div class="hero-next">
+                  <button class="checkbox" aria-label="Mark done"></button>
+                  <div class="hero-next-title">${esc(nextStep.title)}</div>
+                  <button class="btn-sm hero-next-focus">${icon('candle', 14)} Focus 25m</button>
+                </div>`
+              : ''
+          }
+        </div>
+      </div>
+    </div>
+  `);
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('button, a, input, select, textarea, label')) return;
+    openProject(p.id);
+  });
+  if (nextStep) {
+    card.querySelector('.hero-next .checkbox').addEventListener('click', async () => {
+      try {
+        await API.updateStep(p.id, nextStep.id, { completed: true });
+      } catch {
+        toast('Could not update');
+        return;
+      }
+      renderApp();
+    });
+    card.querySelector('.hero-next-focus').addEventListener('click', async () => {
+      await openProject(p.id);
+      if (state.project) openFocusSession(state.project, { stepId: nextStep.id });
+    });
+  }
+  return card;
+}
+
+// A compact row in the home list's rubric-grouped "rest" (docs/design.md
+// 3b-5b). Waiting For draws differently — a dashed border and the waiting
+// reason in italic instead of a tally, since how long it's been stuck matters
+// more than how far along it is.
+function compactRow(p) {
+  const total = p.step_count || 0;
+  const done = p.step_done || 0;
+  const estLeft = p.open_estimate_minutes || 0;
+  const isWaiting = p.status === 'Waiting For';
+  const metaLine = p.deadline ? 'due ' + fmtDate(p.deadline) : estLeft ? '~' + fmtDuration(estLeft) + ' left' : '';
+  const row = h(`
+    <div class="proj-row${isWaiting ? ' is-waiting' : ''}" role="button" tabindex="0">
+      <div class="proj-row-tile"></div>
+      <div class="proj-row-main">
+        <div class="proj-row-title">${esc(p.title)}</div>
+        ${
+          isWaiting
+            ? `<div class="proj-row-waiting-note">${
+                p.pickup_note ? esc(p.pickup_note) : 'Waiting'
+              }</div>`
+            : `<div class="proj-row-tally-line">${total ? tallySvg(done, total, 20) : ''}<span class="proj-row-meta">${[
+                esc((p.category || UNCATEGORIZED).toUpperCase()),
+                esc(metaLine),
+              ]
+                .filter(Boolean)
+                .join(' · ')}</span></div>`
+        }
+      </div>
+    </div>
+  `);
+  row.addEventListener('click', () => openProject(p.id));
+  return row;
+}
+
 function projectCard(p) {
   const total = p.step_count || 0;
   const done = p.step_done || 0;
   const estLeft = p.open_estimate_minutes || 0;
-  const pct = total ? Math.round((done / total) * 100) : 0;
   const card = h(`
     <div class="card" role="button" tabindex="0">
       <div class="card-top">
@@ -3887,7 +4046,7 @@ function projectCard(p) {
       </div>
       ${
         total
-          ? `<div class="progress-bar-wrap"><div class="progress-bar-fill" data-status="${esc(p.status)}" style="width:${pct}%"></div></div>`
+          ? `<div class="bt-tally-wrap">${tallySvg(done, total, 20)}${tallyLabel(done, total)}</div>`
           : ''
       }
       ${p.pickup_note ? `<div class="card-footer">${esc(p.pickup_note)}</div>` : ''}
@@ -4397,7 +4556,6 @@ function renderProject(app) {
   // Progress counts leaf steps only — a container's state is derived from them.
   const leaves = b.steps.filter((s) => !b.steps.some((o) => o.parent_step_id === s.id));
   const done = leaves.filter((s) => s.completed).length;
-  const pct = leaves.length ? Math.round((done / leaves.length) * 100) : 0;
 
   const view = h(`
     <div>
@@ -4464,7 +4622,11 @@ function renderProject(app) {
         <div class="pickup-box" id="bt-pickup-box"></div>
         ${
           leaves.length
-            ? `<div class="progress-bar-wrap" style="margin:14px 0"><div class="progress-bar-fill" data-status="${esc(p.status)}" style="width:${pct}%"></div></div>`
+            ? `<div class="bt-tally-wrap" style="margin:14px 0">${tallySvg(
+                done,
+                leaves.length,
+                32
+              )}${tallyLabel(done, leaves.length, 'notched')}</div>`
             : ''
         }
         <button class="focus-detail-btn" id="bt-focus">${icon('candle')} Start a focus session</button>

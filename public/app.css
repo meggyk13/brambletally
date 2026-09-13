@@ -656,7 +656,7 @@ body{background:var(--bg);color:var(--text)}
 .project-list{padding:14px 16px 80px}
 
 /* ── New-project bar ──────────────────────────────────────────────────────── */
-.newbar{display:flex;justify-content:flex-end;margin-bottom:14px}
+.newbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
 
 /* ── Project card ─────────────────────────────────────────────────────────── */
 .card{
@@ -682,6 +682,67 @@ body{background:var(--bg);color:var(--text)}
   border-left:3px solid var(--accent-2);
 }
 .card-footer{display:flex;justify-content:space-between;align-items:center}
+
+/* ── Home hero + compact rows (docs/design.md 3b-5b) ──────────────────────── */
+.hero-section{margin-bottom:22px}
+.home-rubric,.hero-rubric{
+  font-family:var(--font-mono);font-size:var(--fs-xs);font-weight:600;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--accent);
+  margin-bottom:8px;
+}
+.home-rubric-count{color:var(--text-muted);font-weight:600}
+.hero-card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);
+  box-shadow:0 2px 10px color-mix(in srgb, var(--text) 9%, transparent);
+  overflow:hidden;cursor:pointer;
+}
+.hero-cover{
+  height:84px;background:var(--accent-2);display:flex;align-items:center;
+  gap:14px;padding:0 18px;
+}
+.hero-tile{width:54px;height:54px;border-radius:var(--radius);flex-shrink:0;background:color-mix(in srgb, var(--on-accent) 22%, var(--accent-2))}
+.hero-cover-meta{min-width:0;font-family:var(--font-mono);color:var(--on-accent)}
+.hero-cover-cat{font-size:10px;font-weight:600;letter-spacing:.16em;opacity:.85}
+.hero-cover-line{font-size:12px;font-weight:500;margin-top:3px;font-feature-settings:"tnum"}
+.hero-body{padding:16px 18px 18px}
+.hero-title{font-family:var(--font-head);font-weight:600;font-size:var(--fs-2xl);color:var(--accent-2);line-height:1.15;margin:0 0 14px}
+.hero-note{
+  font-family:var(--font-head);font-style:italic;font-size:17px;color:var(--text-sub);
+  line-height:1.45;margin-top:14px;
+}
+.hero-next{
+  display:flex;align-items:center;gap:10px;margin-top:16px;
+  background:var(--input);border:1px solid var(--border);border-radius:var(--radius);
+  padding:11px 12px;
+}
+.hero-next-title{flex-grow:1;min-width:0;font-size:var(--fs-base);color:var(--text);line-height:1.35}
+.hero-next-focus{
+  display:flex;align-items:center;gap:6px;flex-shrink:0;
+  background:var(--accent-2);color:var(--on-accent);border:none;
+  border-radius:var(--radius-sm);padding:9px 14px;font-weight:700;letter-spacing:.02em;
+}
+
+.proj-rows{display:flex;flex-direction:column;gap:10px}
+.proj-row{
+  display:flex;align-items:center;gap:14px;
+  background:var(--card);border:1px solid var(--border);border-left:4px solid var(--accent-2);
+  border-radius:var(--radius);box-shadow:0 1px 3px color-mix(in srgb, var(--text) 10%, transparent);
+  padding:13px 15px;min-height:64px;cursor:pointer;
+}
+.proj-row-tile{width:42px;height:42px;border-radius:var(--radius);flex-shrink:0;background:color-mix(in srgb, var(--accent-2) 16%, var(--card))}
+.proj-row-main{flex-grow:1;min-width:0}
+.proj-row-title{font-family:var(--font-head);font-weight:600;font-size:var(--fs-lg);color:var(--accent-2);line-height:1.25}
+.proj-row-tally-line{display:flex;align-items:center;gap:10px;margin-top:5px}
+.proj-row-meta{font-family:var(--font-mono);font-size:11px;letter-spacing:.05em;color:var(--text-muted);font-feature-settings:"tnum"}
+.proj-row.is-waiting{
+  border:1px dashed var(--warn-border);
+  background:var(--warn-bg);
+}
+.proj-row.is-waiting .proj-row-title{color:var(--text-muted)}
+.proj-row-waiting-note{
+  font-family:var(--font-head);font-style:italic;font-size:var(--fs-sm);color:var(--text-muted);
+  margin-top:2px;
+}
 .step-indicator{font-size:var(--fs-sm);flex:1;min-width:0;padding-right:8px}
 .step-count{font-size:var(--fs-xs);color:var(--text-disabled);flex-shrink:0;font-feature-settings:"tnum"}
 
@@ -767,8 +828,13 @@ textarea{resize:vertical;min-height:60px}
 .detail-body{padding:16px 16px 120px}
 .detail-title{font-size:22px;font-weight:700;color:var(--text);margin:0 0 6px;line-height:1.2}
 .detail-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:var(--fs-sm);color:var(--text-muted)}
-.progress-bar-wrap{height:4px;background:var(--elevated);border-radius:99px;overflow:hidden;margin-bottom:18px}
-.progress-bar-fill{height:100%;border-radius:99px;transition:width .4s ease;background:var(--tab-color,var(--accent))}
+/* ── The tally — replaces the progress bar (docs/design.md 3b-5a) ────────── */
+.bt-tally-wrap{display:flex;align-items:flex-end;gap:14px;margin-bottom:18px}
+.bt-tally .is-inked{stroke:var(--accent-2)}
+.bt-tally .is-ghost{stroke:color-mix(in srgb, var(--border-strong) 70%, var(--card))}
+.bt-tally-label{font-family:var(--font-mono);font-feature-settings:"tnum";color:var(--accent-2);font-weight:600}
+.bt-tally-of{color:var(--text-disabled);font-weight:600}
+.bt-tally-label.is-complete .bt-tally-of{color:var(--accent-2)}
 .pickup-box{
   background:var(--card);border-radius:12px;padding:12px 14px;
   margin-bottom:20px;border:1px solid color-mix(in srgb, var(--accent-2) 20%, transparent);
@@ -1743,9 +1809,6 @@ textarea{resize:vertical;min-height:60px}
   background: linear-gradient(var(--accent-2), color-mix(in srgb, var(--accent-2) 88%, #000));
   border-radius:var(--radius); font-weight: 700; letter-spacing: .02em;
 }
-
-/* Progress bar */
-#bt-app .progress-bar-wrap { height: 5px; background: var(--elevated); }
 
 /* Inputs */
 #bt-app .sp-input, #bt-app .sp-select, #bt-app .pickup-input,
