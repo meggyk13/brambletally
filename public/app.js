@@ -3325,7 +3325,7 @@ function renderAuth() {
     <div class="bt-auth">
       <div class="wordmark">brambletally<span>.</span></div>
       <div class="tagline">a keeping-book for makers</div>
-      <p class="sub">A place to track A&amp;S projects, personal research, and Chatelaine office work &mdash; steps, supplies, a timeline, a focus timer, and projects you share with others.</p>
+      <p class="sub">A place to track sewing, research, event prep, and the rest of what takes a while. Steps, supplies, a timeline, a focus timer, and projects you share with others.</p>
       <h1>Sign in</h1>
       <p class="sub">Enter your email and we'll send a one-time link. No password.</p>
       ${invalid ? '<div class="msg err">That link was invalid or expired. Request a new one.</div>' : ''}
@@ -3337,7 +3337,7 @@ function renderAuth() {
         <div id="bt-ts"></div>
         <button type="submit" class="btn-primary" id="bt-auth-submit">Send link</button>
       </form>
-      <a class="back" href="https://rayhanasrepositorium.com/">← Rayhana's Repositorium</a>
+      <a class="back" href="/">← brambletally.com</a>
     </div>
   `)
   );

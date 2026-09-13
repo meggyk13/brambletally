@@ -3,31 +3,36 @@
 Brambletally's own visual identity, separate from Rayhana's Repositorium.
 Companion to `plan.md` and `social-plan.md`.
 
-Status: **Pass 1–2 shipped 2026-09-07** (PRs #1, #3, #4). Palettes, type,
+Status: **Pass 1–2 shipped 2026-09-07** (PRs #1, #3, #4) — palettes, type,
 four tiers, Appearance picker, self-hosted fonts, `noodle`→`focus`, wordmark,
-`icon()` line set — all live. Display font changed to **Uncial Antiqua**
-2026-09-12 (was IM Fell English). **No brand mark** (hedgehog attempts
-dropped; favicon is a placeholder berry). **Pass 3 is spec'd, partly built** —
-3a and 3b-1…4 spec'd 2026-09-09, the card (3b-5) spec'd 2026-09-12 after the
-direction was chosen. See Pass 3 below. Built so far, all 2026-09-12: the
-**Damson/Vellum/Raven CSS token blocks** and the **Appearance picker's
-gated-swatch UI** (all six themes selectable in Settings, the three Supporter
-ones dimmed with a toast-gate for non-Supporters); and **3a-1/3a-2/3a-3** —
-status colours are now per-theme `--status-*` tokens (extended to Vellum and
-Raven, not in the table when this was first spec'd), the pill label went
-neutral with a coloured dot, `STATUS_COLOR`/`CAT_COLOR` are gone, and
-category tabs take `--accent-2`. **3a-4** also shipped: the remaining
-hardcoded reds/ambers/slates moved onto tokens, the blue-grey shadow tint
-became a per-theme `color-mix()` of `--text`, and the real `--text-muted`-on-
-`--elevated` AA failure is fixed at 6 call sites (verified 7.08–8.16:1 across
-all twelve theme-modes). **3a-5 is mostly built**: `--fs-*` tokens adopted
-rule-by-rule (201 sites), `tnum` added to the 5 places numbers jitter, radius
-tokens added and adopted (63 sites) — all mechanical, zero rendered change,
-verified live. The one piece of 3a-5 **not** attempted: folding the `#bt-app`
-override layer back into the original declarations — a cascade change
-touching ~226 rules with real regression risk and no cheap way to verify it,
-deliberately left for its own pass. 3a-6 (stale copy) and all of 3b are still
-open. A real mark is still later work.
+`icon()` line set. Display font changed to **Uncial Antiqua** 2026-09-12 (was
+IM Fell English). **No brand mark** (hedgehog attempts dropped; favicon is a
+placeholder berry).
+
+**Pass 3 is spec'd; 3a is done except one piece, all built 2026-09-12.** Full
+detail is in each 3a-N subsection below — this is the short version:
+
+- **Themes**: Damson/Vellum/Raven CSS token blocks exist, and the Appearance
+  picker gates them behind Supporter with a dimmed swatch + toast for
+  non-Supporters. (Not technically part of Pass 3 — see Themes above — but
+  built the same day and load-bearing for the status-token work below.)
+- **3a-1/2/3**: status colour is now per-theme `--status-*` tokens (all six
+  themes), the pill went neutral-label-plus-dot, `STATUS_COLOR`/`CAT_COLOR`
+  are gone.
+- **3a-4**: the remaining hardcoded reds/ambers/slates are tokenized, the
+  blue-grey shadow tint is a per-theme `color-mix()` of `--text`, and the
+  real `--text-muted`-on-`--elevated` AA failure is fixed at 6 sites.
+- **3a-5**: `--fs-*` and radius tokens adopted rule-by-rule (264 sites),
+  `tnum` added where numbers jitter. **Not attempted**: folding the `#bt-app`
+  override layer (~226 rules) back into the original declarations — a
+  cascade change with real regression risk, deliberately left for its own
+  pass rather than rushed alongside the mechanical stuff.
+- **3a-6**: four stale "Rayhana's Repositorium" copy leftovers gone (auth
+  screen, landing footer, both legal pages), not the original two — a sweep
+  turned up more once the pattern was fixed once.
+
+**3b (the candle, the tally, the hero/compact cards, empty states, texture,
+dividers) is spec'd and entirely open.** A real mark is still later work.
 
 ## Direction
 
@@ -755,16 +760,31 @@ verifiable); the fourth touches the cascade itself and needs its own pass.
   cheap way to verify every one short of screenshotting every theme. Deserves
   its own dedicated, carefully-reviewed pass.
 
-### 3a-6 Two stale-copy bugs
+### 3a-6 Stale-copy bugs — built 2026-09-12, four found not two
 
-Not design, but both are user-visible rebrand leftovers and both are one line.
-See `plan.md` "Audience".
+Not design, but all user-visible rebrand leftovers and each a one-line fix.
+See `plan.md` "Audience". The original two named here; a sweep for
+"Repositorium" while fixing them turned up two more on the legal pages —
+same bug, same fix, worth doing in the same pass.
 
-- The **auth screen** still reads "A&S projects, personal research, and
-  Chatelaine office work" with a "← Rayhana's Repositorium" back link. This is
-  the first screen a new user sees, and it is exactly the SCA vocabulary the
-  audience revision says to drop.
-- The **landing footer** reads "Made for Rayhana's Repositorium."
+- The **auth screen** read "A&S projects, personal research, and Chatelaine
+  office work" with a "← Rayhana's Repositorium" back link — the first screen
+  a new user sees, and exactly the SCA vocabulary the audience revision says
+  to drop. Now: "A place to track sewing, research, event prep, and the rest
+  of what takes a while. Steps, supplies, a timeline, a focus timer, and
+  projects you share with others." Back link now `← brambletally.com`,
+  pointing at the landing page instead of the old product's separate site.
+- The **landing footer** read "Made for Rayhana's Repositorium." Removed
+  outright (and its now-orphaned `.spacer` rule) rather than replaced —
+  there's no equivalent attribution to make, the app isn't run *for*
+  anything else anymore.
+- **`legal/terms.astro`** read "Brambletally is a project tracker for makers,
+  run for Rayhana's Repositorium." → "Brambletally is a project tracker for
+  makers." (found during the sweep, not in the original two)
+- **Both `legal/terms.astro` and `legal/privacy.astro`** had a Contact section
+  reading "go to the Repositorium's usual contact" — no actual address
+  behind it. Now `support@brambletally.com` (mailto link); the user still
+  needs to set that inbox up.
 
 ### 3b-1 The candle
 
