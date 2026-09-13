@@ -1257,15 +1257,24 @@ sanction against it, to exercise the new report/target links below):
   `.bt-checkbox` override (`width:auto`, native `appearance:checkbox`) rather
   than styling the one input inline, since any future checkbox would hit the
   same rule.
-- **Pre-existing bug noticed while testing, not fixed** — `btPrompt`'s Cancel
-  button returns `null`, and every "optional note" call site does
-  `(await btPrompt(...)) || null`, which can't distinguish Cancel from
-  submitting empty text — so Cancel on a report-dismiss, sanction, or
-  Supporter-grant note prompt does **not** abort the action, it just skips
-  the note. Confirmed by accidentally dismissing a report this way. Only
-  `adminRenameInterest`'s prompt is written correctly (`if (next == null)
-  return;`, checked before the `|| null` collapse). Not part of this pass's
-  scope — flagged for a separate fix.
+- **`btPrompt` Cancel-vs-empty bug (found this pass, fixed 2026-09-13
+  same-day follow-up)** — `btPrompt`'s OK path used to collapse an empty
+  input to `null` (`input.value.trim() || null`), the same value Cancel
+  resolves with, so no caller could tell "the user backed out" from "the
+  user submitted nothing." Every "optional note" call site did
+  `(await btPrompt(...)) || null`, which meant Cancel on a report-dismiss,
+  sanction, or Supporter-grant note prompt did **not** abort the action, it
+  just skipped the note — confirmed by accidentally dismissing a report this
+  way. Fixed by changing `btPrompt`'s contract: OK now always resolves the
+  trimmed text (`''` if left blank), only Cancel/Escape/backdrop-click
+  resolve `null`. The four broken call sites (`reportCard`'s "Remove
+  content" and Dismiss, `sanctionFromReport`, `setPlanFromAdmin`) now check
+  `note === null` and return before doing anything. The other `btPrompt`
+  call sites (rename tag/category, new category, edit comment, change email)
+  needed no change — they already used `!value`-style checks where treating
+  an empty submit the same as a cancel was already the correct behavior for
+  that field. Browser-verified: Cancel now leaves the report open / plan
+  unchanged / sanction unapplied; OK with an empty note still proceeds.
 
 ### F. First-project setup tally (the claim trigger)
 

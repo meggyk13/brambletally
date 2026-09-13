@@ -546,6 +546,12 @@ function btConfirm(message, { danger = false, ok = 'Confirm' } = {}) {
   });
 }
 
+// Resolves the trimmed input text on OK/Enter (possibly '' if left blank —
+// callers for whom a blank submit is meaningful, e.g. an optional note,
+// should treat '' as "proceed with no value"), or null on Cancel/Escape/
+// backdrop click — null means "the user backed out," distinct from "the
+// user submitted nothing." A caller that only wants to short-circuit on a
+// real cancel must check `=== null`, not just falsiness.
 function btPrompt(message, value = '') {
   return new Promise((resolve) => {
     const overlay = h(`
@@ -565,10 +571,10 @@ function btPrompt(message, value = '') {
       overlay.remove();
       resolve(v);
     };
-    on(overlay, '[data-ok]', 'click', () => done(input.value.trim() || null));
+    on(overlay, '[data-ok]', 'click', () => done(input.value.trim()));
     on(overlay, '[data-no]', 'click', () => done(null));
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') done(input.value.trim() || null);
+      if (e.key === 'Enter') done(input.value.trim());
       if (e.key === 'Escape') done(null);
     });
     overlay.addEventListener('click', (e) => e.target === overlay && done(null));
@@ -2616,7 +2622,8 @@ function reportCard(rep, reload) {
       rm.addEventListener('click', async () => {
         if (!(await btConfirm('Remove the reported content and mark this report actioned?', { danger: true, ok: 'Remove' })))
           return;
-        const note = (await btPrompt('Resolution note (optional)', '')) || null;
+        const note = await btPrompt('Resolution note (optional)', '');
+        if (note === null) return;
         try {
           if (rep.target_type === 'listing') await API.deleteListing(rep.target_id);
           else await API.deleteListingComment(t.listing_id, rep.target_id);
@@ -2647,7 +2654,8 @@ function reportCard(rep, reload) {
     }
     const dismiss = h('<button class="btn-sm btn-sm-ghost">Dismiss</button>');
     dismiss.addEventListener('click', async () => {
-      const note = (await btPrompt('Why dismiss? (optional)', '')) || null;
+      const note = await btPrompt('Why dismiss? (optional)', '');
+      if (note === null) return;
       try {
         await API.resolveReport(rep.id, { status: 'dismissed', note });
       } catch (ex) {
@@ -2666,7 +2674,8 @@ async function sanctionFromReport(handle, action, reportId, reload) {
   const verb = { board_block: 'Board block', board_unblock: 'Lift board block', disable: 'Disable', enable: 'Enable' }[action];
   if (!(await btConfirm(`${verb} @${handle}?`, { danger: action === 'disable' || action === 'board_block' })))
     return;
-  const note = (await btPrompt('Note (optional)', '')) || null;
+  const note = await btPrompt('Note (optional)', '');
+  if (note === null) return;
   try {
     await API.sanctionUser(handle, { action, note, reportId });
   } catch (ex) {
@@ -2682,7 +2691,8 @@ async function sanctionFromReport(handle, action, reportId, reload) {
 async function setPlanFromAdmin(handle, plan, reload) {
   const verb = plan === 'supporter' ? 'Grant Supporter' : 'Revoke Supporter';
   if (!(await btConfirm(`${verb} for @${handle}?`))) return;
-  const note = (await btPrompt('Note (optional)', '')) || null;
+  const note = await btPrompt('Note (optional)', '');
+  if (note === null) return;
   try {
     await API.setUserPlan(handle, { plan, note });
   } catch (ex) {
