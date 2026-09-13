@@ -1883,3 +1883,94 @@ the above) → A3 → B1 → C1 → B2/B3/C3 (all frontend, one pass) → C2.
   → D1-D3 as time allows. B2-B4 and C1 are independent one-file permission-
   filter fixes with no schema impact and could land first/fastest if a quick
   win is wanted before the account-deletion decision is settled.
+
+## Planned: Shuffle — mainline editing on the card (spec'd 2026-09-13)
+
+**Built and browser-verified against `wrangler dev` 2026-09-13** (not yet
+committed). All three pieces confirmed working: "Edit …" opens the full
+project form on the card and resolves-in-place on save (no navigation away
+from Shuffle); the collapsed "Steps" section lazy-loads and supports
+check-off/rename/add without resolving the card; "→ New project" spins the
+step out into a real standalone project and removes it from the source.
+Along the way, found and fixed an unrelated pre-existing bug blocking *every*
+brand-new sign-up since the 2026-09-12 anonymous-users migration: the new-user
+`INSERT ... ON CONFLICT(email)` in `worker/api/auth/callback.js` didn't
+account for `idx_users_email` becoming a partial index, so SQLite refused the
+upsert with "ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE
+constraint" — a 500 on every first-time magic-link callback. Fixed by adding
+the matching `WHERE email IS NOT NULL` to the conflict target. Confirmed live
+locally (sign-in with a brand-new address now succeeds); **not yet deployed
+to prod** — flagging since this affects every real new-user signup until it
+ships.
+
+Today each Shuffle card (`renderShuffleCard`, `app.js:5885`) only exposes the
+one field its box kind is about — pick a category, pick a deadline, write a
+note. The point of Shuffle is to make working on a random project fun *and*
+productive, so a card shouldn't be a dead end if what you actually want to
+fix is a different field, or the project's steps. Locked in discussion
+2026-09-13:
+
+- **Promote a step to its own project.** `project_next_step_no_note` is the
+  only card kind that carries a `step` — add a "→ New project" action next to
+  its Save button. Confirm, then it becomes a real standalone project (title
+  = step title, description = the step's notes if any) and the step is gone
+  from the source project. Resolves the card like any other action.
+- **"Edit …" opens the full project form on top of the card**, for every
+  project-scoped kind (not `inbox_unsorted`, which has no project). This is
+  the existing `openProjectForm` sheet unchanged — title, category, status,
+  deadline, description, pickup note, archive/delete — just reachable from
+  Shuffle without leaving it. On save, redraws the next card (same "every
+  action redraws" convention as the rest of Shuffle) instead of navigating to
+  the project page.
+- **A collapsed "Steps" section**, default closed, on every project-scoped
+  card. Expanding it lazy-loads the full step list (`stepBlock`/`stepRow`,
+  the same rows the project detail page uses) — check off, rename inline,
+  add, "⋯" for notes/estimate/delete. Its own re-render is local to the
+  section (refetches the project bundle, redraws just this block) — it does
+  **not** resolve the card, so poking at unrelated steps doesn't cost you the
+  box you're mid-editing.
+
+### A. Backend
+
+- `worker/api/lib/shuffle.js`: add `pc.role` to `PROJECT_COLS` and
+  `shapeProject` — the full-editor sheet's archive/delete buttons key off
+  `existing.role === 'owner'`, and today's `shapeProject` doesn't carry it.
+- New `POST /api/shuffle/promote-step` (`worker/api/shuffle/promote-step.js`,
+  registered in `routes.js` next to the other shuffle routes) — body
+  `{ project_id, step_id }`. `requireProject(..., 'editor')`, load the step,
+  reject if it's not top-level or has sub-steps (defensive; the box query
+  already only ever surfaces a leaf). One `db.batch`: insert the new project
+  + its owner collaborator row, delete the source step, `touchStmt` the
+  source project. Returns `{ project }`. No new `shuffle_state` bookkeeping
+  needed — the step is gone, so the candidate query stops matching on its
+  own (same "inert row" pattern the table already relies on).
+
+### B. Frontend (`public/app.js`)
+
+- `API.shufflePromoteStep(projectId, stepId)` — thin wrapper, same shape as
+  the other shuffle client methods.
+- `openProjectForm`: the existing-project save path currently always ends
+  with `close(); openProject(existing.id);`. Add an `opts.onSaved` escape
+  hatch — when passed, call it instead of navigating to the project page;
+  every other call site is unaffected (no caller passes it today).
+- `renderShuffleCard`: for any kind with a `project`, add an "Edit …" button
+  in the card head that calls `openProjectForm(project, { onSaved: onResolved })`,
+  and a `shuffleStepsSection(project, canEdit)` block before the footer — a
+  `.done-toggle`-style disclosure (reusing that class, no new chevron
+  styling needed) that lazy-fetches `API.getProject(project.id)` on first
+  expand and renders with the existing `stepTree`/`stepBlock`/`quickAddRow`
+  helpers, `canEdit = project.role === 'owner' || project.role === 'editor'`.
+  Its `rerender` callback just re-runs the same fetch-and-redraw, scoped to
+  the section.
+- `project_next_step_no_note`'s footer gains the promote button (a
+  `btConfirm` guard, then `API.shufflePromoteStep`, then `onResolved()` like
+  every other resolve action).
+
+### Open before building
+
+- Confirm the "→ New project" copy/confirm wording — leaning toward
+  `Make "<step title>" its own project?` since it names exactly what happens.
+- Whether the promoted project should inherit the source project's
+  `category` — leaning **no** (leave it uncategorized, same as any other
+  freshly created project) since there's no signal the two should be grouped
+  together; easy to flip if it turns out people expect it.

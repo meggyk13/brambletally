@@ -332,6 +332,11 @@ const API = {
   shuffleSkip: (boxKey) => api('/api/shuffle/skip', { method: 'POST', body: { box_key: boxKey } }),
   shuffleDismiss: (boxKey) =>
     api('/api/shuffle/dismiss', { method: 'POST', body: { box_key: boxKey } }),
+  shufflePromoteStep: (projectId, stepId) =>
+    api('/api/shuffle/promote-step', {
+      method: 'POST',
+      body: { project_id: projectId, step_id: stepId },
+    }),
 
   review: () => api('/api/review'),
   search: (q) => api('/api/search?q=' + encodeURIComponent(q)),
@@ -4413,7 +4418,8 @@ async function openProjectForm(existing, opts = {}) {
         };
         await guard(() => API.updateProject(existing.id, body));
         close();
-        openProject(existing.id);
+        if (opts.onSaved) opts.onSaved();
+        else openProject(existing.id);
       } else {
         const body = { title: f.get('title').trim(), category: selectedCategory };
         const { project } = await guard(() => API.createProject(body));
@@ -5882,9 +5888,66 @@ function shuffleFooter(boxKey, onResolved, primaryButtons, { dismiss = true } = 
   return row;
 }
 
+// Collapsed, default-closed full step list on a Shuffle card — the same rows
+// the project detail page uses (stepTree/stepBlock/quickAddRow), so any step
+// can be checked off, renamed, or edited without leaving Shuffle. Lazy-loads
+// the project bundle on first expand. Its own re-render is scoped to this
+// section — it never resolves the card, since poking at unrelated steps
+// shouldn't cost you the box you're mid-editing.
+function shuffleStepsSection(project, canEdit) {
+  const wrap = h('<div class="shuffle-steps"></div>');
+  const toggle = h('<button type="button" class="done-toggle">Steps</button>');
+  const body = h('<div hidden></div>');
+  wrap.appendChild(toggle);
+  wrap.appendChild(body);
+
+  let loaded = false;
+  const load = async () => {
+    body.replaceChildren(h('<div class="empty-section">Loading…</div>'));
+    let bundle;
+    try {
+      bundle = await guard(() => API.getProject(project.id));
+    } catch {
+      body.replaceChildren(h('<div class="empty-section">Couldn’t load steps.</div>'));
+      return;
+    }
+    const tree = stepTree(bundle.steps);
+    const open = tree.top.filter((s) => !s.completed);
+    const done = tree.top.filter((s) => s.completed);
+    body.replaceChildren();
+    if (!bundle.steps.length) {
+      body.appendChild(h(`<div class="empty-section">${canEdit ? 'No steps yet — add the first one.' : 'No steps yet.'}</div>`));
+    }
+    open.forEach((s) => body.appendChild(stepBlock(bundle, s, tree, canEdit, load)));
+    if (canEdit) body.appendChild(quickAddRow(bundle, load));
+    if (done.length) {
+      const doneToggle = h(`<button type="button" class="done-toggle">Completed (${done.length})</button>`);
+      const doneList = h('<div hidden></div>');
+      done.forEach((s) => doneList.appendChild(stepBlock(bundle, s, tree, canEdit, load)));
+      doneToggle.addEventListener('click', () => {
+        doneList.hidden = !doneList.hidden;
+        doneToggle.classList.toggle('open', !doneList.hidden);
+      });
+      body.appendChild(doneToggle);
+      body.appendChild(doneList);
+    }
+  };
+  toggle.addEventListener('click', async () => {
+    body.hidden = !body.hidden;
+    toggle.classList.toggle('open', !body.hidden);
+    if (!body.hidden && !loaded) {
+      loaded = true;
+      await load();
+    }
+  });
+  return wrap;
+}
+
 function renderShuffleCard(card, onResolved) {
   const { box_key: boxKey, kind, project, step, inbox_item: inboxItem } = card;
   const wrap = h('<div class="card shuffle-card"></div>');
+
+  const canEdit = !project || project.role === 'owner' || project.role === 'editor';
 
   const head = h('<div class="shuffle-card-head"></div>');
   if (project) {
@@ -5894,6 +5957,11 @@ function renderShuffleCard(card, onResolved) {
       openProject(project.id);
     });
     head.appendChild(link);
+    if (canEdit) {
+      const editBtn = h('<button type="button" class="btn-sm btn-sm-ghost shuffle-card-edit">Edit…</button>');
+      editBtn.addEventListener('click', () => openProjectForm(project, { onSaved: onResolved }));
+      head.appendChild(editBtn);
+    }
   } else {
     head.appendChild(h('<div class="shuffle-card-project">Captured</div>'));
   }
@@ -6011,7 +6079,18 @@ function renderShuffleCard(card, onResolved) {
       }
       onResolved();
     });
-    footer = shuffleFooter(boxKey, onResolved, [save]);
+    const promote = h('<button type="button" class="btn-sm btn-sm-ghost">→ New project</button>');
+    promote.addEventListener('click', async () => {
+      const ok = await btConfirm(`Make “${step.title}” its own project?`, { ok: 'Make project' });
+      if (!ok) return;
+      try {
+        await guard(() => API.shufflePromoteStep(project.id, step.id));
+      } catch {
+        return;
+      }
+      onResolved();
+    });
+    footer = shuffleFooter(boxKey, onResolved, [save, promote]);
   } else if (kind === 'project_looks_done') {
     body.appendChild(quickAddRow({ project: { id: project.id } }, async () => onResolved()));
     const markDone = h('<button type="button" class="btn-sm btn-sm-sage">Mark Done</button>');
@@ -6026,6 +6105,7 @@ function renderShuffleCard(card, onResolved) {
     footer = shuffleFooter(boxKey, onResolved, [markDone]);
   }
 
+  if (project) wrap.appendChild(shuffleStepsSection(project, canEdit));
   wrap.appendChild(footer);
   return wrap;
 }

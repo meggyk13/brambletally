@@ -35,6 +35,7 @@ const shapeProject = (row) => ({
   deadline: row.deadline,
   description: row.description,
   status: row.status,
+  role: row.role,
 });
 
 async function all(db, sql, ...binds) {
@@ -65,7 +66,8 @@ export async function fetchCandidates(db, userId) {
     });
   }
 
-  const PROJECT_COLS = 'p.id AS project_id, p.title, p.category, p.deadline, p.description, p.status';
+  const PROJECT_COLS =
+    'p.id AS project_id, p.title, p.category, p.deadline, p.description, p.status, pc.role';
 
   const noCategory = await all(
     db,

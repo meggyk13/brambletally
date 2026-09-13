@@ -1606,18 +1606,23 @@ textarea{resize:vertical;min-height:60px}
 
 /* ── Shuffle ──────────────────────────────────────────────────────────────── */
 #bt-app .shuffle-card { margin-top: 16px; }
-#bt-app .shuffle-card-head { margin-bottom: 6px; }
+#bt-app .shuffle-card-head {
+  margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
 #bt-app .shuffle-card-project {
   font-size: var(--fs-sm); font-weight: 700; color: var(--text-muted);
   text-decoration: none; text-transform: uppercase; letter-spacing: .06em;
 }
 #bt-app a.shuffle-card-project:hover { color: var(--accent-2); }
+#bt-app .shuffle-card-edit { flex-shrink: 0; }
 #bt-app .shuffle-card-prompt { font-size: var(--fs-md); font-weight: 600; margin-bottom: 12px; }
 #bt-app .shuffle-card-body { margin-bottom: 14px; }
 #bt-app .shuffle-card-body .sp-select,
 #bt-app .shuffle-card-body .sp-input,
 #bt-app .shuffle-card-body textarea { width: 100%; }
 #bt-app .shuffle-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#bt-app .shuffle-steps { margin-bottom: 14px; }
+#bt-app .shuffle-steps .step-block { margin-top: 8px; }
 
 /* ── People / sharing ────────────────────────────────────────────────────── */
 #bt-app .meta-people {

@@ -39,6 +39,7 @@ import * as inboxItem from './api/inbox/itemId.js';
 import * as shuffleNext from './api/shuffle/next.js';
 import * as shuffleSkip from './api/shuffle/skip.js';
 import * as shuffleDismiss from './api/shuffle/dismiss.js';
+import * as shufflePromoteStep from './api/shuffle/promote-step.js';
 import * as usersSearch from './api/users/search.js';
 import * as profile from './api/profile/index.js';
 import * as profileHandle from './api/profile/handle.js';
@@ -118,6 +119,7 @@ export const routes = [
   ['/api/shuffle/next', shuffleNext],
   ['/api/shuffle/skip', shuffleSkip],
   ['/api/shuffle/dismiss', shuffleDismiss],
+  ['/api/shuffle/promote-step', shufflePromoteStep],
   ['/api/users/search', usersSearch],
   ['/api/profile', profile],
   // literal 4-segment paths must precede '/api/profile/:handle' — first match wins
