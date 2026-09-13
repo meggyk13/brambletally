@@ -2090,3 +2090,21 @@ fix is a different field, or the project's steps. Locked in discussion
   `category` — leaning **no** (leave it uncategorized, same as any other
   freshly created project) since there's no signal the two should be grouped
   together; easy to flip if it turns out people expect it.
+
+### C. Landing page — Shuffle gets its own section (built 2026-09-13)
+
+Shuffle is the highest-value feature and was getting lost as one of four
+tiles under "How it works." `src/pages/index.astro`:
+
+- New `#shuffle` section, its own spotlight panel (`.shuffle-spotlight` /
+  `.shuffle-grid`, mirrors the `#who` two-column pattern) between `#who` and
+  `#how`. Copy + a `.cta` linking to `/app`, live demo alongside it.
+  `#how`'s `.features` grid drops the Shuffle tile (Steps/Focus/Review only,
+  regridded to 3 columns).
+- **Conversion routing:** the demo's "Edit…" and its primary action
+  (Save / Add step / → Project) now navigate to `/app` instead of just
+  cycling the canned card — the moment someone tries to act on a card for
+  real is the moment they need an account. Skip and the step checkboxes stay
+  local (still just "show me another example").
+- Demo card itself de-centered to match the real card's left-aligned layout
+  now that it sits in a grid column instead of standing alone.
