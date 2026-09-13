@@ -1178,7 +1178,10 @@ waiting for that person to sign themselves up.
   `worker/api/lib/userDelete.js` so the no-cascade `users(id)` reassignment
   (deleted-user placeholder, migration 0018) isn't duplicated a third time.
 
-### F. Overview dashboard, cross-admin audit log, listings search (2026-09-13)
+### Admin panel: overview, audit log, listings search, users list (2026-09-13)
+
+(Not part of the guided-onboarding A–F sequence above — a separate round of
+admin-panel work done the same day.)
 
 Three more additions to the admin panel, browser-verified against
 `wrangler dev` with seeded local D1 data (a Supporter grant to check the
@@ -1218,6 +1221,51 @@ Listings filter/search).
   same as every other handle-keyed admin surface. Frontend: filter chips +
   search + Load-more list, click a row to open the existing detail card with
   a "Back to list" button that restores the filtered/searched view.
+
+**Second follow-up (2026-09-13), a full per-tab review** — went back through
+every tab asking "what's missing," browser-verified each fix against
+`wrangler dev` with seeded local D1 data (a fresh report, a board-block
+sanction against it, to exercise the new report/target links below):
+
+- **Reports pagination** — had the same quietly-missing-Load-more gap as
+  Listings did before its fix, just never caught: `GET /api/admin/reports`
+  already returned `next_cursor`, nothing in the frontend used it. Fixed the
+  same way — cursor tracking + Load-more button.
+- **Anonymous list pagination + search** — this list had no `LIMIT` at all,
+  the one admin list that grows without any moderation action behind it
+  (anyone can drop off without signing up). `GET /api/admin/anonymous` now
+  takes `cursor` (50/page) and `q` (matches a project title via `EXISTS`).
+- **Tags pagination + "Unused only"** — `GET /api/admin/interests` had a hard
+  `LIMIT 200` with no way past it and no signal you'd hit it; now paginated
+  (100/page) and takes `unused=1` to narrow to `usage_count = 0`, the natural
+  view for cleanup work.
+- **Audit: action-group filter + report/target links** — `GET /api/admin/audit`
+  gained `group` (board/account/content/supporter, bucketing the 7 exact
+  `action` values into something a chip row can hold). The target user's name
+  is now a link into their Users-tab detail card (sets
+  `state.adminUsersOpenHandle`, which `adminUsersSection` checks on mount and
+  opens directly instead of the list); an entry with a `report_id` shows
+  "from a report", linking to Reports/All (a jump to the tab, not a scroll to
+  the specific card — there's no single-report view to scroll to yet).
+- **Overview: clickable tiles** — every stat tile now sets the matching
+  tab/filter state and switches `state.adminTab`, so "Open reports" lands on
+  Reports filtered to Open, "Board-blocked" lands on Users filtered to
+  Board-blocked, etc., instead of being a dead end.
+- **Bug found via a global `input,textarea,select{width:100%}` rule
+  (`app.css`)**: the new Tags "Unused only" `<input type="checkbox">` inherited
+  it and rendered as a full-width bar instead of a checkbox. Fixed with a
+  `.bt-checkbox` override (`width:auto`, native `appearance:checkbox`) rather
+  than styling the one input inline, since any future checkbox would hit the
+  same rule.
+- **Pre-existing bug noticed while testing, not fixed** — `btPrompt`'s Cancel
+  button returns `null`, and every "optional note" call site does
+  `(await btPrompt(...)) || null`, which can't distinguish Cancel from
+  submitting empty text — so Cancel on a report-dismiss, sanction, or
+  Supporter-grant note prompt does **not** abort the action, it just skips
+  the note. Confirmed by accidentally dismissing a report this way. Only
+  `adminRenameInterest`'s prompt is written correctly (`if (next == null)
+  return;`, checked before the `|| null` collapse). Not part of this pass's
+  scope — flagged for a separate fix.
 
 ### F. First-project setup tally (the claim trigger)
 

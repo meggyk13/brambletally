@@ -3,18 +3,30 @@ import { requireAdmin } from '../lib/admin.js';
 
 const PAGE = 50;
 
-// GET /api/admin/audit?cursor= — every moderation_actions row, any admin,
-// any target, newest first. The Users tab's history is the same table
+// Buckets over moderation_actions.action's 7 CHECK values (schema.sql) — a
+// chip per exact value would be cluttered; these group into what an admin
+// actually wants to isolate.
+const GROUPS = {
+  board: ['board_block', 'board_unblock'],
+  account: ['disable', 'enable'],
+  content: ['content_removed'],
+  supporter: ['grant_supporter', 'revoke_supporter'],
+};
+
+// GET /api/admin/audit?cursor=&group= — every moderation_actions row, any
+// admin, any target, newest first. The Users tab's history is the same table
 // scoped to one target_user_id; this is the unscoped feed for "what has any
 // admin done recently."
 export async function onRequestGet(context) {
   const g = requireAdmin(context);
   if (g.fail) return g.fail;
 
-  const offset = Math.max(
-    0,
-    parseInt(new URL(context.request.url).searchParams.get('cursor') || '0', 10) || 0
-  );
+  const params = new URL(context.request.url).searchParams;
+  const offset = Math.max(0, parseInt(params.get('cursor') || '0', 10) || 0);
+  const actions = GROUPS[params.get('group')];
+
+  const where = actions ? `WHERE m.action IN (${actions.map(() => '?').join(',')})` : '';
+  const binds = actions ? [...actions, PAGE + 1, offset] : [PAGE + 1, offset];
 
   const { results } = await context.env.DB.prepare(
     `SELECT m.id, m.action, m.note, m.created_at, m.report_id,
@@ -23,10 +35,11 @@ export async function onRequestGet(context) {
        FROM moderation_actions m
        LEFT JOIN users a ON a.id = m.admin_id
        LEFT JOIN users t ON t.id = m.target_user_id
+       ${where}
       ORDER BY m.created_at DESC
       LIMIT ? OFFSET ?`
   )
-    .bind(PAGE + 1, offset)
+    .bind(...binds)
     .all();
 
   const hasMore = results.length > PAGE;

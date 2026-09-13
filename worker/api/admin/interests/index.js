@@ -1,29 +1,42 @@
-import { json, error } from '../../lib/http.js';
+import { json } from '../../lib/http.js';
 import { requireAdmin } from '../../lib/admin.js';
 
-// GET /api/admin/interests?q=  — every tag, most-used first, optional filter.
+const PAGE = 100;
+
+// GET /api/admin/interests?cursor=&q=&unused=1 — every tag, most-used first.
+// `q` filters on slug/label; `unused=1` narrows to usage_count = 0 (the
+// natural view for cleanup work). Paginated — previously a hard LIMIT 200
+// with no way past it and no signal you'd hit it.
 export async function onRequestGet(context) {
   const g = requireAdmin(context);
   if (g.fail) return g.fail;
 
-  const q = (new URL(context.request.url).searchParams.get('q') || '').trim().toLowerCase();
+  const params = new URL(context.request.url).searchParams;
+  const offset = Math.max(0, parseInt(params.get('cursor') || '0', 10) || 0);
+  const q = (params.get('q') || '').trim().toLowerCase();
+  const unusedOnly = params.get('unused') === '1';
 
-  let rows;
+  const conds = [];
+  const binds = [];
   if (q) {
+    conds.push('(slug LIKE ? OR lower(label) LIKE ?)');
     const like = `%${q}%`;
-    rows = await context.env.DB.prepare(
-      `SELECT id, slug, label, usage_count, created_at FROM interest_tags
-        WHERE slug LIKE ? OR lower(label) LIKE ?
-        ORDER BY usage_count DESC, label COLLATE NOCASE LIMIT 200`
-    )
-      .bind(like, like)
-      .all();
-  } else {
-    rows = await context.env.DB.prepare(
-      `SELECT id, slug, label, usage_count, created_at FROM interest_tags
-        ORDER BY usage_count DESC, label COLLATE NOCASE LIMIT 200`
-    ).all();
+    binds.push(like, like);
   }
+  if (unusedOnly) conds.push('usage_count = 0');
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
-  return json({ tags: rows.results || [] });
+  const { results } = await context.env.DB.prepare(
+    `SELECT id, slug, label, usage_count, created_at FROM interest_tags
+      ${where}
+      ORDER BY usage_count DESC, label COLLATE NOCASE
+      LIMIT ? OFFSET ?`
+  )
+    .bind(...binds, PAGE + 1, offset)
+    .all();
+
+  const hasMore = results.length > PAGE;
+  const tags = results.slice(0, PAGE);
+
+  return json({ tags, next_cursor: hasMore ? String(offset + PAGE) : null });
 }

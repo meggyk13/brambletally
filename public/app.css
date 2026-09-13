@@ -2303,6 +2303,11 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .bt-au-tag.is-danger { color: var(--danger); border-color: var(--danger); }
 #bt-app .bt-au-row-clickable { cursor: pointer; }
 #bt-app .bt-au-row-clickable:hover { background: var(--elevated); }
+#bt-app .bt-au-inline-link { color: var(--accent-2); cursor: pointer; }
+#bt-app .bt-au-inline-link:hover { text-decoration: underline; }
+#bt-app .bt-checkbox { width: auto; -webkit-appearance: checkbox; appearance: checkbox; margin: 0; padding: 0; flex-shrink: 0; }
+#bt-app .bt-adm-stat.bt-adm-stat-link { cursor: pointer; }
+#bt-app .bt-adm-stat.bt-adm-stat-link:hover { border-color: var(--border-strong); background: var(--elevated); }
 
 /* ── Following (Social Phase 2) ──────────────────────────────────────────── */
 #bt-app .bt-prof-actions { display: flex; gap: 8px; margin: 12px 20px 4px; flex-wrap: wrap; }

@@ -685,18 +685,18 @@ GET    /api/settings/export            JSON dump of the caller's data
 DELETE /api/account                    delete account (guarded — see below)
 
 # admin panel — every route gated by a requireAdmin(context) helper
-GET    /api/admin/reports              queue; ?status=open (default) | actioned | dismissed | all
+GET    /api/admin/reports              ?status=open (default)|actioned|dismissed|all, &cursor= (paginated 2026-09-13)
 PATCH  /api/admin/reports/:reportId    { status: 'actioned'|'dismissed', note? }
-GET    /api/admin/interests            all tags, usage_count desc, ?q= filter
+GET    /api/admin/interests            ?cursor=&q=&unused=1 -> paginated, usage_count desc (2026-09-13)
 POST   /api/admin/interests/merge      { fromSlug, toSlug } -> repoint + recount + drop loser
 PATCH  /api/admin/interests/:slug      { label?, slug? } rename
 DELETE /api/admin/interests/:slug      remove a junk/unused tag
 GET    /api/admin/listings             every listing, newest first; ?status=&q= filter/search (2026-09-13)
-GET    /api/admin/anonymous            unclaimed (email IS NULL) accounts, newest first
+GET    /api/admin/anonymous            ?cursor=&q= unclaimed (email IS NULL) accounts (2026-09-13)
 DELETE /api/admin/anonymous/:id        purge one unclaimed account (2026-09-13)
 POST   /api/admin/anonymous/purge      { olderThanDays } -> bulk purge, up to 200/call (2026-09-13)
 GET    /api/admin/stats                overview counts for the Overview tab (2026-09-13)
-GET    /api/admin/audit                ?cursor= -> every moderation_actions row, any admin/target (2026-09-13)
+GET    /api/admin/audit                ?cursor=&group=board|account|content|supporter (2026-09-13)
 GET    /api/admin/users                ?cursor=&filter=&q= -> browsable/filterable user list (2026-09-13)
 GET    /api/admin/users/:handle        user detail + moderation history
 POST   /api/admin/users/:handle/sanction   { action: 'board_block'|'board_unblock'|'disable'|'enable', note?, reportId? }

@@ -294,7 +294,17 @@ const API = {
   listBlocks: () => api('/api/blocks'),
   block: (handle) => api('/api/blocks', { method: 'POST', body: { handle } }),
   unblock: (handle) => api('/api/blocks/' + encodeURIComponent(handle), { method: 'DELETE' }),
-  adminInterests: (q) => api('/api/admin/interests' + (q ? '?q=' + encodeURIComponent(q) : '')),
+  adminInterests: (cursor, q, unusedOnly) =>
+    api(
+      '/api/admin/interests?' +
+        [
+          cursor ? 'cursor=' + encodeURIComponent(cursor) : '',
+          q ? 'q=' + encodeURIComponent(q) : '',
+          unusedOnly ? 'unused=1' : '',
+        ]
+          .filter(Boolean)
+          .join('&')
+    ),
   adminRenameInterest: (slug, body) =>
     api('/api/admin/interests/' + encodeURIComponent(slug), { method: 'PATCH', body }),
   adminDeleteInterest: (slug) =>
@@ -322,9 +332,26 @@ const API = {
           .join('&')
     ),
   adminStats: () => api('/api/admin/stats'),
-  adminAudit: (cursor) =>
-    api('/api/admin/audit' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
-  adminAnonymous: () => api('/api/admin/anonymous'),
+  adminAudit: (cursor, group) =>
+    api(
+      '/api/admin/audit?' +
+        [
+          cursor ? 'cursor=' + encodeURIComponent(cursor) : '',
+          group ? 'group=' + encodeURIComponent(group) : '',
+        ]
+          .filter(Boolean)
+          .join('&')
+    ),
+  adminAnonymous: (cursor, q) =>
+    api(
+      '/api/admin/anonymous?' +
+        [
+          cursor ? 'cursor=' + encodeURIComponent(cursor) : '',
+          q ? 'q=' + encodeURIComponent(q) : '',
+        ]
+          .filter(Boolean)
+          .join('&')
+    ),
   adminDeleteAnonymous: (id) => api('/api/admin/anonymous/' + encodeURIComponent(id), { method: 'DELETE' }),
   adminPurgeAnonymous: (olderThanDays) =>
     api('/api/admin/anonymous/purge', { method: 'POST', body: { olderThanDays } }),
@@ -2304,35 +2331,60 @@ async function adminOverviewSection(host) {
     return;
   }
   const s = r.stats;
-  const tile = (n, label) => `
-    <div class="bt-adm-stat">
-      <div class="bt-adm-stat-n">${n}</div>
-      <div class="bt-adm-stat-l">${esc(label)}</div>
-    </div>`;
-  host.replaceChildren(
-    h(`
+  // Each tile is a shortcut into the tab/filter that explains its number.
+  const TILES = [
+    [s.reports_open, 'Open reports', 'reports', { repFilter: 'open' }],
+    [s.signups_7d, 'Signups, 7d', 'users', { adminUserFilter: '', adminUserQ: '' }],
+    [s.mod_actions_7d, 'Mod actions, 7d', 'audit', { adminAuditGroup: '' }],
+    [s.users_total, 'Total users', 'users', { adminUserFilter: '', adminUserQ: '' }],
+    [s.users_anonymous, 'Unclaimed accounts', 'anonymous', { adminAnonQ: '' }],
+    [s.users_supporter, 'Supporters', 'users', { adminUserFilter: 'supporter', adminUserQ: '' }],
+    [s.listings_open, 'Listings open', 'listings', { adminListingStatus: 'open', adminListingQ: '' }],
+    [
+      s.listings_closed,
+      'Listings closed',
+      'listings',
+      { adminListingStatus: 'closed', adminListingQ: '' },
+    ],
+    [
+      s.listings_archived,
+      'Listings archived',
+      'listings',
+      { adminListingStatus: 'archived', adminListingQ: '' },
+    ],
+    [
+      s.users_board_blocked,
+      'Board-blocked',
+      'users',
+      { adminUserFilter: 'board_blocked', adminUserQ: '' },
+    ],
+    [s.users_disabled, 'Disabled accounts', 'users', { adminUserFilter: 'disabled', adminUserQ: '' }],
+    [s.users_admin, 'Admins', 'users', { adminUserFilter: 'admin', adminUserQ: '' }],
+  ];
+  const el = h(`
     <div>
       <div class="bt-adm-stats">
-        ${tile(s.reports_open, 'Open reports')}
-        ${tile(s.signups_7d, 'Signups, 7d')}
-        ${tile(s.mod_actions_7d, 'Mod actions, 7d')}
-        ${tile(s.users_total, 'Total users')}
-        ${tile(s.users_anonymous, 'Unclaimed accounts')}
-        ${tile(s.users_supporter, 'Supporters')}
-        ${tile(s.listings_open, 'Listings open')}
-        ${tile(s.listings_closed, 'Listings closed')}
-        ${tile(s.listings_archived, 'Listings archived')}
-        ${tile(s.users_board_blocked, 'Board-blocked')}
-        ${tile(s.users_disabled, 'Disabled accounts')}
-        ${tile(s.users_admin, 'Admins')}
+        ${TILES.map(
+          ([n, label], i) => `
+          <div class="bt-adm-stat bt-adm-stat-link" data-tile="${i}">
+            <div class="bt-adm-stat-n">${n}</div>
+            <div class="bt-adm-stat-l">${esc(label)}</div>
+          </div>`
+        ).join('')}
       </div>
     </div>
-  `)
-  );
+  `);
+  on(el, '[data-tile]', 'click', (e) => {
+    const [, , tab, patch] = TILES[Number(e.currentTarget.dataset.tile)];
+    Object.assign(state, patch);
+    state.adminTab = tab;
+    render();
+  });
+  host.replaceChildren(el);
 }
 
 // ── Admin: anonymous (unclaimed) accounts ───────────────────────────────
-async function adminAnonymousSection(host) {
+function adminAnonymousSection(host) {
   host.replaceChildren(
     h(`
     <div>
@@ -2344,22 +2396,41 @@ async function adminAnonymousSection(host) {
         <input class="sp-input" id="bt-an-days" type="number" min="1" value="30" style="width:70px" />
         <button class="btn-sm btn-sm-ghost" id="bt-an-purge">Purge older than N days</button>
       </div>
+      <div class="sp-field">
+        <input class="sp-input" id="bt-an-q" autocomplete="off" placeholder="Search project title…" value="${esc(
+          state.adminAnonQ || ''
+        )}" />
+      </div>
       <div id="bt-an-list"><div class="empty">Loading…</div></div>
     </div>
   `)
   );
   const listEl = host.querySelector('#bt-an-list');
-  const load = async () => {
+  const qInput = host.querySelector('#bt-an-q');
+  let cursor = null;
+  let first = true;
+
+  const load = async (moreBtn) => {
+    if (moreBtn) moreBtn.disabled = true;
+    if (!moreBtn) {
+      cursor = null;
+      first = true;
+      listEl.replaceChildren(h('<div class="empty">Loading…</div>'));
+    }
     let r;
     try {
-      r = await guard(() => API.adminAnonymous());
+      r = await guard(() => API.adminAnonymous(cursor, state.adminAnonQ));
     } catch {
+      if (moreBtn) moreBtn.disabled = false;
       return;
     }
-    listEl.replaceChildren();
-    if (!r.users.length) {
-      listEl.appendChild(h('<div class="empty">No unclaimed accounts.</div>'));
-      return;
+    if (first) {
+      listEl.replaceChildren();
+      first = false;
+    }
+    if (moreBtn) moreBtn.remove();
+    if (!r.users.length && !listEl.children.length) {
+      listEl.appendChild(h('<div class="empty">No unclaimed accounts match.</div>'));
     }
     r.users.forEach((u) => {
       const row = h(`
@@ -2391,6 +2462,12 @@ async function adminAnonymousSection(host) {
       });
       listEl.appendChild(row);
     });
+    cursor = r.next_cursor;
+    if (cursor) {
+      const b = h('<button class="btn-sm btn-sm-ghost bt-loadmore">Load more</button>');
+      b.addEventListener('click', () => load(b));
+      listEl.appendChild(b);
+    }
   };
 
   host.querySelector('#bt-an-purge').addEventListener('click', async () => {
@@ -2419,6 +2496,12 @@ async function adminAnonymousSection(host) {
     );
     load();
   });
+  let timer;
+  qInput.addEventListener('input', () => {
+    state.adminAnonQ = qInput.value.trim();
+    clearTimeout(timer);
+    timer = setTimeout(() => load(), 250);
+  });
 
   load();
 }
@@ -2443,19 +2526,38 @@ async function adminReportsSection(host) {
   `)
   );
   const listEl = host.querySelector('#bt-rep-list');
-  const load = async () => {
+  let cursor = null;
+  let first = true;
+
+  const load = async (moreBtn) => {
+    if (moreBtn) moreBtn.disabled = true;
+    if (!moreBtn) {
+      cursor = null;
+      first = true;
+      listEl.replaceChildren(h('<div class="empty">Loading…</div>'));
+    }
     let r;
     try {
-      r = await guard(() => API.adminReports(state.repFilter || 'open'));
+      r = await guard(() => API.adminReports(state.repFilter || 'open', cursor));
     } catch {
+      if (moreBtn) moreBtn.disabled = false;
       return;
     }
-    listEl.replaceChildren();
-    if (!r.reports.length) {
+    if (first) {
+      listEl.replaceChildren();
+      first = false;
+    }
+    if (moreBtn) moreBtn.remove();
+    if (!r.reports.length && !listEl.children.length) {
       listEl.appendChild(h('<div class="empty">Nothing here.</div>'));
-      return;
     }
-    r.reports.forEach((rep) => listEl.appendChild(reportCard(rep, load)));
+    r.reports.forEach((rep) => listEl.appendChild(reportCard(rep, () => load())));
+    cursor = r.next_cursor;
+    if (cursor) {
+      const b = h('<button class="btn-sm btn-sm-ghost bt-loadmore">Load more</button>');
+      b.addEventListener('click', () => load(b));
+      listEl.appendChild(b);
+    }
   };
   on(host, '#bt-rep-filter [data-rf]', 'click', (e) => {
     state.repFilter = e.currentTarget.dataset.rf;
@@ -2715,7 +2817,13 @@ function adminUsersSection(host) {
     timer = setTimeout(() => loadList(), 250);
   });
 
-  loadList();
+  if (state.adminUsersOpenHandle) {
+    const handle = state.adminUsersOpenHandle;
+    state.adminUsersOpenHandle = null;
+    showDetail(handle);
+  } else {
+    loadList();
+  }
 }
 
 function adminUserCard(d, reload) {
@@ -2903,8 +3011,15 @@ function adminTagsSection(app) {
     h(`
     <div>
       <div class="sp-field">
-        <input class="sp-input" id="bt-adm-q" autocomplete="off" placeholder="Filter tags…" />
+        <input class="sp-input" id="bt-adm-q" autocomplete="off" placeholder="Filter tags…" value="${esc(
+          state.adminTagQ || ''
+        )}" />
       </div>
+      <label class="sp-row-sub" style="display:flex;align-items:center;gap:6px;padding:0 20px 10px;cursor:pointer">
+        <input type="checkbox" class="bt-checkbox" id="bt-adm-unused"${
+          state.adminTagUnused ? ' checked' : ''
+        } /> Unused only
+      </label>
       <div class="sp-row-sub" id="bt-adm-merge-state" style="padding:0 20px" hidden></div>
       <div id="bt-adm-list"><div class="empty">Loading…</div></div>
     </div>
@@ -2914,8 +3029,11 @@ function adminTagsSection(app) {
 
   const listEl = el.querySelector('#bt-adm-list');
   const qInput = el.querySelector('#bt-adm-q');
+  const unusedInput = el.querySelector('#bt-adm-unused');
   const mergeState = el.querySelector('#bt-adm-merge-state');
   let mergeFrom = null; // { slug, label } armed for merge
+  let cursor = null;
+  let first = true;
 
   const setMerge = (tag) => {
     mergeFrom = tag;
@@ -2930,100 +3048,123 @@ function adminTagsSection(app) {
     });
   };
 
-  const load = async () => {
+  const tagRow = (t) => {
+    const row = h(`
+      <div class="sp-row bt-adm-row" data-slug="${esc(t.slug)}">
+        <div class="sp-row-left">
+          <div>${esc(t.label)}<div class="sp-row-sub">@${esc(t.slug)} · ${t.usage_count} ${
+            t.usage_count === 1 ? 'profile' : 'profiles'
+          }</div></div>
+        </div>
+        <div class="bt-adm-actions">
+          <button class="btn-sm btn-sm-ghost" data-rename>Rename</button>
+          <button class="btn-sm btn-sm-ghost" data-merge>Merge</button>
+          <button class="btn-sm btn-danger" data-del>Delete</button>
+        </div>
+      </div>
+    `);
+    row.querySelector('[data-rename]').addEventListener('click', async () => {
+      const next = await btPrompt('New label', t.label);
+      if (next == null) return;
+      const label = next.trim();
+      if (!label || label === t.label) return;
+      try {
+        await API.adminRenameInterest(t.slug, { label });
+      } catch (ex) {
+        toast(ex.message || 'Rename failed');
+        return;
+      }
+      toast('Renamed');
+      load();
+    });
+    row.querySelector('[data-del]').addEventListener('click', async () => {
+      const ok = await btConfirm(
+        `Delete “${t.label}”? It’s removed from ${t.usage_count} ${
+          t.usage_count === 1 ? 'profile' : 'profiles'
+        }.`,
+        { danger: true, ok: 'Delete' }
+      );
+      if (!ok) return;
+      try {
+        await API.adminDeleteInterest(t.slug);
+      } catch (ex) {
+        toast(ex.message || 'Delete failed');
+        return;
+      }
+      if (mergeFrom && mergeFrom.slug === t.slug) setMerge(null);
+      toast('Deleted');
+      load();
+    });
+    row.querySelector('[data-merge]').addEventListener('click', async () => {
+      if (!mergeFrom) {
+        setMerge({ slug: t.slug, label: t.label });
+        return;
+      }
+      if (mergeFrom.slug === t.slug) {
+        setMerge(null);
+        return;
+      }
+      const from = mergeFrom;
+      const ok = await btConfirm(
+        `Merge “${from.label}” into “${t.label}”? “${from.label}” is removed and everyone tagged with it becomes tagged “${t.label}”.`,
+        { danger: true, ok: 'Merge' }
+      );
+      if (!ok) return;
+      try {
+        await API.adminMergeInterests(from.slug, t.slug);
+      } catch (ex) {
+        toast(ex.message || 'Merge failed');
+        return;
+      }
+      setMerge(null);
+      toast('Merged');
+      load();
+    });
+    return row;
+  };
+
+  const load = async (moreBtn) => {
+    if (moreBtn) moreBtn.disabled = true;
+    if (!moreBtn) {
+      cursor = null;
+      first = true;
+      listEl.replaceChildren(h('<div class="empty">Loading…</div>'));
+    }
     let r;
     try {
-      r = await guard(() => API.adminInterests(qInput.value.trim()));
+      r = await guard(() => API.adminInterests(cursor, qInput.value.trim(), unusedInput.checked));
     } catch {
+      if (moreBtn) moreBtn.disabled = false;
       return;
     }
     const tags = r.tags || [];
-    listEl.replaceChildren();
-    if (!tags.length) {
-      listEl.appendChild(h('<div class="empty">No tags.</div>'));
-      return;
+    if (first) {
+      listEl.replaceChildren();
+      first = false;
     }
-    tags.forEach((t) => {
-      const row = h(`
-        <div class="sp-row bt-adm-row" data-slug="${esc(t.slug)}">
-          <div class="sp-row-left">
-            <div>${esc(t.label)}<div class="sp-row-sub">@${esc(t.slug)} · ${t.usage_count} ${
-              t.usage_count === 1 ? 'profile' : 'profiles'
-            }</div></div>
-          </div>
-          <div class="bt-adm-actions">
-            <button class="btn-sm btn-sm-ghost" data-rename>Rename</button>
-            <button class="btn-sm btn-sm-ghost" data-merge>Merge</button>
-            <button class="btn-sm btn-danger" data-del>Delete</button>
-          </div>
-        </div>
-      `);
-      row.querySelector('[data-rename]').addEventListener('click', async () => {
-        const next = await btPrompt('New label', t.label);
-        if (next == null) return;
-        const label = next.trim();
-        if (!label || label === t.label) return;
-        try {
-          await API.adminRenameInterest(t.slug, { label });
-        } catch (ex) {
-          toast(ex.message || 'Rename failed');
-          return;
-        }
-        toast('Renamed');
-        load();
-      });
-      row.querySelector('[data-del]').addEventListener('click', async () => {
-        const ok = await btConfirm(
-          `Delete “${t.label}”? It’s removed from ${t.usage_count} ${
-            t.usage_count === 1 ? 'profile' : 'profiles'
-          }.`,
-          { danger: true, ok: 'Delete' }
-        );
-        if (!ok) return;
-        try {
-          await API.adminDeleteInterest(t.slug);
-        } catch (ex) {
-          toast(ex.message || 'Delete failed');
-          return;
-        }
-        if (mergeFrom && mergeFrom.slug === t.slug) setMerge(null);
-        toast('Deleted');
-        load();
-      });
-      row.querySelector('[data-merge]').addEventListener('click', async () => {
-        if (!mergeFrom) {
-          setMerge({ slug: t.slug, label: t.label });
-          return;
-        }
-        if (mergeFrom.slug === t.slug) {
-          setMerge(null);
-          return;
-        }
-        const from = mergeFrom;
-        const ok = await btConfirm(
-          `Merge “${from.label}” into “${t.label}”? “${from.label}” is removed and everyone tagged with it becomes tagged “${t.label}”.`,
-          { danger: true, ok: 'Merge' }
-        );
-        if (!ok) return;
-        try {
-          await API.adminMergeInterests(from.slug, t.slug);
-        } catch (ex) {
-          toast(ex.message || 'Merge failed');
-          return;
-        }
-        setMerge(null);
-        toast('Merged');
-        load();
-      });
-      listEl.appendChild(row);
-    });
+    if (moreBtn) moreBtn.remove();
+    if (!tags.length && !listEl.children.length) {
+      listEl.appendChild(h('<div class="empty">No tags.</div>'));
+    }
+    tags.forEach((t) => listEl.appendChild(tagRow(t)));
     if (mergeFrom) setMerge(mergeFrom);
+    cursor = r.next_cursor;
+    if (cursor) {
+      const b = h('<button class="btn-sm btn-sm-ghost bt-loadmore">Load more</button>');
+      b.addEventListener('click', () => load(b));
+      listEl.appendChild(b);
+    }
   };
 
   let timer;
   qInput.addEventListener('input', () => {
+    state.adminTagQ = qInput.value.trim();
     clearTimeout(timer);
-    timer = setTimeout(load, 200);
+    timer = setTimeout(() => load(), 200);
+  });
+  unusedInput.addEventListener('change', () => {
+    state.adminTagUnused = unusedInput.checked;
+    load();
   });
   load();
 }
@@ -3039,17 +3180,56 @@ const AUDIT_VERBS = {
   revoke_supporter: 'revoked Supporter from',
 };
 
+const AUDIT_GROUPS = [
+  ['', 'All'],
+  ['board', 'Board'],
+  ['account', 'Account'],
+  ['content', 'Content'],
+  ['supporter', 'Supporter'],
+];
+
 function adminAuditSection(host) {
-  host.replaceChildren(h('<div id="bt-audit-list"><div class="empty">Loading…</div></div>'));
+  host.replaceChildren(
+    h(`
+    <div>
+      <div class="bt-seg" id="bt-aud-group" style="margin-bottom:12px">
+        ${AUDIT_GROUPS.map(
+          ([v, l]) =>
+            `<button type="button" data-audg="${v}" class="bt-seg-btn${
+              (state.adminAuditGroup || '') === v ? ' is-sel' : ''
+            }">${l}</button>`
+        ).join('')}
+      </div>
+      <div id="bt-audit-list"><div class="empty">Loading…</div></div>
+    </div>
+  `)
+  );
   const listEl = host.querySelector('#bt-audit-list');
   let cursor = null;
   let first = true;
 
+  const openTarget = (target) => {
+    if (!target.handle) return;
+    state.adminUsersOpenHandle = target.handle;
+    state.adminTab = 'users';
+    render();
+  };
+  const openReport = () => {
+    state.adminTab = 'reports';
+    state.repFilter = 'all';
+    render();
+  };
+
   const loadMore = async (moreBtn) => {
     if (moreBtn) moreBtn.disabled = true;
+    if (!moreBtn) {
+      cursor = null;
+      first = true;
+      listEl.replaceChildren(h('<div class="empty">Loading…</div>'));
+    }
     let r;
     try {
-      r = await guard(() => API.adminAudit(cursor));
+      r = await guard(() => API.adminAudit(cursor, state.adminAuditGroup));
     } catch {
       if (moreBtn) moreBtn.disabled = false;
       return;
@@ -3060,22 +3240,28 @@ function adminAuditSection(host) {
     }
     if (moreBtn) moreBtn.remove();
     if (!r.entries.length && !listEl.children.length) {
-      listEl.appendChild(h('<div class="empty">No moderation actions yet.</div>'));
+      listEl.appendChild(h('<div class="empty">No moderation actions match.</div>'));
     }
     r.entries.forEach((m) => {
-      listEl.appendChild(
-        h(`
+      const row = h(`
         <div class="sp-row">
           <div class="sp-row-left">
-            <div>${esc(ownerName(m.admin))} ${esc(AUDIT_VERBS[m.action] || m.action)} ${esc(
-              ownerName(m.target)
-            )}<div class="sp-row-sub">${esc(timeAgo(m.created_at))}${
-              m.note ? ' — ' + esc(m.note) : ''
-            }</div></div>
+            <div>${esc(ownerName(m.admin))} ${esc(AUDIT_VERBS[m.action] || m.action)}
+              <span${m.target.handle ? ' class="bt-au-inline-link" data-target' : ''}>${esc(
+                ownerName(m.target)
+              )}</span>
+              <div class="sp-row-sub">${esc(timeAgo(m.created_at))}${
+                m.note ? ' — ' + esc(m.note) : ''
+              }${m.report_id ? ' — <span class="bt-au-inline-link" data-report>from a report</span>' : ''}</div>
+            </div>
           </div>
         </div>
-      `)
-      );
+      `);
+      const t = row.querySelector('[data-target]');
+      if (t) t.addEventListener('click', () => openTarget(m.target));
+      const rep = row.querySelector('[data-report]');
+      if (rep) rep.addEventListener('click', openReport);
+      listEl.appendChild(row);
     });
     cursor = r.next_cursor;
     if (cursor) {
@@ -3084,6 +3270,14 @@ function adminAuditSection(host) {
       listEl.appendChild(b);
     }
   };
+
+  on(host, '#bt-aud-group [data-audg]', 'click', (e) => {
+    state.adminAuditGroup = e.currentTarget.dataset.audg;
+    host
+      .querySelectorAll('#bt-aud-group [data-audg]')
+      .forEach((b) => b.classList.toggle('is-sel', b.dataset.audg === state.adminAuditGroup));
+    loadMore();
+  });
 
   loadMore(null);
 }
