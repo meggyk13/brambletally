@@ -899,7 +899,7 @@ const state = {
   projects: [],
   categories: [], // [{id, name, sort_order}]
   filterCategory: 'all', // 'all' | 'none' | a category name
-  homeMode: 'projects', // 'projects' | 'quick' | 'mine'
+  nextMode: 'due', // 'due' | 'quick' | 'mine' — which view Next shows
   quickCap: 30, // minutes ceiling for the Quick tasks list; Infinity = all
   boardMode: 'listings', // 'listings' | 'activity'
   feedFilter: 'all', // 'all' | 'following'
@@ -3348,9 +3348,9 @@ function listingCard(l) {
 function renderBoard(main) {
   main.replaceChildren();
   const modeBar = h(`
-    <div class="bt-home-modes">
-      <button class="bt-home-mode${state.boardMode !== 'activity' ? ' active' : ''}" data-bmode="listings">Listings</button>
-      <button class="bt-home-mode${state.boardMode === 'activity' ? ' active' : ''}" data-bmode="activity">Activity</button>
+    <div class="bt-mode-tabs">
+      <button class="bt-mode-tab${state.boardMode !== 'activity' ? ' active' : ''}" data-bmode="listings">Listings</button>
+      <button class="bt-mode-tab${state.boardMode === 'activity' ? ' active' : ''}" data-bmode="activity">Activity</button>
     </div>
   `);
   const body = h('<div class="bt-board-body"></div>');
@@ -3984,8 +3984,8 @@ function notifNav(n) {
   if (n.subject_type === 'listing' && n.subject_id) return () => openListing(n.subject_id);
   if (n.subject_type === 'step') {
     return () => {
-      state.view = 'home';
-      state.homeMode = 'mine';
+      state.view = 'next';
+      state.nextMode = 'mine';
       renderApp();
     };
   }
@@ -4173,8 +4173,8 @@ async function onRequestLink(e) {
 function header() {
   const nav = [
     ['home', 'Projects'],
-    ['next', 'Next'],
     ['inbox', 'Shuffle'],
+    ['next', 'Next'],
     ['review', 'Review'],
     ['board', 'Board'],
   ];
@@ -4420,30 +4420,6 @@ async function renderHome(main) {
     wrap.appendChild(line);
   }
 
-  const modes = h(`
-    <div class="bt-home-modes">
-      <button class="bt-home-mode${state.homeMode === 'projects' ? ' active' : ''}" data-mode="projects">Projects</button>
-      <button class="bt-home-mode${state.homeMode === 'quick' ? ' active' : ''}" data-mode="quick">Quick tasks</button>
-      <button class="bt-home-mode${state.homeMode === 'mine' ? ' active' : ''}" data-mode="mine">My tasks</button>
-    </div>
-  `);
-  on(modes, '.bt-home-mode', 'click', (e) => {
-    state.homeMode = e.currentTarget.dataset.mode;
-    renderApp();
-  });
-  wrap.appendChild(modes);
-
-  if (state.homeMode === 'quick') {
-    renderQuickTasks(wrap, review);
-    main.replaceChildren(wrap);
-    return;
-  }
-  if (state.homeMode === 'mine') {
-    await renderMyTasks(wrap);
-    main.replaceChildren(wrap);
-    return;
-  }
-
   const catFilters = [['all', 'All']];
   state.categories.forEach((c) => catFilters.push([c.name, c.name]));
   if (projects.some((p) => !p.category)) catFilters.push(['none', UNCATEGORIZED]);
@@ -4527,136 +4503,6 @@ async function renderHome(main) {
   }
 
   main.replaceChildren(wrap);
-}
-
-// "I've got 15 minutes" — open leaf steps that carry a time estimate, across
-// Active + Waiting For, shortest first. Steps with no estimate don't appear.
-function renderQuickTasks(wrap, review) {
-  const caps = [
-    [15, '≤ 15m'],
-    [30, '≤ 30m'],
-    [60, '≤ 1h'],
-    [Infinity, 'All'],
-  ];
-  const capRow = h('<div class="bt-quick-caps"></div>');
-  caps.forEach(([v, label]) => {
-    const b = h(
-      `<button class="bt-quick-cap${state.quickCap === v ? ' active' : ''}">${label}</button>`
-    );
-    b.addEventListener('click', () => {
-      state.quickCap = v;
-      renderApp();
-    });
-    capRow.appendChild(b);
-  });
-  wrap.appendChild(capRow);
-
-  const rows = [];
-  [...(review.active || []), ...(review.waiting || [])].forEach((pr) => {
-    withoutContainers(pr.open_steps || []).forEach((st) => {
-      if (!st.estimate_minutes) return;
-      if (st.estimate_minutes > state.quickCap) return;
-      rows.push({ ...st, projectId: pr.id, projectTitle: pr.title });
-    });
-  });
-  rows.sort(
-    (a, b) =>
-      a.estimate_minutes - b.estimate_minutes ||
-      ((a.due_date || '9') < (b.due_date || '9') ? -1 : 1)
-  );
-
-  if (!rows.length) {
-    wrap.appendChild(
-      h(
-        `<div class="empty">No estimated steps${
-          state.quickCap === Infinity ? '' : ' under that length'
-        }. Add a "time needed" to a step and it shows up here.</div>`
-      )
-    );
-    return;
-  }
-
-  const list = h('<div class="next-wrap"></div>');
-  rows.forEach((r) => {
-    const row = h(`
-      <div class="next-row" data-step="${r.id}">
-        <button class="checkbox" aria-label="Mark done"></button>
-        <div class="next-row-main">
-          <div class="next-row-title">${esc(r.title)}</div>
-          <div class="next-row-sub">${esc(r.projectTitle)} · ~${esc(fmtDuration(r.estimate_minutes))}</div>
-        </div>
-      </div>
-    `);
-    row.querySelector('.next-row-main').addEventListener('click', () => openProject(r.projectId));
-    row.querySelector('.checkbox').addEventListener('click', async (e) => {
-      e.stopPropagation();
-      row.classList.add('done');
-      try {
-        await API.updateStep(r.projectId, r.id, { completed: true });
-      } catch {
-        row.classList.remove('done');
-        toast('Could not update');
-        return;
-      }
-      state.doneThisSession++;
-      setTimeout(() => {
-        row.remove();
-        if (!list.querySelector('.next-row')) renderApp();
-      }, 320);
-    });
-    list.appendChild(row);
-  });
-  wrap.appendChild(list);
-}
-
-// Home "My tasks" — open leaf steps assigned to me across every project.
-async function renderMyTasks(wrap) {
-  let tasks;
-  try {
-    ({ tasks } = await guard(() => API.getTasks()));
-  } catch {
-    return;
-  }
-  if (!tasks.length) {
-    wrap.appendChild(
-      h('<div class="empty">Nothing is assigned to you. Steps you\'re given on shared projects show up here.</div>')
-    );
-    return;
-  }
-  const list = h('<div class="next-wrap"></div>');
-  tasks.forEach((t) => {
-    const tail = [t.due_date ? 'due ' + fmtDate(t.due_date) : '', t.estimate_minutes ? '~' + fmtDuration(t.estimate_minutes) : '']
-      .filter(Boolean)
-      .join(' · ');
-    const row = h(`
-      <div class="next-row" data-step="${t.id}">
-        <button class="checkbox" aria-label="Mark done"></button>
-        <div class="next-row-main">
-          <div class="next-row-title">${crumb(t.title)}</div>
-          <div class="next-row-sub">${esc(t.project_title)}${tail ? ' · ' + esc(tail) : ''}</div>
-        </div>
-      </div>
-    `);
-    row.querySelector('.next-row-main').addEventListener('click', () => openProject(t.project_id));
-    row.querySelector('.checkbox').addEventListener('click', async (e) => {
-      e.stopPropagation();
-      row.classList.add('done');
-      try {
-        await API.updateStep(t.project_id, t.id, { completed: true });
-      } catch {
-        row.classList.remove('done');
-        toast('Could not update');
-        return;
-      }
-      state.doneThisSession++;
-      setTimeout(() => {
-        row.remove();
-        if (!list.querySelector('.next-row')) renderApp();
-      }, 320);
-    });
-    list.appendChild(row);
-  });
-  wrap.appendChild(list);
 }
 
 // The home screen's hero card — "In hand" (docs/design.md 3b-5b). No cover
@@ -6874,12 +6720,167 @@ const NEXT_LINES = [
 ];
 const NICE_WORDS = ['nice', 'yes', 'done', 'boom', 'one down', 'keep going'];
 
+// Next · Quick — "I've got 15 minutes": open leaf steps that carry a time
+// estimate, across Active + Waiting For, shortest first. No estimate, no show.
+function renderQuickTasks(wrap, data) {
+  const caps = [
+    [15, '≤ 15m'],
+    [30, '≤ 30m'],
+    [60, '≤ 1h'],
+    [Infinity, 'All'],
+  ];
+  const capRow = h('<div class="bt-quick-caps"></div>');
+  caps.forEach(([v, label]) => {
+    const b = h(
+      `<button class="bt-quick-cap${state.quickCap === v ? ' active' : ''}">${label}</button>`
+    );
+    b.addEventListener('click', () => {
+      state.quickCap = v;
+      renderApp();
+    });
+    capRow.appendChild(b);
+  });
+  wrap.appendChild(capRow);
+
+  const rows = [];
+  [...(data.active || []), ...(data.waiting || [])].forEach((pr) => {
+    withoutContainers(pr.open_steps || []).forEach((st) => {
+      if (!st.estimate_minutes) return;
+      if (st.estimate_minutes > state.quickCap) return;
+      rows.push({ ...st, projectId: pr.id, projectTitle: pr.title });
+    });
+  });
+  rows.sort(
+    (a, b) =>
+      a.estimate_minutes - b.estimate_minutes ||
+      ((a.due_date || '9') < (b.due_date || '9') ? -1 : 1)
+  );
+
+  if (!rows.length) {
+    wrap.appendChild(
+      h(
+        `<div class="empty">No estimated steps${
+          state.quickCap === Infinity ? '' : ' under that length'
+        }. Add a "time needed" to a step and it shows up here.</div>`
+      )
+    );
+    return;
+  }
+
+  const list = h('<div class="next-wrap"></div>');
+  rows.forEach((r) => {
+    const row = h(`
+      <div class="next-row" data-step="${r.id}">
+        <button class="checkbox" aria-label="Mark done"></button>
+        <div class="next-row-main">
+          <div class="next-row-title">${esc(r.title)}</div>
+          <div class="next-row-sub">${esc(r.projectTitle)} · ~${esc(fmtDuration(r.estimate_minutes))}</div>
+        </div>
+      </div>
+    `);
+    row.querySelector('.next-row-main').addEventListener('click', () => openProject(r.projectId));
+    row.querySelector('.checkbox').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      row.classList.add('done');
+      try {
+        await API.updateStep(r.projectId, r.id, { completed: true });
+      } catch {
+        row.classList.remove('done');
+        toast('Could not update');
+        return;
+      }
+      state.doneThisSession++;
+      setTimeout(() => {
+        row.remove();
+        if (!list.querySelector('.next-row')) renderApp();
+      }, 320);
+    });
+    list.appendChild(row);
+  });
+  wrap.appendChild(list);
+}
+
+// Next · Mine — open leaf steps assigned to me across every project.
+async function renderMyTasks(wrap) {
+  let tasks;
+  try {
+    ({ tasks } = await guard(() => API.getTasks()));
+  } catch {
+    return;
+  }
+  if (!tasks.length) {
+    wrap.appendChild(
+      h('<div class="empty">Nothing is assigned to you. Steps you\'re given on shared projects show up here.</div>')
+    );
+    return;
+  }
+  const list = h('<div class="next-wrap"></div>');
+  tasks.forEach((t) => {
+    const tail = [t.due_date ? 'due ' + fmtDate(t.due_date) : '', t.estimate_minutes ? '~' + fmtDuration(t.estimate_minutes) : '']
+      .filter(Boolean)
+      .join(' · ');
+    const row = h(`
+      <div class="next-row" data-step="${t.id}">
+        <button class="checkbox" aria-label="Mark done"></button>
+        <div class="next-row-main">
+          <div class="next-row-title">${crumb(t.title)}</div>
+          <div class="next-row-sub">${esc(t.project_title)}${tail ? ' · ' + esc(tail) : ''}</div>
+        </div>
+      </div>
+    `);
+    row.querySelector('.next-row-main').addEventListener('click', () => openProject(t.project_id));
+    row.querySelector('.checkbox').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      row.classList.add('done');
+      try {
+        await API.updateStep(t.project_id, t.id, { completed: true });
+      } catch {
+        row.classList.remove('done');
+        toast('Could not update');
+        return;
+      }
+      state.doneThisSession++;
+      setTimeout(() => {
+        row.remove();
+        if (!list.querySelector('.next-row')) renderApp();
+      }, 320);
+    });
+    list.appendChild(row);
+  });
+  wrap.appendChild(list);
+}
+
 async function renderNext(main) {
   main.replaceChildren(h('<div class="empty">Loading…</div>'));
   let data;
   try {
     data = await guard(() => API.review());
   } catch {
+    return;
+  }
+
+  const shell = h('<div></div>');
+  const modes = h(`
+    <div class="bt-mode-tabs">
+      <button class="bt-mode-tab${state.nextMode === 'due' ? ' active' : ''}" data-mode="due">Due</button>
+      <button class="bt-mode-tab${state.nextMode === 'quick' ? ' active' : ''}" data-mode="quick">Quick</button>
+      <button class="bt-mode-tab${state.nextMode === 'mine' ? ' active' : ''}" data-mode="mine">Mine</button>
+    </div>
+  `);
+  on(modes, '.bt-mode-tab', 'click', (e) => {
+    state.nextMode = e.currentTarget.dataset.mode;
+    renderApp();
+  });
+  shell.appendChild(modes);
+
+  if (state.nextMode === 'quick') {
+    renderQuickTasks(shell, data);
+    main.replaceChildren(shell);
+    return;
+  }
+  if (state.nextMode === 'mine') {
+    await renderMyTasks(shell);
+    main.replaceChildren(shell);
     return;
   }
 
@@ -6943,7 +6944,8 @@ async function renderNext(main) {
   };
 
   if (!remaining()) {
-    main.replaceChildren(wrap);
+    shell.appendChild(wrap);
+    main.replaceChildren(shell);
     showEmpty();
     return;
   }
@@ -6989,7 +6991,8 @@ async function renderNext(main) {
     wrap.appendChild(grp);
   });
 
-  main.replaceChildren(wrap);
+  shell.appendChild(wrap);
+  main.replaceChildren(shell);
   updateCount();
 
   function nextRow(s, key) {

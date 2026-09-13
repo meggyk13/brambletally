@@ -2052,14 +2052,14 @@ textarea{resize:vertical;min-height:60px}
   margin: 0 20px 4px; font-size:var(--fs-base); font-weight: 700; color: var(--text);
 }
 
-/* Home: Projects / Quick tasks toggle + the quick list */
-#bt-app .bt-home-modes { display: flex; gap: 6px; margin-bottom: 12px; }
-#bt-app .bt-home-mode {
+/* Shared pill-tab toggle: Next's Due/Quick/Mine, Board's Listings/Activity */
+#bt-app .bt-mode-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+#bt-app .bt-mode-tab {
   background: var(--elevated); border: 1px solid transparent; border-radius:var(--radius);
   padding: 7px 14px; font: inherit; font-size:var(--fs-sm); font-weight: 700;
   color: var(--text-muted); cursor: pointer;
 }
-#bt-app .bt-home-mode.active {
+#bt-app .bt-mode-tab.active {
   color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 #bt-app .bt-quick-caps { display: flex; gap: 6px; margin-bottom: 12px; }

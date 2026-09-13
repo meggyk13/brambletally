@@ -2108,3 +2108,71 @@ tiles under "How it works." `src/pages/index.astro`:
   local (still just "show me another example").
 - Demo card itself de-centered to match the real card's left-aligned layout
   now that it sits in a grid column instead of standing alone.
+
+## Planned: Nav reorder + Next absorbs Quick tasks/My tasks (spec'd 2026-09-13)
+
+Discussion 2026-09-13 mapped every "flat list of open steps across projects"
+surface in the app and found three doing the same underlying job in two
+different places: Home's `Quick tasks` and `My tasks` modes (`state.homeMode`,
+`app.js:4423`) and the top-nav **Next** view — sliced by estimate, by
+assignee, and by due date respectively, but all pulling from the same
+open-leaf-step pool. Decision: consolidate all three into Next; Home's mode
+toggle goes away, back to pure browse. Shuffle is a genuinely different job
+(one-at-a-time gap-filling/triage, not task execution — see
+`worker/api/lib/shuffle.js`) and was already correctly separate. Review is
+spared for now — it does a different job already (full project listing, not a
+task list) but has its own follow-on noted below.
+
+**Nav order (built 2026-09-13):** `header()` (`app.js:4174`) reordered to
+Projects · Shuffle · Next · Review · Board — Shuffle moved up next to Projects
+since it's the highest-traffic entry point (see "Shuffle gets its own landing
+section" above), ahead of the two step-list views.
+
+### Next absorbs Quick tasks + My tasks
+
+- **New `state.nextMode`**, default `'due'` (also `'quick'` | `'mine'`). A
+  small mode-switcher row (reuse the `.bt-home-mode` button styling, renamed
+  generically e.g. `.bt-next-mode`) at the top of `renderNext` (`app.js:6877`):
+  **Due · Quick · Mine**.
+- `'due'` — today's existing bucketed body (Overdue/Today/This week/Later,
+  the nudge line, the "Surprise me" button) — unchanged.
+- `'quick'` — move `renderQuickTasks` (`app.js:4534`) into this section as-is:
+  cap chips (≤15/30/60m/All), estimate-then-due-date sort, flat list. It
+  currently takes `review` as a param from its Home caller's single shared
+  fetch; since it moves under `renderNext`, it fetches its own
+  `API.review()` the same way `renderNext`'s `'due'` branch already does.
+- `'mine'` — move `renderMyTasks` (`app.js:4613`) in the same way; no
+  data-fetch change needed, it already calls `API.getTasks()` itself.
+- `state.quickCap` (`app.js:903`) stays as-is, just now read/written from
+  Next instead of Home.
+- **Home** (`renderHome`, `app.js:4423`): delete the `.bt-home-modes` button
+  row and the two `if (state.homeMode === …)` early-returns
+  (`app.js:4436-4445`). `state.homeMode` itself goes too — nothing else reads
+  it once this lands. Home becomes what it was before Quick tasks/My tasks
+  existed: the hero, due-band, and next-focus banner, then the card grid with
+  its status/category filters.
+- The nudge line and "Surprise me" button stay `'due'`-only — they're
+  specific to that view's voice, not to Quick or Mine.
+
+### Not in this pass
+
+Review keeps its current shape (full Active/Waiting-For listing, grouped by
+project, all open steps inline). The staleness / no-open-steps / "looks done
+but not marked" audit signals discussed the same day are a natural fit for
+making Review earn its nav slot — and notably,
+`worker/api/lib/shuffle.js`'s `fetchCandidates` already computes most of
+them (`project_no_steps`, `project_looks_done`, hours/days since touched) for
+Shuffle's one-at-a-time draw. Reusing that vocabulary as inline badges on
+Review's project cards, instead of inventing a parallel staleness query, is
+the likely shape of that work — but it's a separate spec, not committed here.
+
+### Build order
+
+1. Add `state.nextMode` (replaces `state.homeMode` for these two views) and
+   the mode-switcher row in `renderNext`.
+2. Move `renderQuickTasks` and `renderMyTasks` under Next's `'quick'`/`'mine'`
+   branches; drop their Home call sites.
+3. Strip Home back down: remove the mode row and the two early-returns in
+   `renderHome`.
+4. Verify: Quick tasks' cap-chip state and My tasks' assignee list both still
+   work identically, just reached via Next's switcher instead of Home's.
