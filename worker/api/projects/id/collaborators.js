@@ -151,5 +151,15 @@ export async function onRequestDelete(context) {
     .bind(id, body.userId)
     .run();
 
+  // And any focus time they'd planned here — otherwise it's stuck: they lose
+  // access to the project (404 on requireProject) and the session PATCH/DELETE
+  // routes only let the original planner touch their own session, so no one
+  // could ever clear it (docs/plan.md "Data-integrity hardening pass", B1).
+  await context.env.DB.prepare(
+    'DELETE FROM work_sessions WHERE project_id = ? AND user_id = ?'
+  )
+    .bind(id, body.userId)
+    .run();
+
   return json({ ok: true });
 }

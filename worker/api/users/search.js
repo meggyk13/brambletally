@@ -18,6 +18,7 @@ export async function onRequestGet(context) {
   const { results } = await context.env.DB.prepare(
     `SELECT id, name, display_name, handle FROM users
       WHERE id != ?
+        AND disabled_at IS NULL
         AND (
           (name IS NOT NULL AND lower(name) LIKE ?)
           OR (display_name IS NOT NULL AND lower(display_name) LIKE ?)

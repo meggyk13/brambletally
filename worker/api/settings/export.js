@@ -2,8 +2,10 @@ import { error } from '../lib/http.js';
 import { readNotifPrefs } from '../lib/notif.js';
 
 // GET /api/settings/export — a JSON dump of everything tied to the caller's
-// account: their profile, categories, inbox, and every project they own with
-// its full contents, plus a reference list of projects shared with them.
+// account: their profile (incl. links + interests), categories, inbox,
+// shuffle state, notifications, planned focus sessions, and every project
+// they own with its full contents, plus a reference list of projects shared
+// with them.
 export async function onRequestGet(context) {
   const me = context.data.user;
   if (!me) return error(401, 'Not signed in');
@@ -74,6 +76,40 @@ export async function onRequestGet(context) {
     me.id
   );
 
+  // Not scoped by project ownership like `forOwned` above — a planned focus
+  // session belongs to whoever planned it, on any project they can reach
+  // (owned or shared), so this queries by user_id directly.
+  const workSessions = await all(
+    'SELECT * FROM work_sessions WHERE user_id = ? ORDER BY starts_at',
+    me.id
+  );
+  const userLinks = await all(
+    'SELECT id, platform, value, sort_order FROM user_links WHERE user_id = ? ORDER BY sort_order',
+    me.id
+  );
+  const interests = await all(
+    `SELECT t.slug, t.label FROM user_interests ui
+       JOIN interest_tags t ON t.id = ui.tag_id
+      WHERE ui.user_id = ? ORDER BY t.label`,
+    me.id
+  );
+  const shuffleState = await all(
+    'SELECT box_key, last_shown_at, snoozed_until, dismissed_at FROM shuffle_state WHERE user_id = ?',
+    me.id
+  );
+  const notifications = await all(
+    'SELECT id, type, actor_id, subject_type, subject_id, preview, read_at, created_at FROM notifications WHERE user_id = ? ORDER BY created_at',
+    me.id
+  );
+
+  // avatar_url/timezone/tos_* already live on `me` (session.js's auth SELECT);
+  // calendar_token/created_at don't, since that SELECT stays lean for every
+  // request — a one-off lookup here instead of widening the hot path.
+  const accountRow = await db
+    .prepare('SELECT calendar_token, created_at FROM users WHERE id = ?')
+    .bind(me.id)
+    .first();
+
   const payload = {
     exported_at: new Date().toISOString(),
     account: {
@@ -81,15 +117,26 @@ export async function onRequestGet(context) {
       handle: me.handle,
       display_name: me.display_name,
       name: me.name,
+      avatar_url: me.avatar_url,
       plan: me.plan,
+      timezone: me.timezone,
+      calendar_token: accountRow ? accountRow.calendar_token : null,
+      created_at: accountRow ? accountRow.created_at : null,
+      tos_accepted_at: me.tos_accepted_at,
+      tos_version: me.tos_version,
     },
     profile: {
       bio: profileRow ? profileRow.bio : null,
       pronouns: profileRow ? profileRow.pronouns : null,
       notif_prefs: readNotifPrefs(profileRow && profileRow.notif_prefs),
+      links: userLinks,
+      interests: interests.map((i) => i.label),
     },
     categories,
     inbox,
+    shuffle_state: shuffleState,
+    notifications,
+    work_sessions: workSessions,
     projects,
     shared_with_me: sharedWithMe,
   };

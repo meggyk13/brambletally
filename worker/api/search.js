@@ -37,7 +37,8 @@ export async function onRequestGet(context) {
 
   const steps = (await db.prepare(
     `SELECT s.id, s.title, s.completed, s.due_date, s.project_id, s.parent_step_id,
-            s.estimate_minutes, p.title AS project_title, parent.title AS parent_title
+            (CASE WHEN ${notContainer} THEN s.estimate_minutes ELSE NULL END) AS estimate_minutes,
+            p.title AS project_title, parent.title AS parent_title
        FROM project_steps s
        JOIN projects p ON p.id = s.project_id
        LEFT JOIN project_steps parent ON parent.id = s.parent_step_id

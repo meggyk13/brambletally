@@ -1,5 +1,11 @@
 import { json, error } from './lib/http.js';
 
+// A step with sub-steps is a container whose completion is derived from its
+// children (parentRollupStmt, lib/projects.js) and must not be tallied itself
+// — mirrors worker/api/projects/index.js.
+const NOT_CONTAINER =
+  's.id NOT IN (SELECT parent_step_id FROM project_steps WHERE parent_step_id IS NOT NULL)';
+
 // GET /api/review — the weekly-review payload: every project the user is on
 // with status Active or Waiting For, each with its incomplete steps.
 export async function onRequestGet(context) {
@@ -37,7 +43,8 @@ export async function onRequestGet(context) {
     `SELECT COUNT(*) AS n
        FROM project_steps s
        JOIN project_collaborators pc ON pc.project_id = s.project_id AND pc.user_id = ?
-      WHERE s.completed = 1 AND s.completed_at >= datetime('now', '-7 days')`
+      WHERE s.completed = 1 AND s.completed_at >= datetime('now', '-7 days')
+        AND ${NOT_CONTAINER}`
   ).bind(user.id).first();
 
   return json({

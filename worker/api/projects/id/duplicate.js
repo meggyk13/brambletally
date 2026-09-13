@@ -2,6 +2,18 @@ import { json, error } from '../../lib/http.js';
 import { uuid } from '../../lib/id.js';
 import { requireProject } from '../../lib/projects.js';
 
+// D1 caps how much a single batch can hold; a project built up over many
+// bash-breakdown calls can carry hundreds of steps plus supplies/links, which
+// used to go into one unbounded db.batch(). Chunked, sequential batches avoid
+// that ceiling. Each chunk still commits atomically; only the cross-chunk
+// boundary isn't — see the cleanup-on-failure note below.
+const BATCH_CHUNK = 50;
+async function runChunked(db, stmts) {
+  for (let i = 0; i < stmts.length; i += BATCH_CHUNK) {
+    await db.batch(stmts.slice(i, i + BATCH_CHUNK));
+  }
+}
+
 // POST /api/projects/:id/duplicate — copy a project the caller can see into a
 // new project they own. Copies steps (incl. sub-steps), supplies, and links;
 // resets completion / acquired state. Does NOT copy the journal, collaborators,
@@ -108,7 +120,15 @@ export async function onRequestPost(context) {
     );
   }
 
-  await db.batch(stmts);
+  try {
+    await runChunked(db, stmts);
+  } catch (e) {
+    // The project insert is always in the first chunk, so anything already
+    // committed hangs off newId — cascade it away rather than leave a
+    // half-duplicated project behind.
+    await db.prepare('DELETE FROM projects WHERE id = ?').bind(newId).run().catch(() => {});
+    throw e;
+  }
 
   return json({ id: newId }, { status: 201 });
 }

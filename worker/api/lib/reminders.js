@@ -2,6 +2,11 @@ import { notify } from './notify.js';
 import { readNotifPrefs } from './notif.js';
 import { DEFAULT_TZ } from './constants.js';
 
+// No pagination on the candidate query below — fine at today's scale, but a
+// defensive ceiling so a much larger user base fails loud rather than an
+// unbounded query eventually hitting D1's response-size limit.
+const CANDIDATE_LIMIT = 10000;
+
 // Local calendar date (YYYY-MM-DD) `days` from now, in IANA zone `tz`.
 // en-CA formats as YYYY-MM-DD.
 function localDate(tz, days = 0) {
@@ -34,10 +39,18 @@ export async function runDueReminders(env, ctx) {
         AND p.status IN ('Active', 'Waiting For')
         AND s.id NOT IN (SELECT parent_step_id FROM project_steps WHERE parent_step_id IS NOT NULL)
         AND s.due_date >= date('now', '-2 days')
-        AND s.due_date <= date('now', '+2 days')`
-  ).all();
+        AND s.due_date <= date('now', '+2 days')
+      LIMIT ?`
+  )
+    .bind(CANDIDATE_LIMIT)
+    .all();
 
   if (!rows.length) return { considered: 0, written: 0 };
+  if (rows.length >= CANDIDATE_LIMIT) {
+    console.error(
+      `[brambletally] due reminders: candidate query hit CANDIDATE_LIMIT (${CANDIDATE_LIMIT}) — some due steps may be missing from this run`
+    );
+  }
 
   // owner + editors per project (recipients for unassigned steps)
   const projIds = [...new Set(rows.map((r) => r.project_id))];

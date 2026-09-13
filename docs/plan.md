@@ -1406,3 +1406,244 @@ the router changes — only the nav label (`app.js:3446`,
   probably doesn't need a note yet) — leaning towards **no age gate for v1**,
   since staleness weighting already means a brand-new empty-note step won't
   dominate the draw even though it's eligible.
+
+## Planned: Data-integrity hardening pass (spec'd 2026-09-12)
+
+Full-workflow review, not a response to a specific bug report. Three parallel
+audits (project/task routes, board/social/admin routes, settings/cron/auth
+edges) plus direct review of `account.js` and `callback.js`. Nothing below is
+fixed yet — this section is the findings + proposed approach, ranked by
+severity, for review before building.
+
+The unifying root cause behind most of Critical/High: **`schema.sql`'s
+`users(id)` references are inconsistent about `ON DELETE` behavior**, and the
+two places that delete a `users` row (`account.js`'s hard delete,
+`callback.js`'s anonymous-merge delete) were each written against only the
+columns their author had in mind at the time, not the full column list. Every
+column below has no `ON DELETE` clause (= SQLite `NO ACTION` = the delete
+throws if a referencing row exists): `project_listings.created_by`,
+`contributor_requests.decided_by`, `pending_invites.invited_by`,
+`ownership_transfer_log.from_user_id`/`to_user_id`, `project_journal.user_id`,
+`moderation_actions.admin_id`, `reports.resolved_by`.
+
+### A. Critical
+
+**A1. `DELETE /api/account` throws for most active users, not just edge
+cases — fixed 2026-09-12 (decision: reassign-and-delete).**
+(`worker/api/account.js:9-35`). It only refuses deletion if you currently
+*own* a project with other collaborators — it never reassigns or checks the
+seven no-cascade columns above. Confirmed reachable through the
+ordinary board flow, not just admin actions: list a project → accept a
+helper's request (`decided_by` = you) → transfer the project to them (you
+drop to editor, `ownership_transfer_log.from_user_id` = you) → your account
+is now undeletable, and D1 returns a raw constraint error (500) instead of
+any explanation. Same trap from ever inviting a collaborator, journaling on a
+project you don't own, or (if admin) taking any moderation action.
+Confidence: high — reproduced the code path directly against schema.sql.
+
+**Fixed:** new migration `0018_deleted_user_placeholder.sql` inserts a
+permanent, never-logs-in `deleted-user` row (`DELETED_USER_ID` in
+`constants.js`) with `disabled_at` pre-set, so every existing `disabled_at IS
+NULL` filter already excludes it as an actor/owner. `account.js` now
+reassigns all seven no-cascade columns onto it in the same batch as the
+`DELETE`, mirroring `mergeAnonymousInto`. The existing "refuse if you own a
+shared project" guard is unchanged — that one protects *other people's*
+access to a still-live shared project, a different concern from the
+FK-orphan columns, and reassigning `owner_id` itself was never part of this
+fix. **Must run migration 0018 against prod before this deploys** — the
+`UPDATE ... = 'deleted-user'` reassignments will themselves throw an FK
+violation if that row doesn't exist yet.
+
+**A2. Claiming an anonymous account can permanently fail — fixed 2026-09-12.**
+(`worker/api/auth/callback.js:74-112`, `mergeAnonymousInto`). Reassigns
+owner_id/collaborators/listings/decided_by/invited_by/transfer_log but misses
+`project_journal.user_id` — any anonymous user who wrote a journal entry
+before claiming hits the same FK crash on the merge's final `DELETE FROM
+users`. Worse than A1: the magic-link token's `used_at` is stamped *before*
+the merge runs (`callback.js:19-25`), so the failure burns the link — the
+user is stuck requesting a new one, which fails the same way every time.
+Separately (data loss, not a crash): the merge never reassigns
+`inbox_items`, `categories`, `work_sessions`, `shuffle_state`,
+`user_profiles`, `user_links`, `user_interests`, `follows`, `user_blocks`, or
+`notifications` — these carry `ON DELETE CASCADE`, so they silently vanish
+rather than merging into the target account, with no warning shown anywhere.
+Confidence: high.
+
+**Fixed (the crash):** `mergeAnonymousInto` now reassigns
+`project_journal.user_id` too, so the claim path no longer throws. **Not
+fixed (the data loss):** the cascade-deleted tables above are unchanged —
+merging an anon account still silently drops its inbox/shuffle/profile/social
+data. Left as a follow-up: reassigning all of them mirrors A1's "placeholder
+row" question (should a claim ever silently discard user data, or should
+every one of these get folded in too?), so it's cleaner to settle alongside
+A1 than fix piecemeal.
+
+### B. High — B2-B4 fixed 2026-09-12
+
+**Fixed:** B2 (`requireBoardOk` gate added to listing PATCH, comment PATCH, and
+request-decision PATCH), B3 (digest's `emailed_at` stamp now chunks ids in
+groups of 100 instead of one unbounded `IN (...)`), B4 (feed's listing/comment
+queries now also require the project's *current* owner to be non-disabled,
+matching Board's rule, independent of the original actor's status). C1 (users
+search excludes `disabled_at`) fixed alongside these — see section C.
+
+**B1. Orphaned, unreachable `work_sessions` — fixed 2026-09-12.** Removing a
+collaborator (`worker/api/projects/id/collaborators.js:140-152`, DELETE)
+nulled their step assignments but never touched their planned focus sessions
+on that project. Session mutation was gated on `row.user_id === g.user.id`
+with no owner override (`worker/api/projects/id/sessions/sessionId.js:31,93`),
+so once removed, nobody — not them (404 via `requireProject`), not the
+owner — could ever edit or delete that session again; it kept showing to
+every remaining collaborator indefinitely. Confidence: high.
+
+**Fixed:** collaborator removal now also deletes their `work_sessions` on
+that project (root cause — stops new orphans). `DELETE
+/api/projects/:id/sessions/:sessionId` (not PATCH — editing stays
+planner-only) additionally allows the project owner, as a safety net for any
+row orphaned before this fix shipped.
+
+**B2. Board-sanctioned users can still perform blocked writes — fixed
+2026-09-12.** `requireBoardOk` (the `board_blocked_at` check) was missing on
+three routes that are writes, not reads, contradicting the documented policy
+at `worker/api/lib/board.js:38-47`: editing/reopening a listing
+(`worker/api/board/listingId.js:122-167`, PATCH), editing an existing
+comment (`worker/api/board/listingId/comments/commentId.js:18-37`, PATCH),
+and accepting a pending contributor request — which inserts a real
+`project_collaborators` row
+(`worker/api/board/listingId/requests/requestId.js`). Confidence: high.
+**Fixed:** the gate is now checked at the top of all three.
+
+**B3. Weekly digest can loop forever for one user — fixed 2026-09-12.** The
+digest's `UPDATE notifications SET emailed_at = ... WHERE id IN (...)` bound
+one parameter per unemailed notification with no cap
+(`worker/api/lib/digest.js:73-79`). Past roughly 100 in a week this exceeds
+D1's per-statement bound-parameter limit, the `UPDATE` throws, `emailed_at`
+never gets stamped, and the same notifications re-fetch and re-send in full
+every following Sunday. Confidence: high — parameter-count math is direct,
+D1's limit is documented. **Fixed:** the stamp now runs in chunks of 100 ids.
+
+**B4. Feed and Board disagree on which listings are hidden after a
+transfer — fixed 2026-09-12.** Board filtered by the *current* project
+owner's `disabled_at` (`worker/api/board/index.js:33-34`); Feed filtered by
+the *original listing creator's* `disabled_at`
+(`worker/api/feed/index.js:45-51,66-77`). After an ownership transfer the two
+could disagree in either direction. Confidence: medium-high. **Fixed:** both
+feed sub-queries now also join the project's current owner and require
+`o.disabled_at IS NULL`, on top of the existing actor check — hidden if
+either the actor or the current owner is disabled, matching Board's guarantee
+without dropping the "hide disabled actors' own content" behavior.
+
+### C. Medium
+
+- **C1. Disabled accounts stay searchable — fixed 2026-09-12.**
+  `worker/api/users/search.js` was the one user-listing endpoint with no
+  `disabled_at IS NULL` filter; added.
+- **C2. `GET /api/settings/export` is incomplete — fixed 2026-09-12.** Was
+  missing `work_sessions`, `user_links`, `user_interests`, `shuffle_state`,
+  the user's own `notifications`, and several `users` columns (avatar_url,
+  timezone, calendar_token, created_at, tos_accepted_at/version) — a real
+  completeness gap for a feature whose whole point is "everything tied to my
+  account." All now included.
+- **C3. Weekly review overcounts — fixed 2026-09-12.**
+  `worker/api/review.js:36-41` counted "steps completed this week" over all
+  `project_steps`, without the `NOT_CONTAINER` filter every sibling query
+  uses — a fully-checked-off container (a step split into sub-steps via
+  "bash") added a derived double-count on top of its own children. Filter
+  added.
+- **C4. No idempotency guard on the cron jobs — assessed, not changed.**
+  `digest.js` and `reminders.js` both read-then-later-write with no
+  transaction or unique constraint backing it, so two overlapping runs could
+  in principle both pass the same "not yet sent" check. In practice the risk
+  is lower than the original framing assumed: `worker/index.js`'s
+  `scheduled()` wraps each job in `.catch(e => console.error(...))` before
+  returning, so a thrown error never propagates out of the handler —
+  Cloudflare sees a clean return and won't auto-retry on failure. The
+  remaining exposure is a manual duplicate trigger (dashboard "Trigger now"
+  overlapping the real scheduled run), which is an operational scenario, not
+  a code path. A real fix (claim-before-send, or a unique index on
+  `notifications(user_id, type, subject_id)`) would trade away the
+  deliberate "never stamp `emailed_at` unless a send actually succeeded"
+  guarantee that protects against losing a user's week when Resend isn't
+  configured — not worth that tradeoff for a risk this narrow. Revisit if a
+  real double-send is ever reported.
+- **C5. Notification mode-switch gap — assessed, not changed.** A
+  notification queued while `notif_prefs.mode = 'weekly'` never gets emailed
+  if the user switches mode before the next Sunday — it stops matching the
+  digest's mode filter but is never stamped `emailed_at`. Less serious than
+  first framed, though: `digest.js`'s own SELECT windows on
+  `created_at > datetime('now', '-8 days')`, so the row simply ages out of
+  every future run's candidate set within 8 days — nothing accumulates or
+  loops. The only real gap is switching `weekly` → `immediate` mid-week
+  doesn't retroactively email that week's backlog. Not fixing: retroactively
+  firing emails on a settings change has its own surprise-factor downside (a
+  batch of days-old notifications landing the moment someone changes a
+  preference).
+- **C6. Email-change race — fixed 2026-09-12.** `settings/email.js` and
+  `auth/email-change.js` each pre-check the new address for a clash, but
+  neither check was atomic with the final `UPDATE users SET email = ?`. Two
+  users racing for the same address could both pass their own pre-check; the
+  loser hit the partial unique index and got a raw 500 instead of the
+  intended "email taken" response. **Fixed:** the confirm-side `UPDATE` is
+  now wrapped in try/catch and redirects to `?email=taken` on a constraint
+  violation, same as the pre-check's clash path.
+
+### D. Low — all fixed 2026-09-12
+
+- **D1.** `worker/api/projects/id/duplicate.js:60-109` batched every
+  step/supply/link insert unbounded (previously deferred in the personal-
+  utility-batch review) — real risk only for very large projects (hundreds
+  of steps). **Fixed:** inserts now run as sequential chunks of 50 statements
+  (`BATCH_CHUNK`) instead of one `db.batch()`; a failure partway cascades
+  away whatever had committed under the new project id rather than leaving a
+  half-duplicated project, since chunking trades away the single-transaction
+  atomicity the old unbounded call had.
+- **D2.** `worker/api/search.js:38-50` had no `NOT_CONTAINER` filter, so a
+  step converted into a container via "bash" still showed its old, now-
+  meaningless `estimate_minutes` in search results. **Fixed:** the search
+  query now nulls `estimate_minutes` for container steps (same predicate
+  every sibling query already uses), rather than dropping them from results
+  entirely — finding a container by title/notes is still useful, it just no
+  longer shows a stale number.
+- **D3.** `digest.js`/`reminders.js` queries had no `LIMIT` — fine at current
+  scale, a future scale risk as the user base grows. **Fixed:** both
+  candidate queries now cap at 10,000 rows with a loud `console.error` if the
+  cap is ever hit, so a future overrun fails visibly (some users silently
+  missing one run) rather than the whole cron job failing for everyone via
+  a D1 response-size error. Not full pagination — not worth that complexity
+  at a "years away, if ever" scale — but bounded and observable.
+
+### Open before building
+
+- **A1's fix shape is a real product decision, not just an implementation
+  detail.** Three options, roughly in order of how much they change user-
+  facing behavior:
+  1. **Reassign-and-delete** — mirror what `mergeAnonymousInto` already does:
+     on account deletion, reassign every no-cascade column to some
+     placeholder (needs a permanent "deleted user" system row, since these
+     columns are all `NOT NULL`), then delete. Keeps deletion truly
+     permanent; adds one synthetic row to the schema.
+  2. **Refuse-with-full-check** — extend `account.js`'s existing "refuse if
+     shared" pattern to check all seven relationships, and tell the user
+     exactly what to resolve first (transfer/withdraw/etc.) before they can
+     delete. No schema change, but deletion becomes multi-step for anyone
+     with board/collaboration history — which, per B-audit, is most active
+     users.
+  3. **Soft delete / anonymize in place** — stop hard-deleting the row;
+     instead null out PII (email, name, avatar, handle) and keep the id, so
+     every FK stays valid with zero reassignment logic. Changes the meaning
+     of "delete my account" (the row persists) — worth confirming this is
+     acceptable before building it, especially given `account.js`'s existing
+     comment implies users expect a real delete.
+  Leaning toward **option 1** for consistency with how the anonymous-merge
+  path already works and because it keeps "delete" meaning delete, but this
+  is the one item in this whole spec that's a judgment call rather than a
+  clear bug fix — flag before building.
+- **Whether to fix A2's missing `project_journal` reassignment as part of
+  A1's work** (same placeholder-row mechanism would cover both) or
+  separately/sooner, since A2 is reachable today by anyone using Shuffle's
+  guided-onboarding claim flow.
+- **Build order**, pending the above: A2 alone (journal reassignment, no
+  product decision needed) → A1 (once the approach is picked) → B1-B4 → C1-C6
+  → D1-D3 as time allows. B2-B4 and C1 are independent one-file permission-
+  filter fixes with no schema impact and could land first/fastest if a quick
+  win is wanted before the account-deletion decision is settled.

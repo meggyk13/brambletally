@@ -19,6 +19,11 @@ export const FROM_EMAIL = 'Brambletally <login@brambletally.com>';
 // re-accepts at their next load. Compared against users.tos_version.
 export const TOS_VERSION = '2026-09-07';
 
+// Permanent system row (migration 0018) that DELETE /api/account reassigns
+// the no-cascade users(id) columns onto before hard-deleting the real row —
+// see docs/plan.md "Data-integrity hardening pass", A1.
+export const DELETED_USER_ID = 'deleted-user';
+
 // Fallback zone for a user with no `users.timezone` set (migration 0013).
 // Used to compute "today / tomorrow" for due-date reminders and to render
 // server-side dates. Matches the app's historical implicit default.

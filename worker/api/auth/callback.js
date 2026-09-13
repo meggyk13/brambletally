@@ -68,9 +68,17 @@ export async function onRequestGet(context) {
 // foreign keys at runtime (unlike a `wrangler d1 execute` migration), so every
 // users(id) reference the anon account could plausibly hold — not just
 // projects/collaborators — must move first or the final DELETE fails its
-// constraint check. project_listings/pending_invites/ownership_transfer_log
-// cover what an anonymous owner can create (board listing, invite, transfer);
+// constraint check. project_listings/pending_invites/ownership_transfer_log/
+// project_journal cover what an anonymous account can create (board listing,
+// invite, transfer, journal entry — on a project it owns or collaborates on);
 // magic_links.claim_user_id is the row this very request is processing.
+//
+// Not reassigned, by design: inbox_items, categories, work_sessions,
+// shuffle_state, user_profiles, user_links, user_interests, follows,
+// user_blocks, notifications. These all cascade-delete with the anon row
+// instead of merging (docs/plan.md "Data-integrity hardening pass", A2) —
+// tracked as a follow-up, not blocking this fix, since none of them can make
+// the DELETE itself fail.
 async function mergeAnonymousInto(env, anonId, targetId) {
   await env.DB.batch([
     env.DB.prepare('UPDATE projects SET owner_id = ? WHERE owner_id = ?').bind(targetId, anonId),
@@ -101,6 +109,10 @@ async function mergeAnonymousInto(env, anonId, targetId) {
       'UPDATE ownership_transfer_log SET from_user_id = ? WHERE from_user_id = ?'
     ).bind(targetId, anonId),
     env.DB.prepare('UPDATE ownership_transfer_log SET to_user_id = ? WHERE to_user_id = ?').bind(
+      targetId,
+      anonId
+    ),
+    env.DB.prepare('UPDATE project_journal SET user_id = ? WHERE user_id = ?').bind(
       targetId,
       anonId
     ),

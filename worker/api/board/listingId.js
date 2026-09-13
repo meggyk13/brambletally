@@ -8,6 +8,7 @@ import {
   HELP_WANTED_MAX,
   LISTING_STATUSES,
   fetchUpcomingSteps,
+  requireBoardOk,
   shapeOwner,
   shapeComment,
 } from '../lib/board.js';
@@ -122,6 +123,8 @@ export async function onRequestGet(context) {
 export async function onRequestPatch(context) {
   const me = context.data.user;
   if (!me) return error(401, 'Not signed in');
+  const gate = requireBoardOk(me);
+  if (gate.fail) return gate.fail;
   const { listingId } = context.params;
 
   const listing = await context.env.DB.prepare(

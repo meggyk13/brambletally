@@ -1,5 +1,6 @@
 import { json, error, readJson } from '../../../lib/http.js';
 import { notify } from '../../../lib/notify.js';
+import { requireBoardOk } from '../../../lib/board.js';
 
 async function loadRequest(env, listingId, requestId) {
   return env.DB.prepare(
@@ -19,6 +20,8 @@ async function loadRequest(env, listingId, requestId) {
 export async function onRequestPatch(context) {
   const me = context.data.user;
   if (!me) return error(401, 'Not signed in');
+  const gate = requireBoardOk(me);
+  if (gate.fail) return gate.fail;
   const { listingId, requestId } = context.params;
 
   const body = await readJson(context.request);

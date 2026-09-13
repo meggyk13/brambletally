@@ -16,7 +16,10 @@ const notBlocked = (userCol) =>
 //
 // Reverse-chron board activity, derived at read time from project_listings and
 // listing_comments. Never touches private project activity. Excludes the
-// caller's own events, disabled actors, and anything blocked either direction.
+// caller's own events, disabled actors, anything blocked either direction, and
+// (matching GET /api/board) anything on a project whose CURRENT owner is
+// disabled — actor and owner can diverge after an ownership transfer, so both
+// are checked independently.
 // Each event carries `from_followed` so the client can mark people you follow;
 // ?filter=following narrows to just those.
 export async function onRequestGet(context) {
@@ -49,8 +52,10 @@ export async function onRequestGet(context) {
            FROM project_listings l
            JOIN projects p ON p.id = l.project_id
            JOIN users u ON u.id = l.created_by
+           JOIN users o ON o.id = p.owner_id
           WHERE l.status = 'open'
             AND u.disabled_at IS NULL
+            AND o.disabled_at IS NULL
             AND l.created_by != ?1
             AND ${notBlocked('l.created_by')}
 
@@ -71,9 +76,11 @@ export async function onRequestGet(context) {
            JOIN project_listings l ON l.id = c.listing_id
            JOIN projects p ON p.id = l.project_id
            JOIN users u ON u.id = c.user_id
+           JOIN users o ON o.id = p.owner_id
           WHERE c.deleted_at IS NULL
             AND l.status = 'open'
             AND u.disabled_at IS NULL
+            AND o.disabled_at IS NULL
             AND c.user_id != ?1
             AND ${notBlocked('c.user_id')}
        )

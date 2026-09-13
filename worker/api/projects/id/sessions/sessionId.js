@@ -82,7 +82,10 @@ export async function onRequestPatch(context) {
   return json({ session: shapeSession(updated, g.user.id) });
 }
 
-// DELETE /api/projects/:id/sessions/:sessionId — planner only.
+// DELETE /api/projects/:id/sessions/:sessionId — the planner, or the project
+// owner clearing stray focus time (e.g. left over from before a collaborator
+// was removed — collaborators.js now deletes these going forward, but this
+// keeps any already-orphaned row reachable rather than stuck forever).
 export async function onRequestDelete(context) {
   const { id, sessionId } = context.params;
   const g = await requireProject(context, id, 'viewer');
@@ -90,7 +93,9 @@ export async function onRequestDelete(context) {
 
   const row = await loadSession(context.env, id, sessionId);
   if (!row) return error(404, 'Session not found');
-  if (row.user_id !== g.user.id) return error(403, 'That focus time belongs to someone else');
+  if (row.user_id !== g.user.id && g.role !== 'owner') {
+    return error(403, 'That focus time belongs to someone else');
+  }
 
   await context.env.DB.prepare('DELETE FROM work_sessions WHERE id = ?').bind(sessionId).run();
   return json({ ok: true });

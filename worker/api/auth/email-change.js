@@ -36,9 +36,19 @@ export async function onRequestGet(context) {
     .bind(req.user_id)
     .first();
 
-  await env.DB.prepare('UPDATE users SET email = ? WHERE id = ?')
-    .bind(req.new_email, req.user_id)
-    .run();
+  // The clash check above and this UPDATE aren't atomic — a second request
+  // (another email-change confirm, or a brand-new signup) can still claim
+  // this address in between. Rather than let that throw a raw constraint
+  // error against the partial unique index on users.email, treat it the same
+  // as the pre-check clash.
+  try {
+    await env.DB.prepare('UPDATE users SET email = ? WHERE id = ?')
+      .bind(req.new_email, req.user_id)
+      .run();
+  } catch (e) {
+    console.error('[brambletally] email-change confirm: address claimed concurrently', e);
+    return redirect(`${APP_PATH}?email=taken`);
+  }
 
   if (prior && prior.email && prior.email !== req.new_email) {
     context.waitUntil(

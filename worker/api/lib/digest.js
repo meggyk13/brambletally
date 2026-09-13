@@ -5,6 +5,17 @@ import { appOrigin } from './constants.js';
 
 const MAX_LINES = 12;
 
+// D1/SQLite caps bound parameters per statement at 100 — well below what an
+// active week can produce for one user, so the emailed_at stamp is chunked
+// rather than a single `IN (...)` over every id.
+const STAMP_CHUNK = 100;
+
+// No pagination on the candidate query below — fine at today's scale, but a
+// defensive ceiling so a much larger user base fails loud (one run silently
+// missing some users' digests) rather than an unbounded query eventually
+// hitting D1's response-size limit and failing every user's digest at once.
+const CANDIDATE_LIMIT = 10000;
+
 const escapeHtml = (s) =>
   String(s == null ? '' : s).replace(
     /[&<>"']/g,
@@ -27,8 +38,17 @@ export async function runWeeklyDigest(env) {
       WHERE n.emailed_at IS NULL
         AND u.disabled_at IS NULL
         AND n.created_at > datetime('now', '-8 days')
-      ORDER BY n.user_id, n.created_at DESC`
-  ).all();
+      ORDER BY n.user_id, n.created_at DESC
+      LIMIT ?`
+  )
+    .bind(CANDIDATE_LIMIT)
+    .all();
+
+  if (rows && rows.length >= CANDIDATE_LIMIT) {
+    console.error(
+      `[brambletally] weekly digest: candidate query hit CANDIDATE_LIMIT (${CANDIDATE_LIMIT}) — some users' notifications may be missing from this run`
+    );
+  }
 
   const byUser = new Map();
   for (const r of rows || []) {
@@ -71,12 +91,15 @@ export async function runWeeklyDigest(env) {
     // configured doesn't silently swallow the week's activity.
     if (r && r.ok && !r.skipped) {
       const ids = items.map((it) => it.id);
-      const ph = ids.map(() => '?').join(',');
-      await env.DB.prepare(
-        `UPDATE notifications SET emailed_at = datetime('now') WHERE id IN (${ph})`
-      )
-        .bind(...ids)
-        .run();
+      for (let i = 0; i < ids.length; i += STAMP_CHUNK) {
+        const chunk = ids.slice(i, i + STAMP_CHUNK);
+        const ph = chunk.map(() => '?').join(',');
+        await env.DB.prepare(
+          `UPDATE notifications SET emailed_at = datetime('now') WHERE id IN (${ph})`
+        )
+          .bind(...chunk)
+          .run();
+      }
       sent++;
     }
   }

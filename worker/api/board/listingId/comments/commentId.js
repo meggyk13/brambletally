@@ -1,6 +1,6 @@
 import { json, error, readJson } from '../../../lib/http.js';
 import { trimOrNull } from '../../../lib/validate.js';
-import { COMMENT_MAX } from '../../../lib/board.js';
+import { COMMENT_MAX, requireBoardOk } from '../../../lib/board.js';
 
 async function loadComment(env, listingId, commentId) {
   return env.DB.prepare(
@@ -18,6 +18,8 @@ async function loadComment(env, listingId, commentId) {
 export async function onRequestPatch(context) {
   const me = context.data.user;
   if (!me) return error(401, 'Not signed in');
+  const gate = requireBoardOk(me);
+  if (gate.fail) return gate.fail;
   const { listingId, commentId } = context.params;
 
   const c = await loadComment(context.env, listingId, commentId);
