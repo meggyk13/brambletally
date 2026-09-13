@@ -1008,3 +1008,345 @@ estimate + delete in one place) but is no longer the primary tap target.
   Paid — the print-to-PDF path covers it until then.
 - Revisit the email-frequency **default** (`weekly` → maybe `immediate` for
   some types) once there's real usage data against Resend's daily cap.
+
+## Planned: Guided onboarding + zero-friction account creation (spec'd 2026-09-12)
+
+Today a visitor has to sign in (magic link → check email → click) before
+touching anything. Goal: **"Start your first project"** takes them straight
+into a real, working project — steps, sub-steps, due dates, estimates,
+supplies, links, journal, archive, duplicate, print — with no email at all,
+and the email ask only shows up when they choose to save their work for
+later or invite someone else in. Locked in discussion 2026-09-12.
+
+### A. Simplify project creation, everywhere
+
+Not onboarding-specific — this replaces today's create form for existing
+users too.
+
+- `openProjectForm` (`public/app.js:4076`) splits into a lean **create** path
+  and the existing full **edit** path (opened from a project's `⋯`).
+- Create asks for **Title** + one-tap **category chips** (`Making · Research
+  · Event prep · Household · Admin` — the **A** defaults) instead of the
+  dropdown + manage-categories link. No chip picked = `(none)`, same as today.
+- Status/Deadline/Description/Project notes **drop off the create form**.
+  Status still defaults `Active` server-side (already does). Those fields
+  move to Edit only — nothing users can't already do today, just not asked
+  for before the project exists.
+- Submit goes straight to the project page, same as now.
+
+### B. Anonymous project creation
+
+- **Schema:** `users.email` goes from `UNIQUE NOT NULL` to nullable, with a
+  partial unique index — same pattern as `handle` / `calendar_token`
+  (`schema.sql:11,27`). No other table changes; every project-owned table
+  already cascades from `users.id` (`schema.sql:236,253,287`).
+- **CTA:** "Start your first project" shows a required "I agree to the
+  [Terms](...)" checkbox next to the button (not a separate acceptance
+  screen). Clicking it `POST`s to a new endpoint that creates a `users` row
+  (`email = NULL`, `tos_accepted_at = now`, `tos_version` = current) and a
+  session, then opens straight into the **A** create form.
+- Because `tos_accepted_at` is set at creation, the router's existing
+  `needsTos` gate (`worker/index.js:109`) never triggers for this account —
+  no special-case exemption needed, it just falls out of the ordering.
+- Everything under "projects and steps" works from here on with zero further
+  gating, using the existing owner/collaborator permission checks unchanged.
+
+### C. Claiming the account (adding an email later)
+
+This can't be a plain `UPDATE users SET email = ...`, because whoever clicks
+the emailed link might not be the same browser/device that built the
+project — `callback.js` today has no notion of "which anonymous session
+asked for this link," it just signs in whoever clicks.
+
+- **Schema:** add nullable `magic_links.claim_user_id` (`REFERENCES
+  users(id)`) — set only on a claim request, `NULL` for ordinary
+  login/signup links.
+- **Request:** "Save your project" prompts for an email, sends a magic link
+  as today but stamps `claim_user_id` = the anonymous user's id.
+- **Callback** (`worker/api/auth/callback.js`), when `claim_user_id` is set:
+  - Email has no existing account → `UPDATE users SET email = ...` on the
+    `claim_user_id` row in place. Session signs into that (now-claimed)
+    account.
+  - Email matches an existing account → reassign the anonymous user's
+    `projects.owner_id` and `project_collaborators` rows onto the existing
+    account, delete the anonymous `users` row, session signs into the
+    existing account.
+- Anonymous session stays fully usable while the link is unclicked — nothing
+  blocks on "pending" claim state.
+
+### D. Inviting a collaborator creates their account immediately
+
+Change from today's `pending_invites`-then-wait behavior
+(`worker/api/projects/id/collaborators.js:40-50`): inviting by email that
+has no matching account now creates the account right away instead of
+waiting for that person to sign themselves up.
+
+- On invite: create the `users` row now (`email` set, `tos_accepted_at =
+  NULL` — they still owe their own acceptance), create the
+  `project_collaborators` row now (so the relationship exists immediately),
+  and still insert a `pending_invites` row for attribution — it becomes an
+  audit record (`invited_by`, `created_at`) rather than a gate;
+  `accepted_at` is no longer what creates the collaborator relationship.
+- Immediately generate and email a magic link (reuse `magic_links` +
+  `sendMagicLink`) so the invitee has a working sign-in link right away —
+  no separate "request a link" step for them.
+- `callback.js` needs no change for this path: the `users` row already
+  exists by email, so it signs them straight into a session as normal. The
+  router's `needsTos` gate then blocks everything except the small allowlist,
+  since `tos_accepted_at IS NULL`.
+- `/api/auth/me` (or the 403 body the gate returns) needs to surface invite
+  context when `needs_tos` is true: look up the most recent non-owner
+  `project_collaborators` row for this user, joined to `projects` and the
+  inviter's `users` row, so the client renders **"Meg has invited you to
+  collaborate on "<Project>"! Accept the Terms to continue"** instead of the
+  generic acceptance screen. Accept still goes through the existing
+  `/api/legal/accept`.
+
+### E. Admin visibility
+
+- New Admin tab/section: `users WHERE email IS NULL`, `created_at`, and
+  their project's title, so drop-off is eyeballable.
+- **No purge job yet** — deferred per 2026-09-12 decision; revisit if this
+  list gets long enough to matter. Nothing here depends on retention, so
+  adding a clear-out cron later is additive.
+
+### F. First-project setup tally (the claim trigger)
+
+Decided 2026-09-12, replaces the plain "Save your project" pill. Audience
+note: Brambletally's users skew ADHD/neurodivergent — the design choices
+below (no percentage scoreboard, no countdown, checklist doubles as a guided
+path rather than a nag) are chosen for that audience specifically, not
+generic gamification.
+
+- **Renders only** while `email IS NULL` (the anonymous, unclaimed account).
+  Sits in `detail-topbar` next to Back/Print/Duplicate/Edit, where the pill
+  was going to go.
+- **Visual:** reuse the existing hand-drawn tally-mark component
+  (`tallySvg`/`tallyLabel`, `app.js:36`) instead of a plain progress bar —
+  five tracked items map onto exactly one group-of-five in that renderer, no
+  new visual component needed.
+- **Tracked items, 20% each, in this order** (payoff before bookkeeping):
+  1. Title — auto-checked at creation, so the bar starts at 20%, never 0%.
+  2. At least one step added.
+  3. Category chosen.
+  4. Description added.
+  5. Deadline set.
+- **Every unchecked item is clickable** and jumps to / focuses the
+  corresponding control (description field, deadline picker, category
+  select, the step quick-add row) — the checklist doubles as a guided path
+  through the page rather than a scoreboard to hunt against.
+- Clicking the tally itself at **any** percentage opens the claim-email flow
+  (**C**) — it's motivation, not a lock.
+- **On landing on a freshly-created project, auto-focus the step quick-add
+  box** (same treatment Title gets on the create form, `app.js:4237`) —
+  removes the "notice the empty box" step entirely for item 2.
+- Zero backend change — `title`/`category`/`description`/`deadline`/step
+  count are already loaded on the project page (`b.project`, `b.steps`).
+- Copy stays restrained — short declarative sentences, no quest-log cosplay.
+  The existing candle/quill/basket icon set and the tally marks themselves
+  already carry the gentle-not-corporate tone; don't stack flavor text on
+  top. A one-line toast on the first step added ("First mark made.") is
+  about as far as this goes.
+- **Named tradeoff, accepted:** someone who closes the tab without claiming
+  is genuinely unreachable — no email captured, no re-engagement possible.
+  This is the direct consequence of deferring the purge/funnel-log question
+  (**E**) rather than a new gap; revisit together if it turns out to matter.
+
+### Security note for B
+
+The anonymous-creation endpoint in **B** needs the same Turnstile check
+`request-link.js:19` already requires before any DB write on the login path.
+As spec'd it's a wide-open unauthenticated endpoint that creates a real
+`users` row (cascading to a project) on every hit — add the check so it
+isn't a free-form spam vector. Turnstile is typically invisible to a real
+visitor, so this doesn't reintroduce the friction **B** removes.
+
+### Second gate found for B — the handle prompt
+
+Browser-verified 2026-09-12. Separately from the TOS gate, `app.js:829` —
+`if (state.me.needs_handle) return renderHandlePrompt()` — is a **client-side**
+hard block (no server-side enforcement; `worker/index.js` has no equivalent
+check, only `needs_handle` is exposed for the client to act on). A fresh
+anonymous `users` row has `handle = NULL`, so even after the TOS fix in **B**,
+an anonymous user would land straight into "Pick a handle" instead of their
+project — a second wall we hadn't accounted for. Fix: the same render-gate
+check needs to skip `renderHandlePrompt()` while `email IS NULL`, deferring
+handle selection to the same moment as claiming the email (**C**) or accepting
+an invite (**D**) — a handle is a social/sharing concept, so it belongs with
+the rest of the identity-creation step, not before it.
+
+### Open before building
+
+- Whether the invite email template needs new copy vs. reusing the existing
+  magic-link email with an "invited by X" line.
+- Exact copy for the ToS checkbox on the "Start your first project" CTA.
+
+## Planned: Shuffle — the Inbox rebrand (spec'd 2026-09-12)
+
+Today's Inbox (`renderInbox`, `public/app.js:5544`) is just a capture box plus
+a flat list of raw text (`inbox_items`, `schema.sql:357`). This turns it into
+the place you go when you have a spare ten minutes and want to make some kind
+of progress without deciding what to work on first — a Contactually
+"bucket game" for everything outstanding across the app, not just raw
+captures. Locked in discussion 2026-09-12:
+
+- **Mechanic:** one card at a time, not a list. Draw a card, resolve it (or
+  skip it, or mark it not applicable), the next one appears. No "browse
+  everything" mode for v1.
+- **Session bounds:** open-ended. No timer, no fixed count — you stop by
+  navigating away. This is why there's no explicit "end session" control
+  anywhere below.
+- **Draw order:** weighted random, not a strict queue. Recently-touched
+  projects with outstanding boxes are much likelier to come up, but nothing
+  is ever fully buried — anything not shown in a while gets a rising boost
+  until it surfaces.
+- **Naming:** renaming the nav tab from "Inbox" to **Shuffle** (confidence:
+  high — names the actual mechanic, avoids GTD jargon per the house copy
+  rule, and there's no installed base to retrain). The capture textarea moves
+  inside this same view rather than losing it. If "Shuffle" reads wrong once
+  it's on screen, it's a one-line label change (`app.js:3446`) — nothing else
+  depends on the string.
+
+### A. What counts as a "box"
+
+Seven kinds, each a single outstanding gap with one obvious resolving action.
+Deliberately not "any empty field anywhere" — every kind below traces back to
+something on your list (categorize / deadlines / missing info / add steps /
+convert inbox items / next-step notes), plus one bonus kind (`looks_done`)
+that fell out of the same query for free. Flag in review if `looks_done`
+isn't wanted — it's the one kind you didn't ask for directly.
+
+| kind | candidates | excluded |
+|---|---|---|
+| `inbox_unsorted` | every `inbox_items` row | — |
+| `project_no_category` | `category IS NULL` | `status = 'Done'` |
+| `project_no_deadline` | `deadline IS NULL` | `status NOT IN ('Active','Waiting For')` |
+| `project_no_description` | `description IS NULL OR description = ''` | `status = 'Done'` |
+| `project_no_steps` | leaf `step_count = 0` | `status != 'Active'` |
+| `project_next_step_no_note` | the single earliest open leaf step (by `sort_order`) has `notes IS NULL OR notes = ''` | `status != 'Active'` |
+| `project_looks_done` | `step_count > 0 AND step_done = step_count` | `status != 'Active'` |
+
+All project-scoped kinds are further scoped to projects where the signed-in
+user is `owner` or `editor` (same cut `openAssignStep` already uses,
+`app.js:5622`) — a viewer can't act on any of these anyway.
+
+### B. Schema — migration `0015_shuffle.sql`
+
+One small table. Recency for the weighting comes from data that already
+exists (`projects.updated_at`, kept current by every child write via
+`touchStmt`, `worker/api/lib/projects.js:28`; `inbox_items.created_at`) — the
+only new state is "when did the shuffle last show this box, and did the user
+ask to skip or hide it."
+
+```sql
+CREATE TABLE shuffle_state (
+  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  box_key       TEXT NOT NULL,       -- '<kind>:<object_id>', e.g. 'project_no_category:abc123'
+  last_shown_at TEXT,                -- NULL = never drawn
+  snoozed_until TEXT,                -- set by "skip" — hidden until this passes
+  dismissed_at  TEXT,                -- set by "not applicable" — hidden forever
+  PRIMARY KEY (user_id, box_key)
+);
+CREATE INDEX idx_shuffle_state_user ON shuffle_state(user_id);
+```
+
+No FK on the object half of `box_key` — it's a loose reference by design (a
+project or step can be deleted; the row just becomes inert and stops
+matching any candidate query, same pattern as `reports.target_id`,
+`schema.sql:158`).
+
+### C. Draw endpoint — `GET /api/shuffle/next`
+
+New file `worker/api/shuffle/next.js`, registered in `worker/routes.js`
+next to the inbox routes (`routes.js:108`).
+
+1. Run the seven candidate queries from **A**, each scoped to the signed-in
+   user, `LEFT JOIN shuffle_state` to pull `last_shown_at`/`snoozed_until`/
+   `dismissed_at`, filtering out `dismissed_at IS NOT NULL` and
+   `snoozed_until > datetime('now')`.
+2. If nothing comes back: `{ card: null }` — the empty state.
+3. Otherwise score every candidate:
+   - `recency = 1 / (1 + hoursSince(anchorTs) / 48)` — `anchorTs` is
+     `projects.updated_at` for project-scoped kinds, `inbox_items.created_at`
+     for `inbox_unsorted`. Recent ≈ 1, ~2-day half-life.
+   - `staleness = last_shown_at IS NULL ? 3 : min(daysSince(last_shown_at) / 7, 3)`
+     — never-shown items get the max boost immediately; anything else climbs
+     back to that same ceiling over a week.
+   - `weight = recency + staleness`.
+4. Weighted-random pick (cumulative weights + one `Math.random()`).
+5. Upsert `shuffle_state` for the picked `box_key`:
+   `last_shown_at = datetime('now')` (insert if the row didn't exist).
+6. Return `{ card: { box_key, kind, project: {...}, step: {...} | null,
+   inbox_item: {...} | null } }` — just the fields the card UI needs (title,
+   category, deadline, description, step title/notes, inbox text), not a
+   full project bundle.
+
+### D. Resolve, skip, dismiss
+
+No new endpoints for *resolving* — every action in the table below already
+exists:
+
+| kind | resolving action | existing endpoint |
+|---|---|---|
+| `inbox_unsorted` | → Project | `openProjectForm` flow, `app.js:5589` |
+| `inbox_unsorted` | → Step in… | `openAssignStep`, `app.js:5615` |
+| `inbox_unsorted` | Delete | `API.deleteInbox`, `app.js:302` |
+| `project_no_category` | pick a category chip | `PATCH /api/projects/:id` (`category`) |
+| `project_no_deadline` | pick a date | `PATCH /api/projects/:id` (`deadline`) |
+| `project_no_description` | write a line | `PATCH /api/projects/:id` (`description`) |
+| `project_no_steps` | quick-add a step | `POST /api/projects/:id/steps` |
+| `project_next_step_no_note` | write a note | `PATCH /api/projects/:id/steps/:stepId` (`notes`) |
+| `project_looks_done` | Mark Done / add another step | `PATCH /api/projects/:id` (`status`) or the step endpoint above |
+
+Two new tiny endpoints for the other two outcomes, both upserts against
+`shuffle_state`, both `{ box_key }` in the body (not the URL — `box_key`
+contains colons):
+
+- `POST /api/shuffle/skip` → `snoozed_until = datetime('now', '+3 days')`.
+- `POST /api/shuffle/dismiss` → `dismissed_at = datetime('now')`.
+
+The client calls the matching resolve action (or skip/dismiss), then
+immediately calls `/api/shuffle/next` again — that's the whole "shuffle"
+feel, no separate "next" button needed on a successful resolve.
+
+### E. Frontend — `renderInbox` becomes the Shuffle view
+
+Same view key (`state.view === 'inbox'`, `app.js:3562`) so nothing else in
+the router changes — only the nav label (`app.js:3446`,
+`['inbox', 'Inbox']` → `['inbox', 'Shuffle']`) and the function body.
+
+- Capture box stays at the top, unchanged (including the just-added
+  multi-line paste-to-add-many behavior).
+- Below it, one card at a time:
+  - A one-line context header: the project title (linking to
+    `openProject`) for project-scoped kinds, or "Captured" for
+    `inbox_unsorted`.
+  - Kind-specific prompt copy + inline control (category chips reused from
+    the **A** create-form work above; a native date input; a textarea; the
+    existing step quick-add row; two buttons for `looks_done`).
+  - Action row: primary resolve button, **Skip**, **Not applicable**. Every
+    action re-draws immediately on success.
+  - Empty state (`card: null`): reuse `emptyVine()` — "Nothing outstanding
+    right now."
+- Auto-draw the first card on entering the view — no "shuffle" button to
+  click first.
+
+### F. What this replaces vs. leaves alone
+
+- The Review tab (`renderReview`, `app.js:5957`) stays exactly as is — it's a
+  passive weekly-review listing, not an interactive tool. Shuffle and Review
+  answer different questions ("what needs attention right now" vs. "here's
+  everything Active, read through it").
+- Nothing about `project_next_step_no_note` touches `estimate_minutes` or
+  `due_date` on steps — those stay out of scope for v1. Easy to add as an
+  eighth kind later if it turns out to matter.
+
+### Open before building
+
+- Exact prompt copy per kind (e.g. what `project_looks_done` says) — short
+  declarative sentences, no quest-log framing, per the usual house style.
+- Whether `project_next_step_no_note` should also require the step be older
+  than some minimum age before it counts (a step added five minutes ago
+  probably doesn't need a note yet) — leaning towards **no age gate for v1**,
+  since staleness weighting already means a brand-new empty-note step won't
+  dominate the draw even though it's eligible.

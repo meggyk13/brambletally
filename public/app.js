@@ -301,6 +301,11 @@ const API = {
   addInbox: (text) => api('/api/inbox', { method: 'POST', body: { text } }),
   deleteInbox: (id) => api('/api/inbox/' + id, { method: 'DELETE' }),
 
+  shuffleNext: () => api('/api/shuffle/next'),
+  shuffleSkip: (boxKey) => api('/api/shuffle/skip', { method: 'POST', body: { box_key: boxKey } }),
+  shuffleDismiss: (boxKey) =>
+    api('/api/shuffle/dismiss', { method: 'POST', body: { box_key: boxKey } }),
+
   review: () => api('/api/review'),
   search: (q) => api('/api/search?q=' + encodeURIComponent(q)),
 
@@ -3443,7 +3448,7 @@ function header() {
   const nav = [
     ['home', 'Projects'],
     ['next', 'Next'],
-    ['inbox', 'Inbox'],
+    ['inbox', 'Shuffle'],
     ['review', 'Review'],
     ['board', 'Board'],
   ];
@@ -3753,7 +3758,7 @@ async function renderHome(main) {
 
   if (!list.length) {
     const msg = !projects.length
-      ? 'No projects yet. Start one, or capture a thought in the Inbox first.'
+      ? 'No projects yet. Start one, or capture a thought in Shuffle first.'
       : `Nothing ${
           state.filterCategory !== 'all' && state.filterCategory !== 'none'
             ? 'in ' + esc(state.filterCategory)
@@ -5540,71 +5545,239 @@ function timelinePanel(b, canEdit) {
   return wrap;
 }
 
-// ── Inbox ──────────────────────────────────────────────────────────────────
-async function renderInbox(main) {
-  main.replaceChildren(h('<div class="empty">Loading…</div>'));
-  let items;
-  try {
-    ({ items } = await guard(() => API.listInbox()));
-  } catch {
-    return;
+// ── Shuffle (formerly Inbox) ─────────────────────────────────────────────────
+// One outstanding "box" at a time, weighted towards recently-touched projects
+// but eventually covering everything. See docs/plan.md, "Planned: Shuffle —
+// the Inbox rebrand". The capture box below is the one thing carried over
+// unchanged from the old Inbox.
+const SHUFFLE_PROMPT = {
+  inbox_unsorted: 'What should this become?',
+  project_no_category: 'No category yet.',
+  project_no_deadline: 'No deadline set.',
+  project_no_description: 'No description yet.',
+  project_no_steps: "What's the first step?",
+  project_next_step_no_note: "What's the next action?",
+  project_looks_done: 'Every step is checked off.',
+};
+
+// Skip ("not now") is always offered; dismiss ("not applicable") is not
+// offered for inbox_unsorted since Delete already covers that outcome.
+function shuffleFooter(boxKey, onResolved, primaryButtons, { dismiss = true } = {}) {
+  const row = h('<div class="shuffle-actions"></div>');
+  primaryButtons.forEach((btn) => row.appendChild(btn));
+  const skip = h('<button type="button" class="btn-sm btn-sm-ghost">Skip</button>');
+  skip.addEventListener('click', async () => {
+    try {
+      await guard(() => API.shuffleSkip(boxKey));
+    } catch {
+      return;
+    }
+    onResolved();
+  });
+  row.appendChild(skip);
+  if (dismiss) {
+    const na = h('<button type="button" class="btn-sm btn-sm-ghost">Not applicable</button>');
+    na.addEventListener('click', async () => {
+      try {
+        await guard(() => API.shuffleDismiss(boxKey));
+      } catch {
+        return;
+      }
+      onResolved();
+    });
+    row.appendChild(na);
+  }
+  return row;
+}
+
+function renderShuffleCard(card, onResolved) {
+  const { box_key: boxKey, kind, project, step, inbox_item: inboxItem } = card;
+  const wrap = h('<div class="card shuffle-card"></div>');
+
+  const head = h('<div class="shuffle-card-head"></div>');
+  if (project) {
+    const link = h(`<a class="shuffle-card-project" href="#">${esc(project.title)}</a>`);
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      openProject(project.id);
+    });
+    head.appendChild(link);
+  } else {
+    head.appendChild(h('<div class="shuffle-card-project">Captured</div>'));
+  }
+  wrap.appendChild(head);
+  wrap.appendChild(h(`<div class="shuffle-card-prompt">${esc(SHUFFLE_PROMPT[kind] || '')}</div>`));
+
+  const body = h('<div class="shuffle-card-body"></div>');
+  wrap.appendChild(body);
+
+  let footer;
+
+  if (kind === 'inbox_unsorted') {
+    body.appendChild(h(`<div class="pickup-box">${esc(inboxItem.text)}</div>`));
+    const toProj = h('<button type="button" class="btn-sm btn-sm-sage">→ Project</button>');
+    const toStep = h('<button type="button" class="btn-sm btn-sm-ghost">→ Step in…</button>');
+    const del = h('<button type="button" class="btn-sm btn-sm-ghost">Delete</button>');
+    // → Project opens a modal and navigates away on submit — nothing to
+    // redraw here unless it's cancelled, in which case the card stays put.
+    toProj.addEventListener('click', () => {
+      openProjectForm(null, { prefillTitle: inboxItem.text, onCreate: () => API.deleteInbox(inboxItem.id) });
+    });
+    toStep.addEventListener('click', () => {
+      openAssignStep(inboxItem.text, async () => {
+        await guard(() => API.deleteInbox(inboxItem.id));
+        onResolved();
+      });
+    });
+    del.addEventListener('click', async () => {
+      try {
+        await guard(() => API.deleteInbox(inboxItem.id));
+      } catch {
+        return;
+      }
+      onResolved();
+    });
+    footer = shuffleFooter(boxKey, onResolved, [toProj, toStep, del], { dismiss: false });
+  } else if (kind === 'project_no_category') {
+    const sel = h(`
+      <select class="sp-select">
+        <option value="">+ category</option>
+        ${state.categories.map((c) => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}
+        <option value="__new">＋ New category…</option>
+      </select>
+    `);
+    body.appendChild(sel);
+    const save = h('<button type="button" class="btn-sm btn-sm-sage">Save</button>');
+    save.addEventListener('click', async () => {
+      let category = sel.value;
+      if (category === '__new') {
+        const name = await btPrompt('New category');
+        if (!name) return;
+        try {
+          category = (await guard(() => API.createCategory(name))).category.name;
+          await loadCategories();
+        } catch {
+          return;
+        }
+      }
+      try {
+        await guard(() => API.updateProject(project.id, { category: category || null }));
+      } catch {
+        return;
+      }
+      onResolved();
+    });
+    footer = shuffleFooter(boxKey, onResolved, [save]);
+  } else if (kind === 'project_no_deadline') {
+    const input = h('<input type="date" class="sp-input" />');
+    body.appendChild(input);
+    const save = h('<button type="button" class="btn-sm btn-sm-sage">Save</button>');
+    save.addEventListener('click', async () => {
+      if (!input.value) return toast('Pick a date first');
+      try {
+        await guard(() => API.updateProject(project.id, { deadline: input.value }));
+      } catch {
+        return;
+      }
+      onResolved();
+    });
+    footer = shuffleFooter(boxKey, onResolved, [save]);
+  } else if (kind === 'project_no_description') {
+    const ta = h('<textarea class="sp-input" rows="3" placeholder="Add a description"></textarea>');
+    body.appendChild(ta);
+    const save = h('<button type="button" class="btn-sm btn-sm-sage">Save</button>');
+    save.addEventListener('click', async () => {
+      const text = ta.value.trim();
+      if (!text) return;
+      try {
+        await guard(() => API.updateProject(project.id, { description: text }));
+      } catch {
+        return;
+      }
+      onResolved();
+    });
+    footer = shuffleFooter(boxKey, onResolved, [save]);
+  } else if (kind === 'project_no_steps') {
+    body.appendChild(quickAddRow({ project: { id: project.id } }, async () => onResolved()));
+    footer = shuffleFooter(boxKey, onResolved, []);
+  } else if (kind === 'project_next_step_no_note') {
+    body.appendChild(h(`<div class="check-sub" style="margin-bottom:6px">${esc(step.title)}</div>`));
+    const ta = h('<textarea class="sp-input" rows="3" placeholder="What\'s the next action?"></textarea>');
+    body.appendChild(ta);
+    const save = h('<button type="button" class="btn-sm btn-sm-sage">Save</button>');
+    save.addEventListener('click', async () => {
+      const text = ta.value.trim();
+      if (!text) return;
+      try {
+        await guard(() => API.updateStep(project.id, step.id, { notes: text }));
+      } catch {
+        return;
+      }
+      onResolved();
+    });
+    footer = shuffleFooter(boxKey, onResolved, [save]);
+  } else if (kind === 'project_looks_done') {
+    body.appendChild(quickAddRow({ project: { id: project.id } }, async () => onResolved()));
+    const markDone = h('<button type="button" class="btn-sm btn-sm-sage">Mark Done</button>');
+    markDone.addEventListener('click', async () => {
+      try {
+        await guard(() => API.updateProject(project.id, { status: 'Done' }));
+      } catch {
+        return;
+      }
+      onResolved();
+    });
+    footer = shuffleFooter(boxKey, onResolved, [markDone]);
   }
 
+  wrap.appendChild(footer);
+  return wrap;
+}
+
+async function renderInbox(main) {
   const wrap = h(`
     <div>
       <div class="journal-add-form">
         <textarea id="bt-inbox-text" rows="2" placeholder="Capture a thought — sort it later"></textarea>
         <div style="margin-top:8px"><button class="btn-sm btn-sm-sage" id="bt-inbox-add">Add</button></div>
       </div>
-      <div id="bt-inbox-list"></div>
+      <div id="bt-shuffle-slot"><div class="empty">Loading…</div></div>
     </div>
   `);
 
-  const listEl = wrap.querySelector('#bt-inbox-list');
-  const paint = (arr) => {
-    listEl.replaceChildren();
-    if (!arr.length) {
-      listEl.appendChild(h(`<div class="empty">${emptyVine()}Inbox is clear.</div>`));
+  const slot = wrap.querySelector('#bt-shuffle-slot');
+  const drawCard = async () => {
+    slot.replaceChildren(h('<div class="empty">Loading…</div>'));
+    let card;
+    try {
+      ({ card } = await guard(() => API.shuffleNext()));
+    } catch {
       return;
     }
-    arr.forEach((it) => {
-      const drop = async () => {
-        await guard(() => API.deleteInbox(it.id));
-        arr = arr.filter((x) => x.id !== it.id);
-        paint(arr);
-      };
-      const row = h(`
-        <div class="inbox-item">
-          <div class="check-title" style="font-weight:400;white-space:pre-wrap">${esc(it.text)}</div>
-          <div class="check-sub">${esc(timeAgo(it.created_at))}</div>
-          <div class="inbox-actions">
-            <button class="btn-sm btn-sm-ghost" data-toproj>→ Project</button>
-            <button class="btn-sm btn-sm-ghost" data-tostep>→ Step in…</button>
-            <button class="btn-sm btn-sm-ghost" data-del>Delete</button>
-          </div>
-        </div>
-      `);
-      on(row, '[data-del]', 'click', drop);
-      on(row, '[data-toproj]', 'click', () => {
-        openProjectForm(null, { prefillTitle: it.text, onCreate: () => API.deleteInbox(it.id) });
-      });
-      on(row, '[data-tostep]', 'click', () => openAssignStep(it.text, drop));
-      listEl.appendChild(row);
-    });
+    slot.replaceChildren(
+      card
+        ? renderShuffleCard(card, drawCard)
+        : h(`<div class="empty">${emptyVine()}Nothing outstanding right now.</div>`)
+    );
   };
 
   on(wrap, '#bt-inbox-add', 'click', async () => {
     const ta = wrap.querySelector('#bt-inbox-text');
-    const text = ta.value.trim();
-    if (!text) return;
-    const { item } = await guard(() => API.addInbox(text));
+    const lines = ta.value.split('\n').map((t) => t.trim()).filter(Boolean);
+    if (!lines.length) return;
+    try {
+      for (const line of lines) await guard(() => API.addInbox(line));
+    } catch {
+      return;
+    }
     ta.value = '';
-    items = [item, ...items];
-    paint(items);
+    toast(lines.length > 1 ? `${lines.length} captured` : 'Captured');
+    drawCard();
   });
 
-  paint(items);
   main.replaceChildren(wrap);
+  await loadCategories();
+  drawCard();
 }
 
 // Pick a project and drop the inbox text in as a step.

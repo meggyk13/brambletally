@@ -1597,11 +1597,26 @@ textarea{resize:vertical;min-height:60px}
   font: inherit; font-weight: 600; cursor: pointer;
 }
 
-/* ── Inbox items ──────────────────────────────────────────────────────────── */
+/* ── Inbox items (search results only — see Shuffle below) ────────────────── */
 #bt-app .inbox-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
 #bt-app .inbox-item:last-child { border-bottom: none; }
 #bt-app .inbox-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 #bt-app .inbox-actions .btn-sm { padding: 5px 10px; font-size:var(--fs-sm); }
+
+/* ── Shuffle ──────────────────────────────────────────────────────────────── */
+#bt-app .shuffle-card { margin-top: 16px; }
+#bt-app .shuffle-card-head { margin-bottom: 6px; }
+#bt-app .shuffle-card-project {
+  font-size: var(--fs-sm); font-weight: 700; color: var(--text-muted);
+  text-decoration: none; text-transform: uppercase; letter-spacing: .06em;
+}
+#bt-app a.shuffle-card-project:hover { color: var(--accent-2); }
+#bt-app .shuffle-card-prompt { font-size: var(--fs-md); font-weight: 600; margin-bottom: 12px; }
+#bt-app .shuffle-card-body { margin-bottom: 14px; }
+#bt-app .shuffle-card-body .sp-select,
+#bt-app .shuffle-card-body .sp-input,
+#bt-app .shuffle-card-body textarea { width: 100%; }
+#bt-app .shuffle-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* ── People / sharing ────────────────────────────────────────────────────── */
 #bt-app .meta-people {
