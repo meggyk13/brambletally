@@ -1068,9 +1068,9 @@ function renderTos() {
       }</p>
       <div class="msg err" id="bt-tos-err" hidden></div>
       <p class="bt-tos-links">
-        <a href="/legal/terms" target="_blank" rel="noopener">Terms of Use</a>
+        <a href="/legal#terms" target="_blank" rel="noopener">Terms of Use</a>
         <span aria-hidden="true">·</span>
-        <a href="/legal/acceptable-use" target="_blank" rel="noopener">Acceptable Use</a>
+        <a href="/legal#acceptable-use" target="_blank" rel="noopener">Acceptable Use</a>
       </p>
       <label class="bt-tos-check">
         <input type="checkbox" id="bt-tos-agree" />
@@ -4079,7 +4079,7 @@ function renderAuth() {
       <div class="msg err" id="bt-anon-err" hidden></div>
       <label class="bt-tos-check">
         <input type="checkbox" id="bt-anon-agree" />
-        <span>I agree to the <a href="/legal/terms" target="_blank" rel="noopener">Terms</a></span>
+        <span>I agree to the <a href="/legal#terms" target="_blank" rel="noopener">Terms</a></span>
       </label>
       <button class="btn-primary" id="bt-anon-start" disabled>Start your first project</button>
 
