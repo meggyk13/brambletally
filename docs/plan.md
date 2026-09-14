@@ -2378,3 +2378,113 @@ rule for everyone:
    badge; a Paused project with no steps shows "No steps yet"; backdate one
    of each past its own threshold (30d Paused, 90d Someday) and confirm the
    "Untouched" badge fires at the right point, not at 14 days.
+
+## Planned: Small magic touches — Shuffle draw, tally flourish, focus timer pass (spec'd 2026-09-13)
+
+Not new features — small motion/visual passes on three places that already
+exist, aimed at making the app feel a little enchanted rather than just
+functional. Three independent pieces, can ship separately.
+
+### Shuffle: card draw-in
+
+`drawCard()` (`app.js:6549`) currently swaps the shuffle card in with a flat
+`slot.replaceChildren(...)`. Add a CSS entrance animation on `.shuffle-card`
+(subtle slide + settle, like a card being dealt) that plays automatically on
+mount — no JS timing needed since the card is fresh DOM every draw.
+`prefers-reduced-motion` gated, matching the flame-flicker convention already
+used for the focus candle.
+
+### Tally: flourish on every 5th mark, not project completion
+
+Correction from the first pass at this idea: the flourish belongs on the
+tally's own group-of-5 closing stroke, not on "project done" — you might
+finish all current steps and then add more before the project is actually
+over, and project-end is a status change, not a tally event anyway.
+
+`tallySvg(done, total, heightPx)` (`app.js:36`) already has a "static for
+now — the draw-in 'cut' animation on check-off is deferred" note (line 33).
+This is that deferred work, scoped to one call site:
+
+- Add an optional `flourishFrom` param. Any group-closing diagonal stroke
+  whose `markIdx` falls in `[flourishFrom, done)` gets `is-flourish` in
+  addition to `is-inked`. Default `flourishFrom = done`, so every other call
+  site (home cards, setup badge) is unaffected — no flourish unless a caller
+  opts in.
+- Add `data-done="${done}"` on the rendered `<svg class="bt-tally">` so a
+  caller can read the previously-rendered count straight off the outgoing DOM
+  node before replacing it, instead of threading state through the render
+  path.
+- **Only the project-detail header tally** (`app.js:5266`, the one right
+  under the description, `leaves.length` steps) gets wired up. This is also
+  the one genuine bug fix in this pass: that tally currently goes stale after
+  checking a step, because `refreshDetail()` (`app.js:5469`) only rebuilds
+  `#bt-panel` and patches `#bt-setup-tally`, never the header tally sitting
+  outside the panel. Give the wrapping div `id="bt-steps-tally"` and add a
+  `refreshStepsTallyBadge()` (same shape as the existing
+  `refreshSetupTallyBadge()`, `app.js:5482`) that reads `data-done` off the
+  current DOM node as `flourishFrom`, then re-renders. Call it from
+  `refreshDetail()` alongside the setup badge patch.
+- CSS: `.bt-tally .is-flourish` — a brief scale pulse + stroke color swing
+  through `--gold`, `transform-box:fill-box` (same technique as
+  `.focus-candle-wax`), reduced-motion gated.
+
+Not touched: the three other `tallySvg` call sites (home card rows, setup
+tally). They're glanced-at summaries, not the moment of the action, so
+there's no "just happened" instant to mark.
+
+### Focus timer: full pass (setup → running → finish)
+
+The candle (`candleSvg()`, `app.js:7431`) is already the centerpiece —
+wax/wick/flame with a `--burn` (0→1) CSS hook driving `scaleY` on the wax.
+This pass polishes it and adds the two transitions, rather than replacing it.
+
+- **`--burn` moves up to the root `<svg class="focus-candle">`.** Currently
+  `running()`'s `tick()` sets it on `#fs-wax` directly (`app.js:7573`); since
+  it's a CSS custom property it inherits to descendants, so setting it once
+  on the svg root instead lets the drip and flame rules below read it too,
+  same as the wax already does.
+- **Flame warms as burn approaches 1** — `.focus-candle-flame` shifts from
+  `--gold` toward a redder ember tone via `color-mix`, keyed off `--burn`.
+  Wordless urgency cue for the last stretch of a session.
+- **A thin smoke wisp**, small curved path near the wick, opacity near 0
+  normally, very slow drift-and-fade loop — reads as "alive," not part of
+  the burn mechanic.
+- **Drips form near the end instead of being fixed from the start** — the
+  existing `.focus-candle-drip` paths (`app.css:1407`) are static/always
+  visible today. Gate their opacity off `--burn` so they only appear past
+  roughly 70% burned (`opacity: clamp(0, calc((var(--burn, 0) - .7) * 10), .55)`).
+- **Ambient glow behind the candle** — a soft radial-gradient on
+  `.focus-candle-wrap`, warmest in dark theme, that grows subtly with
+  `--burn` plus its own slow independent breathing pulse (not tied to burn) —
+  calm, not a productivity-app pulse.
+- **Setup → running transition**: the flame "catches" instead of just
+  appearing. Since `running()` rebuilds the screen fresh each time, this is
+  pure CSS — a short `bt-flame-catch` keyframe (scale/opacity 0→1) that hands
+  off to the existing `bt-flame-flicker` loop via an `animation-delay`
+  matching the catch's duration. No JS change.
+- **Running → finish transition**: the flame gets snuffed instead of the
+  screen hard-cutting. This one needs a small JS change since it has to
+  happen *before* `finish()` replaces the screen's children: add
+  `.is-snuffing` to the flame, wait out a short animation (~300ms), then call
+  `finish()`. Wire both paths that currently call `finish()` directly — the
+  natural end of `tick()` (`app.js:7578`) and the "I'm done" early-finish
+  button (`app.js:7558`) — through this one helper.
+- **Finish screen icon**: swap `icon('leaf', 40)` for `icon('smoke', 40)`
+  (`app.js:7597`). `smoke` already exists in `ICONS` (`app.js:452`) as a
+  snuffed-candle-with-wisp glyph — no new icon needed, and it matches the
+  extinguished moment instead of a leaf that doesn't relate to what just
+  happened.
+
+### Build order
+
+1. Tally: `flourishFrom` param + `data-done` attribute + CSS, then
+   `refreshStepsTallyBadge()` wiring.
+2. Shuffle draw-in CSS (fully independent, smallest piece).
+3. Focus timer: `--burn` root move, flame warm + smoke + gated drips +
+   ambient glow, then the two transitions, then the finish icon swap.
+4. Verify against `wrangler dev`: check off a 5th/10th step and watch the
+   header tally flourish; draw several shuffle cards in a row; run a short
+   (10 min) focus session end-to-end watching for the catch, the drip
+   appearing late, the warming flame, and the snuff into the finish screen
+   with the new icon. Confirm all new animations are inert under
+   `prefers-reduced-motion: reduce`.

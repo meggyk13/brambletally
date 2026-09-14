@@ -30,10 +30,11 @@ function statusPill(status) {
 // ── The tally — replaces the progress bar everywhere (docs/design.md 3b-5a).
 // A notched-stick tally mark: groups of 5, four uprights then a closing
 // diagonal, hand-cut jitter, capped at 20 marks (4 groups) past which the
-// numeral carries the true count. Static for now — the draw-in "cut"
-// animation on check-off is deferred; every render draws the resting state.
+// numeral carries the true count. Every render draws the resting state;
+// callers that want the group-closing "flourish" on a freshly-completed 5th
+// mark pass `flourishFrom` (see the project-detail header tally).
 const TALLY_JITTER = [0.5, -0.4, 0.6, -0.3, 0.2];
-function tallySvg(done, total, heightPx) {
+function tallySvg(done, total, heightPx, flourishFrom = done) {
   if (!total) return '';
   const capped = Math.min(total, 20);
   const drawnDone = Math.min(done, capped);
@@ -59,15 +60,16 @@ function tallySvg(done, total, heightPx) {
     }
     if (isFullGroup) {
       const inked = markIdx < drawnDone;
+      const justInked = inked && markIdx >= flourishFrom;
       parts.push(
         `<path d="M${(baseX - 2).toFixed(2)} 20.5L${(baseX + 23).toFixed(2)} 3.5" class="${
           inked ? 'is-inked' : 'is-ghost'
-        }"/>`
+        }${justInked ? ' is-flourish' : ''}"/>`
       );
       markIdx++;
     }
   }
-  return `<svg class="bt-tally" width="${width}" height="${heightPx}" viewBox="0 0 ${width} 24" fill="none" stroke-linecap="round" stroke-width="2.2" aria-hidden="true">${parts.join(
+  return `<svg class="bt-tally" data-done="${done}" width="${width}" height="${heightPx}" viewBox="0 0 ${width} 24" fill="none" stroke-linecap="round" stroke-width="2.2" aria-hidden="true">${parts.join(
     ''
   )}</svg>`;
 }
@@ -5263,7 +5265,7 @@ function renderProject(app) {
         <div class="pickup-box" id="bt-pickup-box"></div>
         ${
           leaves.length
-            ? `<div class="bt-tally-wrap" style="margin:14px 0">${tallySvg(
+            ? `<div class="bt-tally-wrap" id="bt-steps-tally" style="margin:14px 0">${tallySvg(
                 done,
                 leaves.length,
                 32
@@ -5475,6 +5477,25 @@ async function refreshDetail() {
   const panel = document.getElementById('bt-panel');
   if (panel) renderPanel(panel);
   refreshSetupTallyBadge();
+  refreshStepsTallyBadge();
+}
+
+// Patches the project-detail header's steps tally in place after a
+// panel-only refresh (refreshDetail rebuilds #bt-panel, not the header it
+// lives in — same reason refreshSetupTallyBadge exists). Reads the
+// previously-rendered count straight off the outgoing DOM node so the newly
+// completed group-of-5 mark, if any, gets its `is-flourish` class.
+function refreshStepsTallyBadge() {
+  const wrap = document.getElementById('bt-steps-tally');
+  if (!wrap) return;
+  const b = state.project;
+  const leaves = b.steps.filter((s) => !b.steps.some((o) => o.parent_step_id === s.id));
+  if (!leaves.length) return;
+  const done = leaves.filter((s) => s.completed).length;
+  const prevSvg = wrap.querySelector('.bt-tally');
+  const flourishFrom = prevSvg ? Number(prevSvg.dataset.done) : done;
+  wrap.innerHTML =
+    tallySvg(done, leaves.length, 32, flourishFrom) + tallyLabel(done, leaves.length, 'notched');
 }
 
 // Patches the setup-tally topbar badge in place after a panel-only refresh
@@ -7437,9 +7458,11 @@ const DURATIONS = [10, 25, 45, 60];
 
 let focusTimer = null;
 
-// The candle — replaces the old progress ring (docs/design.md 3b-1). The wax
-// rect reads --burn (0→1) via a CSS scaleY, anchored to its own bottom edge;
-// CANDLE_WAX_HEIGHT is that rect's unscaled height, in the same SVG user
+// The candle — replaces the old progress ring (docs/design.md 3b-1). --burn
+// (0→1) is set on .focus-candle-wrap and inherited down: the wax rect reads
+// it via a CSS scaleY anchored to its own bottom edge, the flame warms
+// toward ember as it climbs, and the drip only opacities in near the end.
+// CANDLE_WAX_HEIGHT is the wax rect's unscaled height, in the same SVG user
 // units the running() tick uses to slide the wick+flame group down in
 // lockstep, so the flame always sits right at the wax's (shrinking) top.
 const CANDLE_WAX_HEIGHT = 80;
@@ -7451,7 +7474,8 @@ function candleSvg() {
       <rect class="focus-candle-wax" id="fs-wax" x="36" y="50" width="28" height="80" rx="3"/>
       <g id="fs-wick-flame">
         <path class="focus-candle-wick" d="M50 50L50 43"/>
-        <path class="focus-candle-flame" d="M50 32.5c2.8 2 2.8 5.1 0 6.9-2.8-1.8-2.8-4.9 0-6.9z"/>
+        <path class="focus-candle-flame" id="fs-flame" d="M50 32.5c2.8 2 2.8 5.1 0 6.9-2.8-1.8-2.8-4.9 0-6.9z"/>
+        <path class="focus-candle-smoke" id="fs-smoke" d="M50 26c1.5-2.5-1.5-4-.3-6.5S48.5 15 50 12.5"/>
       </g>
     </svg>
   `;
@@ -7570,27 +7594,41 @@ function openFocusSession(bundle, opts = {}) {
     on(screen, '#fs-done', 'click', () => {
       clearInterval(focusTimer);
       focusTimer = null;
-      finish(Date.now() - (endsAt - totalMs));
+      snuffAndFinish(Date.now() - (endsAt - totalMs));
     });
 
     const clock = screen.querySelector('#fs-clock');
-    const wax = screen.querySelector('#fs-wax');
+    const candleWrap = screen.querySelector('.focus-candle-wrap');
     const wickFlame = screen.querySelector('#fs-wick-flame');
+    const flame = screen.querySelector('#fs-flame');
+    const smoke = screen.querySelector('#fs-smoke');
+    // The flame going out before the screen swaps to finish() — screen.
+    // replaceChildren happens instantly, so the snuff has to run first and
+    // finish() has to wait for it, rather than being purely CSS like the
+    // setup→running catch (bt-flame-catch, app.css) which plays for free on
+    // fresh DOM.
+    function snuffAndFinish(elapsedMs) {
+      flame.classList.add('is-snuffing');
+      smoke.classList.add('is-rising');
+      setTimeout(() => finish(elapsedMs), 300);
+    }
     const tick = () => {
       const remaining = endsAt - Date.now();
       clock.textContent = mmss(remaining);
-      // --burn (0→1) is the spec'd hook (docs/design.md 3b-1); the wax rect
-      // reads it via a CSS scaleY. The wick+flame group can't ride the same
-      // CSS transform without unit ambiguity between SVG user-units and px,
-      // so its position is set directly here, in lockstep with the same
-      // burn value — both driven by this one tick, nothing new to wind up.
+      // --burn (0→1) is the spec'd hook (docs/design.md 3b-1), set on the
+      // wrap (not the wax rect) so it inherits to the wax's scaleY, the
+      // flame's warm-up color-mix, the drip's late-appearing opacity, and
+      // the ambient glow behind it all — one value, one place. The
+      // wick+flame group can't ride the same CSS transform without unit
+      // ambiguity between SVG user-units and px, so its position is set
+      // directly here, in lockstep with the same burn value.
       const burn = Math.min(1, 1 - remaining / totalMs);
-      wax.style.setProperty('--burn', burn);
+      candleWrap.style.setProperty('--burn', burn);
       wickFlame.setAttribute('transform', `translate(0,${(burn * CANDLE_WAX_HEIGHT).toFixed(2)})`);
       if (remaining <= 0) {
         clearInterval(focusTimer);
         focusTimer = null;
-        finish(totalMs);
+        snuffAndFinish(totalMs);
       }
     };
     if (focusTimer) clearInterval(focusTimer);
@@ -7609,7 +7647,7 @@ function openFocusSession(bundle, opts = {}) {
           <button class="focus-close" aria-label="Close">${icon('close')}</button>
         </div>
         <div class="focus-body focus-body-timer">
-          <div class="focus-finish-emoji">${icon('leaf', 40)}</div>
+          <div class="focus-finish-emoji">${icon('smoke', 40)}</div>
           <div class="focus-finish-headline">Session done</div>
           <div class="focus-finish-time">${mins} minute${mins === 1 ? '' : 's'} on ${esc(sess.projectTitle)}</div>
           <div class="focus-finish-msg">What did you get done?</div>
