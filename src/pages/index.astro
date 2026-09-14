@@ -254,21 +254,16 @@ const canonical = 'https://brambletally.com/';
         font-family: 'IBM Plex Mono', ui-monospace, monospace; text-transform: uppercase;
         letter-spacing: .12em; font-size: .7rem; color: var(--text-muted);
       }
-      .shuffle-demo-edit {
-        font-family: var(--body); font-weight: 600; font-size: .82rem; color: var(--text-sub);
-        background: var(--elevated); border: none; border-radius: 9px;
-        padding: 6px 13px; cursor: pointer; flex-shrink: 0;
-      }
-      .shuffle-demo-edit[hidden] { display: none; }
       .shuffle-demo-prompt { margin: 0; font-family: var(--head); font-weight: 600; color: var(--accent-2); font-size: 1.05rem; }
       .shuffle-demo-title { margin: 0; color: var(--text-sub); font-size: .98rem; }
       .shuffle-demo-title[hidden] { display: none; }
-      .shuffle-demo-category {
+      .shuffle-demo-field {
         background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 9px;
         padding: 7px 10px; font-family: var(--body); font-size: .92rem; color: var(--text);
         cursor: pointer; align-self: flex-start;
       }
-      .shuffle-demo-category[hidden] { display: none; }
+      .shuffle-demo-field[hidden] { display: none; }
+      .shuffle-demo-textarea { width: 100%; resize: vertical; font-family: var(--body); align-self: stretch; box-sizing: border-box; }
       .shuffle-demo-steps {
         margin: 10px 0 0; padding: 0; background: none; border: none;
         font-family: var(--body); font-weight: 600; font-size: .88rem; color: var(--text-muted);
@@ -307,6 +302,16 @@ const canonical = 'https://brambletally.com/';
       }
       .shuffle-demo-skip:hover { color: var(--accent); border-color: var(--accent); }
       .shuffle-demo-skip svg { transform: rotate(-90deg); }
+      .shuffle-demo-secondary {
+        background: none; border: 1px solid var(--border-strong); border-radius: 999px;
+        padding: 8px 16px; font-family: var(--body); font-weight: 600; font-size: .92rem;
+        color: var(--text-sub); cursor: pointer; transition: color .2s, border-color .2s;
+      }
+      .shuffle-demo-secondary:hover { color: var(--accent); border-color: var(--accent); }
+      .shuffle-demo-secondary[hidden] { display: none; }
+      .shuffle-demo-primary:disabled, .shuffle-demo-secondary:disabled, .shuffle-demo-skip:disabled { opacity: .5; cursor: default; }
+      .shuffle-demo-hint { margin: 2px 0 0; font-family: var(--body); font-size: .82rem; color: var(--text-muted); }
+      .shuffle-demo-hint[hidden] { display: none; }
 
       /* ── Section 3: "share" — invite flow diagram ──────────── */
       .flow { display: flex; align-items: flex-start; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 2rem; }
@@ -478,28 +483,31 @@ const canonical = 'https://brambletally.com/';
                 <div class="shuffle-demo-card" id="shuffleDemoCard">
                   <div class="shuffle-demo-head">
                     <div class="shuffle-demo-kicker" id="shuffleDemoKicker">Captured</div>
-                    <button class="shuffle-demo-edit" id="shuffleDemoEdit" type="button" hidden>Edit&hellip;</button>
                   </div>
                   <p class="shuffle-demo-prompt" id="shuffleDemoPrompt">What should this become?</p>
                   <p class="shuffle-demo-title" id="shuffleDemoTitle">&ldquo;Order more elastic before the trim run&rdquo;</p>
-                  <select class="shuffle-demo-category" id="shuffleDemoCategory" hidden>
+                  <select class="shuffle-demo-field" id="shuffleDemoCategory" hidden>
                     <option value="">+ category</option>
                     <option>Making</option>
                     <option>Research</option>
                     <option>Event prep</option>
                     <option>Household</option>
                     <option>Miscellaneous</option>
-                    <option value="__new">&#65291; New category&hellip;</option>
                   </select>
+                  <input class="shuffle-demo-field" id="shuffleDemoDate" type="date" hidden />
+                  <input class="shuffle-demo-field" id="shuffleDemoStepInput" type="text" placeholder="e.g. Order the wool broadcloth" hidden />
+                  <textarea class="shuffle-demo-field shuffle-demo-textarea" id="shuffleDemoTextarea" rows="2" hidden></textarea>
                   <button class="shuffle-demo-steps" id="shuffleDemoSteps" type="button" hidden>Steps</button>
                   <div class="shuffle-demo-steplist" id="shuffleDemoStepList" hidden></div>
                   <div class="shuffle-demo-actions">
                     <button class="shuffle-demo-primary" id="shuffleDemoPrimary" type="button">&rarr; Project</button>
+                    <button class="shuffle-demo-secondary" id="shuffleDemoSecondary" type="button" hidden></button>
                     <button class="shuffle-demo-skip" id="shuffleDemoSkip" type="button">
                       Skip
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
                     </button>
                   </div>
+                  <p class="shuffle-demo-hint" id="shuffleDemoHint" hidden></p>
                 </div>
               </div>
             </div>
@@ -677,14 +685,18 @@ const canonical = 'https://brambletally.com/';
         var checkSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
         var cards = [
           {
-            kicker: 'Captured', prompt: 'What should this become?',
+            kind: 'captured', kicker: 'Captured', prompt: 'What should this become?',
             title: '“Order more elastic before the trim run”',
-            project: false, primary: '→ Project'
+            primary: '→ Project', resolved: 'Nice — that’s a project now.'
           },
           {
-            kicker: 'Solstice feast garb', prompt: 'No deadline set.',
-            title: 'Add one, or leave it open-ended.',
-            project: true, primary: 'Save',
+            kind: 'captured', kicker: 'Captured', prompt: 'What should this become?',
+            title: '“Ask Mara if she still has that spinning wheel”',
+            primary: '→ Project', resolved: 'Filed — go bother Mara.'
+          },
+          {
+            kind: 'deadline', kicker: 'Solstice feast garb', prompt: 'No deadline set.',
+            primary: 'Save',
             steps: [
               { title: 'Order the wool broadcloth', done: true },
               { title: 'Cut the bodice pieces', done: false },
@@ -692,31 +704,76 @@ const canonical = 'https://brambletally.com/';
             ]
           },
           {
-            kicker: 'Herbal tincture research', prompt: 'What’s the first step?',
-            title: 'Break it into something you can start today.',
-            project: true, primary: 'Add step', steps: []
+            kind: 'deadline', kicker: '40th birthday quilt', prompt: 'No deadline set.',
+            primary: 'Save',
+            steps: [
+              { title: 'Piece the top', done: true },
+              { title: 'Baste it', done: false },
+              { title: 'Quilt the border', done: false }
+            ]
           },
           {
-            kicker: 'Repaint the shed', prompt: 'No category yet.',
-            categoryPicker: true,
-            project: true, primary: 'Save',
+            kind: 'steps', kicker: 'Herbal tincture research', prompt: 'What’s the first step?',
+            primary: 'Add step', resolved: 'Added — on the board now.', steps: []
+          },
+          {
+            kind: 'steps', kicker: 'Learn Norse knotwork', prompt: 'What’s the first step?',
+            primary: 'Add step', resolved: 'First knot tied — carry on.', steps: []
+          },
+          {
+            kind: 'category', kicker: 'Repaint the shed', prompt: 'No category yet.',
+            primary: 'Save',
             steps: [
               { title: 'Buy exterior paint', done: false },
               { title: 'Scrape the old paint off the trim', done: false }
             ]
+          },
+          {
+            kind: 'description', kicker: 'Elderflower cordial batch #3', prompt: 'No description yet.',
+            primary: 'Save', resolved: 'Saved — future you says thanks.',
+            steps: [
+              { title: 'Pick the elderflowers', done: true },
+              { title: 'Steep 24 hours', done: false }
+            ]
+          },
+          {
+            kind: 'nextstep', kicker: 'Viking-age tent research',
+            title: 'Talk to the reenactment group about their pattern',
+            prompt: 'What’s the next action?',
+            primary: 'Save', resolved: 'Saved — you’ll remember what you meant.',
+            secondary: '→ New project', secondaryResolved: 'Spun off — it’s its own project now.'
+          },
+          {
+            kind: 'lookdone', kicker: 'Fix the garden gate', prompt: 'Every step is checked off.',
+            primary: 'Mark Done', resolved: 'Marked done — nice work.',
+            steps: [
+              { title: 'Buy new hinges', done: true },
+              { title: 'Swap the hinges', done: true },
+              { title: 'Oil the latch', done: true }
+            ]
           }
         ];
+        // A different order each visit — small touch, keeps repeat visitors
+        // from seeing the exact same four cards every time.
+        for (var s = cards.length - 1; s > 0; s--) {
+          var j = Math.floor(Math.random() * (s + 1));
+          var tmp = cards[s]; cards[s] = cards[j]; cards[j] = tmp;
+        }
         var i = 0;
         var card = document.getElementById('shuffleDemoCard');
         var kicker = document.getElementById('shuffleDemoKicker');
-        var edit = document.getElementById('shuffleDemoEdit');
         var prompt = document.getElementById('shuffleDemoPrompt');
         var title = document.getElementById('shuffleDemoTitle');
         var category = document.getElementById('shuffleDemoCategory');
+        var dateInput = document.getElementById('shuffleDemoDate');
+        var stepInput = document.getElementById('shuffleDemoStepInput');
+        var textarea = document.getElementById('shuffleDemoTextarea');
         var stepsBtn = document.getElementById('shuffleDemoSteps');
         var stepList = document.getElementById('shuffleDemoStepList');
         var primaryBtn = document.getElementById('shuffleDemoPrimary');
+        var secondaryBtn = document.getElementById('shuffleDemoSecondary');
         var skipBtn = document.getElementById('shuffleDemoSkip');
+        var hint = document.getElementById('shuffleDemoHint');
         if (!card || !skipBtn) return;
 
         function renderSteps() {
@@ -745,13 +802,25 @@ const canonical = 'https://brambletally.com/';
           var c = cards[i];
           kicker.textContent = c.kicker;
           prompt.textContent = c.prompt;
+          title.hidden = c.kind !== 'captured' && c.kind !== 'nextstep';
           title.textContent = c.title || '';
-          title.hidden = !!c.categoryPicker;
-          category.hidden = !c.categoryPicker;
+          category.hidden = c.kind !== 'category';
           category.value = '';
+          dateInput.hidden = c.kind !== 'deadline';
+          dateInput.value = '';
+          stepInput.hidden = c.kind !== 'steps';
+          stepInput.value = '';
+          textarea.hidden = c.kind !== 'description' && c.kind !== 'nextstep';
+          textarea.value = '';
+          textarea.placeholder = c.kind === 'nextstep' ? 'e.g. Email them this week' : 'Add a description';
           primaryBtn.textContent = c.primary;
-          edit.hidden = !c.project;
-          stepsBtn.hidden = !c.project;
+          primaryBtn.disabled = false;
+          secondaryBtn.hidden = !c.secondary;
+          secondaryBtn.textContent = c.secondary || '';
+          secondaryBtn.disabled = false;
+          skipBtn.disabled = false;
+          hint.hidden = true;
+          stepsBtn.hidden = c.kind === 'captured' || c.kind === 'nextstep';
           stepsBtn.classList.remove('open');
           stepList.hidden = true;
           renderSteps();
@@ -764,20 +833,58 @@ const canonical = 'https://brambletally.com/';
             card.classList.remove('is-changing');
           }, 160);
         }
+        function showHint(msg) {
+          hint.textContent = msg;
+          hint.hidden = false;
+        }
+        // Resolving a card mirrors the real app: a short confirmation in
+        // place of the prompt, then the next card — instead of bouncing to
+        // signup on every click. "Try it for real" (outside the card) is
+        // the actual conversion path; Skip and the step checkboxes stay
+        // local too, same as before.
+        function resolveCard(message) {
+          primaryBtn.disabled = true;
+          secondaryBtn.disabled = true;
+          skipBtn.disabled = true;
+          hint.hidden = true;
+          prompt.textContent = message;
+          setTimeout(advance, 700);
+        }
         stepsBtn.addEventListener('click', function () {
           var open = stepList.hidden;
           stepList.hidden = !open;
           stepsBtn.classList.toggle('open', open);
         });
-        // Save / Add step / → Project and Edit… are where someone stops
-        // playing with a canned example and means it for real — send them
-        // to account creation instead of just cycling the demo. Skip and the
-        // step checkboxes stay local; those are just "show me another one."
-        function toApp() { window.location.href = '/app'; }
-        primaryBtn.addEventListener('click', toApp);
-        edit.addEventListener('click', toApp);
+        var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        function formatDate(v) {
+          var p = v.split('-');
+          return MONTHS[parseInt(p[1], 10) - 1] + ' ' + parseInt(p[2], 10) + ', ' + p[0];
+        }
+        primaryBtn.addEventListener('click', function () {
+          if (primaryBtn.disabled) return;
+          var c = cards[i];
+          // Deadline and category resolve with what was actually picked —
+          // more convincing than a canned line, and both are safe to drop
+          // into the message (short, from a fixed list or a date picker).
+          if (c.kind === 'deadline') {
+            if (!dateInput.value) return showHint('Pick a date first.');
+            return resolveCard('Sorted — ' + formatDate(dateInput.value) + '.');
+          }
+          if (c.kind === 'category') {
+            if (!category.value) return showHint('Pick a category first.');
+            return resolveCard('Filed under ' + category.value + '.');
+          }
+          if (c.kind === 'steps' && !stepInput.value.trim()) return showHint('Type the first step.');
+          if (c.kind === 'description' && !textarea.value.trim()) return showHint('Type a description first.');
+          if (c.kind === 'nextstep' && !textarea.value.trim()) return showHint('Type the next action first.');
+          resolveCard(c.resolved);
+        });
+        secondaryBtn.addEventListener('click', function () {
+          if (secondaryBtn.disabled) return;
+          resolveCard(cards[i].secondaryResolved || cards[i].resolved);
+        });
         skipBtn.addEventListener('click', advance);
-        renderSteps();
+        render();
       })();
 
       (function () {
