@@ -185,7 +185,7 @@ const API = {
   requestLink: (email, turnstileToken) =>
     api('/api/auth/request-link', { method: 'POST', body: { email, turnstileToken } }),
   startAnonymous: (turnstileToken) =>
-    api('/api/auth/anonymous', { method: 'POST', body: { turnstileToken } }),
+    api('/api/auth/anonymous', { method: 'POST', body: { turnstileToken, agreedTos: true } }),
   claim: (email) => api('/api/auth/claim', { method: 'POST', body: { email } }),
 
   listProjects: (opts = {}) => api('/api/projects' + (opts.archived ? '?archived=1' : '')),
@@ -4065,6 +4065,22 @@ function openNotifPanel(anchorBtn) {
 
 // ── Sign-in ────────────────────────────────────────────────────────────────
 let tsWidgetId = null;
+// Set by Turnstile's own error-callback (e.g. an extension or network policy
+// blocking challenges.cloudflare.com). Only used to pick a better error
+// message after the server rejects a request — never to block submission
+// client-side, since local dev has no secret key configured and accepts an
+// empty token regardless of whether the widget itself loaded.
+let tsLoadFailed = false;
+
+// The server can't tell "no token because Turnstile failed to load" apart
+// from "no token because the check genuinely failed" — both come back as the
+// same generic message. Swap in a more specific one when we know why.
+function explainTurnstileError(message) {
+  if (tsLoadFailed && message === 'Bot check failed. Reload the page and try again.') {
+    return 'Verification could not load — if you have an ad or script blocker, allow challenges.cloudflare.com and try again.';
+  }
+  return message;
+}
 
 function renderAuth() {
   const invalid = new URLSearchParams(location.search).get('auth') === 'invalid';
@@ -4117,7 +4133,7 @@ async function onStartAnonymous() {
   try {
     await API.startAnonymous(token);
   } catch (ex) {
-    err.textContent = ex.message || 'Could not start your project just now.';
+    err.textContent = explainTurnstileError(ex.message) || 'Could not start your project just now.';
     err.hidden = false;
     btn.disabled = false;
     btn.textContent = 'Start your first project';
@@ -4137,8 +4153,15 @@ function mountTurnstile() {
   if (!box) return;
   let tries = 0;
   const tick = () => {
-    if (window.turnstile) tsWidgetId = window.turnstile.render(box, { sitekey: TURNSTILE_SITE_KEY });
-    else if (tries++ < 60) setTimeout(tick, 200);
+    if (window.turnstile) {
+      tsLoadFailed = false;
+      tsWidgetId = window.turnstile.render(box, {
+        sitekey: TURNSTILE_SITE_KEY,
+        'error-callback': () => {
+          tsLoadFailed = true;
+        },
+      });
+    } else if (tries++ < 60) setTimeout(tick, 200);
   };
   tick();
 }
@@ -4160,7 +4183,7 @@ async function onRequestLink(e) {
     ok.hidden = false;
     document.getElementById('bt-auth-form').reset();
   } catch (ex) {
-    err.textContent = ex.message;
+    err.textContent = explainTurnstileError(ex.message);
     err.hidden = false;
   } finally {
     btn.disabled = false;

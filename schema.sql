@@ -22,7 +22,8 @@ CREATE TABLE users (
   disabled_at     TEXT,                    -- hard sanction: router 403s everything but /api/auth/me + logout
   calendar_token  TEXT,                    -- keys the per-user ICS feed (migration 0012); UNIQUE via the partial index below
   timezone        TEXT,                    -- IANA name (migration 0013); NULL falls back to DEFAULT_TZ
-  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  signup_ip       TEXT                     -- creating IP for anonymous accounts only (migration 0019); forensic, unindexed
 );
 CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
 CREATE UNIQUE INDEX idx_users_handle ON users(handle) WHERE handle IS NOT NULL;

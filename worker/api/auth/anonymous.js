@@ -13,6 +13,10 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   const body = await readJson(request);
 
+  // The checkbox on the client only disables the button; without this the
+  // endpoint would stamp tos_accepted_at for anyone who hits it directly.
+  if (!body || body.agreedTos !== true) return error(400, 'You must agree to the Terms first');
+
   const ts = await verifyTurnstile(
     env,
     body && body.turnstileToken,
@@ -22,9 +26,9 @@ export async function onRequestPost(context) {
 
   const id = uuid();
   await env.DB.prepare(
-    `INSERT INTO users (id, tos_accepted_at, tos_version) VALUES (?, datetime('now'), ?)`
+    `INSERT INTO users (id, tos_accepted_at, tos_version, signup_ip) VALUES (?, datetime('now'), ?, ?)`
   )
-    .bind(id, TOS_VERSION)
+    .bind(id, TOS_VERSION, request.headers.get('CF-Connecting-IP'))
     .run();
 
   const session = await createSession(env, id);

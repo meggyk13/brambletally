@@ -7,6 +7,12 @@ import { MAGIC_LINK_TTL_MIN, appOrigin } from '../lib/constants.js';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+// Turnstile proves a human is submitting, not that they control this inbox —
+// nothing else stopped repeatedly re-targeting the same address with sign-in
+// emails. Same rolling-24h count pattern as REQUEST_DAILY_CAP/REPORT_DAILY_CAP
+// (worker/api/lib/board.js) and CLAIM_DAILY_CAP/EMAIL_CHANGE_DAILY_CAP.
+const REQUEST_LINK_DAILY_CAP = 5;
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -18,6 +24,16 @@ export async function onRequestPost(context) {
 
   const ts = await verifyTurnstile(env, body.turnstileToken, request.headers.get('CF-Connecting-IP'));
   if (!ts.ok) return error(400, 'Bot check failed. Reload the page and try again.');
+
+  const recent = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM magic_links
+      WHERE email = ? AND created_at > datetime('now', '-1 day')`
+  )
+    .bind(email)
+    .first();
+  if ((recent.n || 0) >= REQUEST_LINK_DAILY_CAP) {
+    return error(429, "You've requested a lot of sign-in links for this address today. Try again tomorrow.");
+  }
 
   const token = randomToken(32);
   await env.DB.prepare(
