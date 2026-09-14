@@ -1622,6 +1622,10 @@ textarea{resize:vertical;min-height:60px}
 #bt-app .shuffle-card-body .sp-input,
 #bt-app .shuffle-card-body textarea { width: 100%; }
 #bt-app .shuffle-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#bt-app .shuffle-card button:disabled,
+#bt-app .shuffle-card select:disabled,
+#bt-app .shuffle-card input:disabled,
+#bt-app .shuffle-card textarea:disabled { opacity: .5; cursor: default; }
 #bt-app .shuffle-steps { margin-bottom: 14px; }
 #bt-app .shuffle-steps .step-block { margin-top: 8px; }
 

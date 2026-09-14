@@ -6272,7 +6272,9 @@ const SHUFFLE_PROMPT = {
 
 // Skip ("not now") is always offered; dismiss ("not applicable") is not
 // offered for inbox_unsorted since Delete already covers that outcome.
-function shuffleFooter(boxKey, onResolved, primaryButtons, { dismiss = true } = {}) {
+// `resolve(message)` (from renderShuffleCard) flashes a short confirmation
+// in place of the prompt before drawing the next card.
+function shuffleFooter(boxKey, resolve, primaryButtons, { dismiss = true } = {}) {
   const row = h('<div class="shuffle-actions"></div>');
   primaryButtons.forEach((btn) => row.appendChild(btn));
   // A fast double-click (skip, or skip+dismiss together) fired two in-flight
@@ -6291,7 +6293,7 @@ function shuffleFooter(boxKey, onResolved, primaryButtons, { dismiss = true } = 
       busy = false;
       return;
     }
-    onResolved();
+    resolve('Skipped.');
   });
   row.appendChild(skip);
   if (dismiss) {
@@ -6305,7 +6307,7 @@ function shuffleFooter(boxKey, onResolved, primaryButtons, { dismiss = true } = 
         busy = false;
         return;
       }
-      onResolved();
+      resolve('Dismissed.');
     });
     row.appendChild(na);
   }
@@ -6390,10 +6392,23 @@ function renderShuffleCard(card, onResolved) {
     head.appendChild(h('<div class="shuffle-card-project">Captured</div>'));
   }
   wrap.appendChild(head);
-  wrap.appendChild(h(`<div class="shuffle-card-prompt">${esc(SHUFFLE_PROMPT[kind] || '')}</div>`));
+  const promptEl = h(`<div class="shuffle-card-prompt">${esc(SHUFFLE_PROMPT[kind] || '')}</div>`);
+  wrap.appendChild(promptEl);
 
   const body = h('<div class="shuffle-card-body"></div>');
   wrap.appendChild(body);
+
+  // Flash a short confirmation in place of the prompt, then draw the next
+  // card — same resolve-then-advance pacing as the homepage demo, instead
+  // of swapping straight to the next card with no feedback.
+  let resolved = false;
+  const resolve = (message) => {
+    if (resolved) return;
+    resolved = true;
+    promptEl.textContent = message;
+    wrap.querySelectorAll('button, select, input, textarea').forEach((el) => { el.disabled = true; });
+    setTimeout(onResolved, 700);
+  };
 
   let footer;
 
@@ -6410,7 +6425,7 @@ function renderShuffleCard(card, onResolved) {
     toStep.addEventListener('click', () => {
       openAssignStep(inboxItem.text, async () => {
         await guard(() => API.deleteInbox(inboxItem.id));
-        onResolved();
+        resolve('Added as a step.');
       });
     });
     let delBusy = false;
@@ -6423,9 +6438,9 @@ function renderShuffleCard(card, onResolved) {
         delBusy = false;
         return;
       }
-      onResolved();
+      resolve('Deleted.');
     });
-    footer = shuffleFooter(boxKey, onResolved, [toProj, toStep, del], { dismiss: false });
+    footer = shuffleFooter(boxKey, resolve, [toProj, toStep, del], { dismiss: false });
   } else if (kind === 'project_no_category') {
     const sel = h(`
       <select class="sp-select">
@@ -6453,9 +6468,9 @@ function renderShuffleCard(card, onResolved) {
       } catch {
         return;
       }
-      onResolved();
+      resolve(category ? `Filed under ${category}.` : 'Saved.');
     });
-    footer = shuffleFooter(boxKey, onResolved, [save]);
+    footer = shuffleFooter(boxKey, resolve, [save]);
   } else if (kind === 'project_no_deadline') {
     const input = h('<input type="date" class="sp-input" />');
     body.appendChild(input);
@@ -6467,9 +6482,9 @@ function renderShuffleCard(card, onResolved) {
       } catch {
         return;
       }
-      onResolved();
+      resolve(`Sorted — ${fmtDate(input.value)}.`);
     });
-    footer = shuffleFooter(boxKey, onResolved, [save]);
+    footer = shuffleFooter(boxKey, resolve, [save]);
   } else if (kind === 'project_no_description') {
     const ta = h('<textarea class="sp-input" rows="3" placeholder="Add a description"></textarea>');
     body.appendChild(ta);
@@ -6482,12 +6497,12 @@ function renderShuffleCard(card, onResolved) {
       } catch {
         return;
       }
-      onResolved();
+      resolve('Saved.');
     });
-    footer = shuffleFooter(boxKey, onResolved, [save]);
+    footer = shuffleFooter(boxKey, resolve, [save]);
   } else if (kind === 'project_no_steps') {
-    body.appendChild(quickAddRow({ project: { id: project.id } }, async () => onResolved()));
-    footer = shuffleFooter(boxKey, onResolved, []);
+    body.appendChild(quickAddRow({ project: { id: project.id } }, async () => resolve('Added.')));
+    footer = shuffleFooter(boxKey, resolve, []);
   } else if (kind === 'project_next_step_no_note') {
     body.appendChild(h(`<div class="check-sub" style="margin-bottom:6px">${esc(step.title)}</div>`));
     const ta = h('<textarea class="sp-input" rows="3" placeholder="What\'s the next action?"></textarea>');
@@ -6501,7 +6516,7 @@ function renderShuffleCard(card, onResolved) {
       } catch {
         return;
       }
-      onResolved();
+      resolve('Saved.');
     });
     const promote = h('<button type="button" class="btn-sm btn-sm-ghost">→ New project</button>');
     promote.addEventListener('click', async () => {
@@ -6512,11 +6527,11 @@ function renderShuffleCard(card, onResolved) {
       } catch {
         return;
       }
-      onResolved();
+      resolve('Spun off into its own project.');
     });
-    footer = shuffleFooter(boxKey, onResolved, [save, promote]);
+    footer = shuffleFooter(boxKey, resolve, [save, promote]);
   } else if (kind === 'project_looks_done') {
-    body.appendChild(quickAddRow({ project: { id: project.id } }, async () => onResolved()));
+    body.appendChild(quickAddRow({ project: { id: project.id } }, async () => resolve('Added.')));
     const markDone = h('<button type="button" class="btn-sm btn-sm-sage">Mark Done</button>');
     markDone.addEventListener('click', async () => {
       try {
@@ -6524,9 +6539,9 @@ function renderShuffleCard(card, onResolved) {
       } catch {
         return;
       }
-      onResolved();
+      resolve('Marked done.');
     });
-    footer = shuffleFooter(boxKey, onResolved, [markDone]);
+    footer = shuffleFooter(boxKey, resolve, [markDone]);
   }
 
   if (project) wrap.appendChild(shuffleStepsSection(project, canEdit));
